@@ -506,13 +506,68 @@ body {
 @keyframes slideOutRight { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(24px)} }
 
 /* ─── Responsive ─── */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  /* Nav */
   .nav-links { display: none; }
-  .results-stats { grid-template-columns: repeat(3, 1fr); }
+  .nav-username { display: none; }
+  .nav-inner { gap: 12px; }
+
+  /* Hero */
+  .hero-title { letter-spacing: -1px; }
+  .hero-subtitle { margin-bottom: 32px; }
+
+  /* Upload */
+  .upload-card { padding: 20px; }
+  .upload-zone { padding: 28px 16px; }
+  .upload-icon { font-size: 36px; }
+  .upload-title { font-size: 15px; }
+  .type-options { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .type-option-label { padding: 10px 6px; font-size: 12px; gap: 4px; }
+  .type-option-label .type-icon { font-size: 18px; }
+
+  /* Pricing */
+  .pricing-grid { grid-template-columns: 1fr !important; max-width: 400px !important; }
+
+  /* Features */
+  .features-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Modal */
+  .modal { padding: 28px 20px; }
   .modal-actions { flex-direction: column; }
-  .history-grid { grid-template-columns: 1fr; }
-  .upgrade-banner { flex-direction: column; text-align: center; }
+  .modal-actions .btn { width: 100%; justify-content: center; }
+
+  /* Quiz */
+  .quiz-main { padding-top: calc(var(--nav-height) + 66px); padding-bottom: 32px; }
+  .quiz-card { padding: 20px 16px; }
+  .quiz-question { font-size: 16px; margin-bottom: 20px; }
+  .quiz-option { padding: 12px 14px; font-size: 14px; }
+  .ox-options { gap: 12px; }
+  .ox-option { padding: 20px 12px; font-size: 44px; }
   .quiz-actions { flex-direction: column-reverse; }
+  .quiz-actions .btn { width: 100%; justify-content: center; }
+
+  /* Results */
+  .results-wrap { padding-top: calc(var(--nav-height) + 24px); padding-bottom: 40px; }
+  .results-card { padding: 28px 20px; }
+  .results-actions { flex-direction: column; }
+  .results-actions .btn { width: 100%; justify-content: center; }
+  .results-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .results-stat { padding: 12px 8px; }
+  .results-stat-num { font-size: 22px; }
+
+  /* Toast */
+  .toast-container { bottom: 16px; right: 12px; left: 12px; }
+  .toast { min-width: unset; max-width: 100%; width: 100%; }
+
+  /* History */
+  .history-grid { grid-template-columns: 1fr; }
+
+  /* Upgrade Banner */
+  .upgrade-banner { flex-direction: column; text-align: center; }
+
+  /* Footer */
+  .footer { padding: 28px 0; }
+  .footer-links { gap: 16px; }
 }
 
 /* ─── Scrollbar & Selection ─── */

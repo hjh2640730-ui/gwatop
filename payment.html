@@ -11,6 +11,12 @@
     .payment-header h1 { font-size: clamp(28px,5vw,48px); font-weight: 900; letter-spacing: -1px; margin-bottom: 12px; }
     .payment-header p { font-size: 16px; color: var(--text-secondary); }
     .packages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 860px; margin: 0 auto 48px; }
+    @media (max-width: 768px) {
+      .packages-grid { grid-template-columns: 1fr; max-width: 400px; }
+      .payment-page { padding-top: calc(var(--nav-height) + 32px); padding-bottom: 60px; }
+      .payment-header h1 { font-size: 26px; }
+      #referral-section { padding: 24px 16px !important; }
+    }
     .package-card {
       background: var(--glass-bg); border: 2px solid var(--glass-border);
       border-radius: var(--radius-xl); padding: 32px 24px;
