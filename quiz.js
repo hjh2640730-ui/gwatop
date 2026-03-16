@@ -152,10 +152,11 @@ function renderMCQ(q) {
   (q.options || []).forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'quiz-option';
-    const marker = opt.match(/^[①②③④⑤]/) ? opt[0] : String.fromCharCode(9312 + i);
+    const originalMarker = opt.match(/^[①②③④⑤]/) ? opt[0] : String.fromCharCode(9312 + i);
+    const displayMarker = ['A', 'B', 'C', 'D', 'E'][i] || String(i + 1);
     const text = opt.replace(/^[①②③④⑤]\s*/, '').trim();
-    btn.innerHTML = `<span class="option-marker">${marker}</span><span>${text}</span>`;
-    btn.dataset.value = marker;
+    btn.innerHTML = `<span class="option-marker">${displayMarker}</span><span>${text}</span>`;
+    btn.dataset.value = originalMarker;
     btn.addEventListener('click', () => {
       if (answered) return;
       mcqOptions.querySelectorAll('.quiz-option').forEach(b => b.classList.remove('selected'));
