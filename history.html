@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 내 퀴즈 기록</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">📚</div>
+        <span class="nav-logo-text">GWATOP</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">홈</a></li>
+        <li><a href="/history.html" class="active">내 퀴즈</a></li>
+        <li><a href="/#pricing">요금제</a></li>
+      </ul>
+      <div class="nav-right">
+        <div id="nav-auth-logged-out">
+          <button class="btn btn-primary btn-sm" id="nav-login-btn">🔑 구글 로그인</button>
+        </div>
+        <div id="nav-auth-logged-in" class="nav-user" style="display:none">
+          <img class="nav-avatar" id="nav-avatar" src="" alt="avatar" />
+          <span class="nav-username" id="nav-username"></span>
+          <span class="nav-plan-badge free" id="nav-plan-badge">Free</span>
+          <button class="btn btn-ghost btn-sm" id="nav-logout-btn">로그아웃</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <div class="container">
+      <!-- Header -->
+      <div class="history-header">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+          <div>
+            <h1 style="font-size:clamp(24px,4vw,36px); font-weight:900; letter-spacing:-1px; margin-bottom:8px;">
+              📂 내 퀴즈 기록
+            </h1>
+            <p style="color:var(--text-secondary); font-size:15px;">
+              저장된 퀴즈를 언제든 다시 풀어보세요.
+            </p>
+          </div>
+          <a href="/" class="btn btn-primary">
+            <span>➕</span> 새 퀴즈 만들기
+          </a>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex; gap:8px; margin-top:24px;">
+          <button class="btn btn-glass tab-btn active" data-tab="quizzes" id="tab-quizzes">
+            📝 퀴즈 결과
+          </button>
+          <button class="btn btn-ghost tab-btn" data-tab="documents" id="tab-documents">
+            📄 저장된 문서
+          </button>
+        </div>
+      </div>
+
+      <!-- Quizzes Tab -->
+      <div id="tab-quizzes-content">
+        <div class="history-grid" id="quizzes-grid"></div>
+        <div class="history-empty" id="quizzes-empty" style="display:none">
+          <div class="history-empty-icon">📝</div>
+          <h2 class="history-empty-title">아직 퀴즈 기록이 없습니다</h2>
+          <p class="history-empty-desc">PDF를 업로드하고 첫 번째 퀴즈를 생성해보세요!</p>
+          <a href="/" class="btn btn-primary">퀴즈 만들러 가기</a>
+        </div>
+      </div>
+
+      <!-- Documents Tab -->
+      <div id="tab-documents-content" style="display:none">
+        <div class="history-grid" id="documents-grid"></div>
+        <div class="history-empty" id="documents-empty" style="display:none">
+          <div class="history-empty-icon">📄</div>
+          <h2 class="history-empty-title">저장된 문서가 없습니다</h2>
+          <p class="history-empty-desc">PDF를 업로드하면 여기에 자동으로 저장됩니다.</p>
+          <a href="/" class="btn btn-primary">PDF 업로드하기</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Delete Confirm Modal -->
+  <div class="modal-overlay" id="delete-modal">
+    <div class="modal">
+      <div class="modal-icon">🗑️</div>
+      <h2 class="modal-title">삭제할까요?</h2>
+      <p class="modal-desc" id="delete-modal-desc">이 항목을 삭제하면 복구할 수 없습니다.</p>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="delete-confirm-btn">삭제</button>
+        <button class="btn btn-glass" id="delete-cancel-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script type="module" src="/history.js"></script>
+</body>
+</html>

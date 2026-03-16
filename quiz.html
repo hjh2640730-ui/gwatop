@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 퀴즈 풀기</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">📚</div>
+        <span class="nav-logo-text">GWATOP</span>
+      </a>
+      <div class="nav-right">
+        <div id="nav-auth-logged-out">
+          <button class="btn btn-primary btn-sm" id="nav-login-btn">🔑 로그인</button>
+        </div>
+        <div id="nav-auth-logged-in" class="nav-user" style="display:none">
+          <img class="nav-avatar" id="nav-avatar" src="" alt="avatar" />
+          <span class="nav-username" id="nav-username"></span>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Quiz Top Bar (Progress) -->
+  <div class="quiz-topbar" id="quiz-topbar" style="display:none">
+    <div class="quiz-topbar-inner">
+      <div class="quiz-progress-bar">
+        <div class="quiz-progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <span class="quiz-counter" id="quiz-counter">0 / 0</span>
+      <button class="quiz-quit-btn" id="quit-btn" title="퀴즈 종료">✕</button>
+    </div>
+  </div>
+
+  <!-- Quiz Area (shown while taking quiz) -->
+  <div id="quiz-area" style="display:none">
+    <div class="quiz-main">
+      <div class="quiz-card-container">
+        <div class="quiz-card" id="quiz-card">
+
+          <!-- Type Badge -->
+          <div class="quiz-type-badge" id="type-badge">📝 객관식</div>
+
+          <!-- Question -->
+          <p class="quiz-question" id="question-text">문제가 여기에 표시됩니다.</p>
+
+          <!-- MCQ Options -->
+          <div class="quiz-options" id="mcq-options" style="display:none">
+            <!-- Generated dynamically -->
+          </div>
+
+          <!-- OX Options -->
+          <div class="ox-options" id="ox-options" style="display:none">
+            <button class="ox-option" data-value="O" id="ox-o-btn">
+              ⭕
+              <span class="ox-label">맞다 (O)</span>
+            </button>
+            <button class="ox-option" data-value="X" id="ox-x-btn">
+              ❌
+              <span class="ox-label">틀리다 (X)</span>
+            </button>
+          </div>
+
+          <!-- Short Answer -->
+          <div id="short-options" style="display:none">
+            <textarea
+              class="short-answer-input"
+              id="short-input"
+              placeholder="답을 입력해주세요..."
+            ></textarea>
+          </div>
+
+          <!-- Correct Answer (shown after wrong) -->
+          <div class="quiz-correct-answer" id="correct-answer-box"></div>
+
+          <!-- Explanation -->
+          <div class="quiz-explanation" id="explanation-box">
+            <div class="quiz-explanation-label">📖 해설</div>
+            <div id="explanation-text"></div>
+          </div>
+
+          <!-- Actions -->
+          <div class="quiz-actions">
+            <button class="btn btn-glass" id="submit-btn">제출하기</button>
+            <button class="btn btn-primary" id="next-btn" style="display:none">다음 문제 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Screen -->
+  <div id="results-area" style="display:none">
+    <div class="results-wrap">
+      <div class="results-card">
+        <div class="results-emoji" id="results-emoji">🎉</div>
+        <h1 class="results-title" id="results-title">퀴즈 완료!</h1>
+        <p class="results-subtitle" id="results-subtitle">수고하셨습니다!</p>
+
+        <!-- Score Ring -->
+        <div class="results-score-ring">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <defs>
+              <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#7c3aed"/>
+                <stop offset="100%" style="stop-color:#2563eb"/>
+              </linearGradient>
+            </defs>
+            <circle class="score-ring-bg" cx="70" cy="70" r="58"/>
+            <circle class="score-ring-fill" id="score-ring-fill" cx="70" cy="70" r="58"
+              stroke="url(#scoreGradient)"
+              stroke-dasharray="364.4"
+              stroke-dashoffset="364.4"/>
+          </svg>
+          <div class="results-score-text">
+            <span class="results-score-num" id="score-pct">0%</span>
+            <span class="results-score-label">점수</span>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="results-stats">
+          <div class="results-stat">
+            <div class="results-stat-num" id="stat-correct" style="color:#10b981">0</div>
+            <div class="results-stat-label">정답</div>
+          </div>
+          <div class="results-stat">
+            <div class="results-stat-num" id="stat-wrong" style="color:#ef4444">0</div>
+            <div class="results-stat-label">오답</div>
+          </div>
+          <div class="results-stat">
+            <div class="results-stat-num" id="stat-total" style="color:#94a3b8">0</div>
+            <div class="results-stat-label">총 문제</div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="results-actions">
+          <a href="/" class="btn btn-glass">새 퀴즈 만들기</a>
+          <a href="/history.html" class="btn btn-primary">퀴즈 기록 보기</a>
+        </div>
+
+        <!-- Wrong Answers -->
+        <div class="wrong-answers-section" id="wrong-answers-section" style="display:none">
+          <h2 class="wrong-answers-title">📕 오답 노트</h2>
+          <div id="wrong-answers-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- No Quiz Error -->
+  <div id="no-quiz-area" style="display:none">
+    <div class="results-wrap">
+      <div class="results-card" style="text-align:center">
+        <div class="results-emoji">😕</div>
+        <h1 class="results-title">퀴즈 데이터가 없습니다</h1>
+        <p class="results-subtitle">먼저 PDF를 업로드하고 퀴즈를 생성해주세요.</p>
+        <div class="results-actions">
+          <a href="/" class="btn btn-primary btn-lg">홈으로 돌아가기</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback Overlay -->
+  <div class="feedback-overlay" id="feedback-overlay"></div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Quit Confirm Modal -->
+  <div class="modal-overlay" id="quit-modal">
+    <div class="modal">
+      <div class="modal-icon">🚪</div>
+      <h2 class="modal-title">퀴즈를 종료할까요?</h2>
+      <p class="modal-desc">현재까지의 진행 상황은 저장되지 않습니다.</p>
+      <div class="modal-actions">
+        <button class="btn btn-danger" id="quit-confirm-btn">종료</button>
+        <button class="btn btn-glass" id="quit-cancel-btn">계속 풀기</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/quiz.js"></script>
+</body>
+</html>
