@@ -110,6 +110,7 @@ function renderQuestion(idx) {
   submitBtn.disabled = true;
   correctAnswerBox.classList.remove('visible');
   explanationBox.classList.remove('visible');
+  document.getElementById('comment-box').style.display = 'none';
 
   // Progress
   const pct = Math.round((idx / questions.length) * 100);
@@ -273,6 +274,16 @@ function handleSubmit() {
 
   // Show result on options
   revealAnswer(q, isCorrect);
+
+  // Show comment
+  const commentBox = document.getElementById('comment-box');
+  const commentText = document.getElementById('comment-text');
+  const correctComments = ['정확합니다! 🎯', '완벽해요! ✨', '맞습니다! 잘 하셨어요 👏', '훌륭해요! 🌟', '정답입니다! 💯'];
+  const wrongComments = ['아쉽네요. 다시 확인해보세요 📚', '틀렸습니다. 해설을 잘 읽어보세요 💡', '조금 더 공부가 필요해요 📖', '다음엔 맞출 수 있어요! 💪'];
+  const comments = isCorrect ? correctComments : wrongComments;
+  commentText.textContent = comments[Math.floor(Math.random() * comments.length)];
+  commentBox.className = `quiz-comment ${isCorrect ? 'correct' : 'wrong'}`;
+  commentBox.style.display = '';
 
   // Show explanation (항상 표시)
   explanationText.textContent = q.explanation || '해설이 제공되지 않았습니다.';

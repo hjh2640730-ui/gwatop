@@ -59,14 +59,8 @@
 
           <!-- OX Options -->
           <div class="ox-options" id="ox-options" style="display:none">
-            <button class="ox-option" data-value="O" id="ox-o-btn">
-              ⭕
-              <span class="ox-label">맞다 (O)</span>
-            </button>
-            <button class="ox-option" data-value="X" id="ox-x-btn">
-              ❌
-              <span class="ox-label">틀리다 (X)</span>
-            </button>
+            <button class="ox-option" data-value="O" id="ox-o-btn">⭕</button>
+            <button class="ox-option" data-value="X" id="ox-x-btn">❌</button>
           </div>
 
           <!-- Short Answer -->
@@ -80,6 +74,11 @@
 
           <!-- Correct Answer (shown after wrong) -->
           <div class="quiz-correct-answer" id="correct-answer-box"></div>
+
+          <!-- Result Comment -->
+          <div class="quiz-comment" id="comment-box" style="display:none">
+            <span id="comment-text"></span>
+          </div>
 
           <!-- Explanation -->
           <div class="quiz-explanation" id="explanation-box">
