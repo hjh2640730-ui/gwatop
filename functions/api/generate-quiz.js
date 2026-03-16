@@ -17,6 +17,14 @@ export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
+// 디버그용 (env 변수 키 목록 확인)
+export async function onRequestGet(context) {
+  const { env } = context;
+  const keys = Object.keys(env || {});
+  const hasKey = !!(env.GEMINI_API_KEY);
+  return new Response(JSON.stringify({ keys, hasKey }), { status: 200, headers: CORS_HEADERS });
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
 
