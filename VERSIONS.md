@@ -1,5 +1,12 @@
 # GWATOP - Version History
 
+## v1.0.1 (2026-03-16) - Firebase 설정 적용
+- Firebase 프로젝트 연동 (gwatop-8edaf)
+- 구글 로그인 활성화
+- Cloudflare Pages 배포 완료 (gwatop.pages.dev)
+
+---
+
 ## v1.0.0 (2026-03-16) - Initial Release
 
 ### 핵심 기능
