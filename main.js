@@ -3,7 +3,7 @@
 // PDF 업로드, 텍스트 추출, 퀴즈 생성, 크레딧 기반 과금
 // ============================================================
 
-import { signInWithGoogle, logOut, handleRedirectResult, onUserChange, deductCredit } from './auth.js';
+import { signInWithGoogle, logOut, handleRedirectResult, onUserChange, deductCredit, calcCredits } from './auth.js';
 import { saveDocument, savePendingQuiz } from './db.js';
 
 // ─── PDF.js Setup ───
@@ -71,6 +71,7 @@ async function init() {
   setupModals();
   setupPricing();
   updateSliderStyle();
+  updateCreditCostLabel();
 }
 
 // ─── Navigation Auth ───
@@ -169,7 +170,15 @@ function setupSlider() {
   countSlider?.addEventListener('input', () => {
     countDisplay.textContent = countSlider.value;
     updateSliderStyle();
+    updateCreditCostLabel();
   });
+}
+
+function updateCreditCostLabel() {
+  const count = parseInt(countSlider?.value || 15);
+  const cost = calcCredits(count);
+  const label = document.getElementById('credit-cost-label');
+  if (label) label.textContent = `⚡ ${cost} 크레딧 차감`;
 }
 
 function updateSliderStyle() {
@@ -200,8 +209,10 @@ async function handleGenerate() {
   }
 
   // Credits check
+  const count = parseInt(countSlider?.value || 15);
+  const required = calcCredits(count);
   const credits = currentUserData?.credits ?? 0;
-  if (credits <= 0) {
+  if (credits < required) {
     openModal(upgradeModal); return;
   }
 
@@ -267,10 +278,11 @@ async function generateQuiz() {
       throw new Error('퀴즈 데이터를 파싱하지 못했습니다. 다시 시도해주세요.');
     }
 
-    // 3) Deduct 1 credit
-    await deductCredit(currentUser.uid);
+    // 3) Deduct credits (문제 수 기반)
+    const deductAmount = calcCredits(count);
+    await deductCredit(currentUser.uid, deductAmount);
     if (currentUserData) {
-      currentUserData.credits = Math.max(0, (currentUserData.credits ?? 1) - 1);
+      currentUserData.credits = Math.max(0, (currentUserData.credits ?? deductAmount) - deductAmount);
       document.getElementById('nav-credits').textContent = currentUserData.credits;
     }
 

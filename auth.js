@@ -142,13 +142,20 @@ export async function getCredits(uid) {
   return data?.credits ?? 0;
 }
 
-// ─── Deduct 1 Credit (퀴즈 생성 시 차감) ───
-export async function deductCredit(uid) {
+// ─── 문제 수 → 차감 크레딧 계산 ───
+export function calcCredits(count) {
+  if (count <= 10) return 1;
+  if (count <= 30) return 2;
+  return 3;
+}
+
+// ─── Deduct Credits (문제 수 기반 차감) ───
+export async function deductCredit(uid, amount = 1) {
   if (!isConfigured || !db) return true;
   try {
     const ref = doc(db, 'users', uid);
     await updateDoc(ref, {
-      credits: increment(-1),
+      credits: increment(-amount),
       totalQuizzes: increment(1)
     });
     return true;
