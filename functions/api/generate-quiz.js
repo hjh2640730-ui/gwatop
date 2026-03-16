@@ -103,9 +103,9 @@ export async function onRequestPost(context) {
       const match = rawText.match(/\{[\s\S]*\}/);
       if (match) {
         try { quiz = JSON.parse(match[0]); }
-        catch { return json({ error: '퀴즈 JSON 파싱 실패. 다시 시도해주세요.' }, 502); }
+        catch { return json({ error: `JSON 파싱 실패. 원문: ${rawText.slice(0, 500)}` }, 502); }
       } else {
-        return json({ error: '유효한 퀴즈 데이터를 받지 못했습니다.' }, 502);
+        return json({ error: `JSON 없음. 원문: ${rawText.slice(0, 500)}` }, 502);
       }
     }
 
