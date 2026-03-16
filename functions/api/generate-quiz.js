@@ -28,8 +28,8 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  // API 키 확인 (여러 방법으로 시도)
-  const apiKey = env.GEMINI_API_KEY || env.gemini_api_key || env.GeminiApiKey;
+  // API 키 확인 (공백 포함 키 이름도 처리)
+  const apiKey = env.GEMINI_API_KEY || env['GEMINI_API_KEY '] || env.gemini_api_key || '';
   if (!apiKey) {
     return json({
       error: 'GEMINI_API_KEY 환경 변수가 설정되지 않았습니다. Cloudflare Pages → 설정 → 환경 변수를 확인해주세요.'
