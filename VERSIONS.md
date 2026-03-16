@@ -1,5 +1,17 @@
 # GWATOP - Version History
 
+## v1.2.0 (2026-03-16) - 크레딧 기반 결제 시스템
+- Toss Payments v2 연동 (크레딧 충전)
+- 크레딧 패키지: 스타터(10회/₩500), 스탠다드(30회/₩1,000), 프리미엄(100회/₩2,500)
+- 신규 가입 시 3 크레딧 무료 지급
+- 퀴즈 생성 시 1 크레딧 차감
+- Nav에 잔여 크레딧 실시간 표시
+- 결제 완료/실패 페이지 추가
+- Cloudflare Function: confirm-payment (Toss 확인 + Firestore 크레딧 추가)
+- Firebase Service Account JWT로 서버사이드 Firestore 업데이트
+
+---
+
 ## v1.1.0 (2026-03-16) - 복수 문제 유형 선택 지원
 - 문제 유형 다중 선택 (체크박스 방식)
 - 선택한 유형별 문제 수 자동 분배

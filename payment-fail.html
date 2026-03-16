@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 결제 실패</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">📚</div>
+        <span class="nav-logo-text">GWATOP</span>
+      </a>
+    </div>
+  </nav>
+
+  <div style="padding-top:var(--nav-height);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div class="glass" style="max-width:440px;width:100%;border-radius:var(--radius-xl);padding:48px 32px;text-align:center;">
+      <div style="font-size:60px;margin-bottom:20px">😢</div>
+      <h1 style="font-size:26px;font-weight:900;margin-bottom:10px">결제가 취소되었습니다</h1>
+      <p style="color:var(--text-secondary);font-size:15px;margin-bottom:12px" id="fail-msg">결제가 완료되지 않았습니다.</p>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:32px">크레딧은 차감되지 않았습니다.</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <a href="/payment.html" class="btn btn-primary btn-lg">다시 시도</a>
+        <a href="/" class="btn btn-glass">홈으로</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const msg = params.get('message');
+    if (msg) document.getElementById('fail-msg').textContent = decodeURIComponent(msg);
+  </script>
+</body>
+</html>

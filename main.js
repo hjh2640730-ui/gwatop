@@ -1,10 +1,10 @@
 // ============================================================
-// GWATOP - Main Page Logic v1.0.0
-// PDF 업로드, 텍스트 추출, 퀴즈 생성
+// GWATOP - Main Page Logic v1.2.0
+// PDF 업로드, 텍스트 추출, 퀴즈 생성, 크레딧 기반 과금
 // ============================================================
 
-import { signInWithGoogle, logOut, handleRedirectResult, onUserChange, checkAndIncrementQuizCount } from './auth.js';
-import { saveDocument, savePendingQuiz, getGuestQuizCount, incrementGuestQuizCount } from './db.js';
+import { signInWithGoogle, logOut, handleRedirectResult, onUserChange, deductCredit } from './auth.js';
+import { saveDocument, savePendingQuiz } from './db.js';
 
 // ─── PDF.js Setup ───
 const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -92,9 +92,8 @@ function updateNavUI(user, userData) {
     navLoggedIn.style.display = 'flex';
     navAvatar.src = user.photoURL || '';
     navUsername.textContent = user.displayName || user.email || '사용자';
-    const plan = userData?.plan || 'free';
-    navPlanBadge.textContent = plan === 'premium' ? 'Premium' : 'Free';
-    navPlanBadge.className = `nav-plan-badge ${plan}`;
+    const credits = userData?.credits ?? 0;
+    document.getElementById('nav-credits').textContent = credits;
   } else {
     navLoggedOut.style.display = '';
     navLoggedIn.style.display = 'none';
@@ -200,9 +199,9 @@ async function handleGenerate() {
     openModal(loginModal); return;
   }
 
-  // Quota check
-  const check = await checkAndIncrementQuizCount(currentUser.uid);
-  if (!check.allowed) {
+  // Credits check
+  const credits = currentUserData?.credits ?? 0;
+  if (credits <= 0) {
     openModal(upgradeModal); return;
   }
 
@@ -268,10 +267,17 @@ async function generateQuiz() {
       throw new Error('퀴즈 데이터를 파싱하지 못했습니다. 다시 시도해주세요.');
     }
 
-    // 3) Save document
+    // 3) Deduct 1 credit
+    await deductCredit(currentUser.uid);
+    if (currentUserData) {
+      currentUserData.credits = Math.max(0, (currentUserData.credits ?? 1) - 1);
+      document.getElementById('nav-credits').textContent = currentUserData.credits;
+    }
+
+    // 4) Save document
     const docId = await saveDocument(selectedFile.name, extractedText, selectedFile.size);
 
-    // 4) Pass to quiz page via sessionStorage
+    // 5) Pass to quiz page via sessionStorage
     savePendingQuiz({
       docId,
       docName: selectedFile.name,
@@ -300,7 +306,7 @@ function setupModals() {
   document.getElementById('modal-close-btn')?.addEventListener('click', () => closeModal(loginModal));
   document.getElementById('modal-upgrade-btn')?.addEventListener('click', () => {
     closeModal(upgradeModal);
-    showUpgradeInfo();
+    window.location.href = '/payment.html';
   });
   document.getElementById('modal-upgrade-close-btn')?.addEventListener('click', () => closeModal(upgradeModal));
   document.getElementById('upgrade-btn')?.addEventListener('click', () => openModal(upgradeModal));
@@ -324,7 +330,7 @@ function setupPricing() {
     if (!currentUser) { signInWithGoogle(); } else { showToast('이미 무료 플랜을 사용 중입니다.', 'success'); }
   });
   document.getElementById('pricing-premium-btn')?.addEventListener('click', () => {
-    showUpgradeInfo();
+    window.location.href = '/payment.html';
   });
 }
 

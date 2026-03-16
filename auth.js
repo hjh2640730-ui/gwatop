@@ -1,6 +1,6 @@
 // ============================================================
-// GWATOP - Firebase Auth Module v1.0.2
-// Popup 방식으로 변경 (redirect 방식 호환성 문제 해결)
+// GWATOP - Firebase Auth Module v1.2.0
+// 크레딧 기반 과금 시스템 추가
 // ============================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -37,42 +37,33 @@ try {
   console.warn('Firebase initialization failed:', e);
 }
 
-// ─── Google Sign-In (Popup 방식) ───
+// ─── Google Sign-In ───
 export async function signInWithGoogle() {
   if (!isConfigured) {
-    alert('Firebase가 설정되지 않았습니다.\nfirebase-config.js 파일을 확인해주세요.');
+    alert('Firebase가 설정되지 않았습니다.');
     return;
   }
   try {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     const result = await signInWithPopup(auth, provider);
-    if (result.user) {
-      await ensureUserDoc(result.user);
-    }
+    if (result.user) await ensureUserDoc(result.user);
   } catch (e) {
-    if (e.code === 'auth/popup-closed-by-user') return; // 사용자가 닫은 경우 무시
+    if (e.code === 'auth/popup-closed-by-user') return;
     console.error('Sign in error:', e);
-    alert('로그인 중 오류가 발생했습니다: ' + e.message);
+    alert('로그인 오류: ' + e.message);
   }
 }
 
 // ─── Sign Out ───
 export async function logOut() {
   if (!isConfigured) return;
-  try {
-    await signOut(auth);
-  } catch (e) {
-    console.error('Sign out error:', e);
-  }
+  try { await signOut(auth); } catch (e) { console.error(e); }
 }
 
-// ─── Redirect Result (더 이상 사용 안 하지만 호환성 유지) ───
-export async function handleRedirectResult() {
-  return null;
-}
+export async function handleRedirectResult() { return null; }
 
-// ─── Ensure User Document in Firestore ───
+// ─── Ensure User Document (신규 가입 시 3 크레딧 무료 지급) ───
 export async function ensureUserDoc(user) {
   if (!isConfigured || !db) return;
   try {
@@ -84,15 +75,19 @@ export async function ensureUserDoc(user) {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        plan: 'free',
-        quizGeneratedToday: 0,
-        lastQuizDate: null,
+        credits: 3,           // 신규 가입 무료 크레딧
         totalQuizzes: 0,
         createdAt: serverTimestamp()
       });
+    } else {
+      // 기존 유저 중 credits 필드 없는 경우 마이그레이션
+      const data = snap.data();
+      if (data.credits === undefined) {
+        await updateDoc(ref, { credits: 3 });
+      }
     }
   } catch (e) {
-    console.warn('ensureUserDoc error (non-critical):', e);
+    console.warn('ensureUserDoc error:', e);
   }
 }
 
@@ -109,52 +104,25 @@ export async function getUserData(uid) {
   }
 }
 
-// ─── Check & Increment Quiz Count ───
-export async function checkAndIncrementQuizCount(uid) {
-  if (!isConfigured || !db) return { allowed: true };
-  try {
-    const ref = doc(db, 'users', uid);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return { allowed: true };
-
-    const data = snap.data();
-    const today = new Date().toDateString();
-    const lastDate = data.lastQuizDate?.toDate?.()?.toDateString?.() || '';
-    let count = lastDate === today ? (data.quizGeneratedToday || 0) : 0;
-
-    if (data.plan === 'premium') {
-      await updateDoc(ref, {
-        quizGeneratedToday: count + 1,
-        lastQuizDate: serverTimestamp(),
-        totalQuizzes: increment(1)
-      });
-      return { allowed: true, plan: 'premium' };
-    }
-
-    if (count >= 1) {
-      return { allowed: false, plan: 'free', reason: 'limit' };
-    }
-
-    await updateDoc(ref, {
-      quizGeneratedToday: count + 1,
-      lastQuizDate: serverTimestamp(),
-      totalQuizzes: increment(1)
-    });
-    return { allowed: true, plan: 'free' };
-  } catch (e) {
-    console.warn('checkAndIncrementQuizCount error:', e);
-    return { allowed: true };
-  }
+// ─── Get Credits ───
+export async function getCredits(uid) {
+  const data = await getUserData(uid);
+  return data?.credits ?? 0;
 }
 
-// ─── Upgrade to Premium ───
-export async function upgradeToPremium(uid) {
-  if (!isConfigured || !db) return;
+// ─── Deduct 1 Credit (퀴즈 생성 시 차감) ───
+export async function deductCredit(uid) {
+  if (!isConfigured || !db) return true;
   try {
     const ref = doc(db, 'users', uid);
-    await updateDoc(ref, { plan: 'premium' });
+    await updateDoc(ref, {
+      credits: increment(-1),
+      totalQuizzes: increment(1)
+    });
+    return true;
   } catch (e) {
-    console.error('upgradeToPremium error:', e);
+    console.error('deductCredit error:', e);
+    return false;
   }
 }
 
@@ -174,7 +142,7 @@ export function onUserChange(callback) {
         callback(null, null);
       }
     } catch (e) {
-      console.warn('onUserChange handler error:', e);
+      console.warn('onUserChange error:', e);
       callback(user || null, null);
     }
   });

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 크레딧 충전</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .payment-page { padding: calc(var(--nav-height) + 60px) clamp(16px,4vw,32px) 80px; min-height: 100vh; }
+    .payment-header { text-align: center; margin-bottom: 48px; }
+    .payment-header h1 { font-size: clamp(28px,5vw,48px); font-weight: 900; letter-spacing: -1px; margin-bottom: 12px; }
+    .payment-header p { font-size: 16px; color: var(--text-secondary); }
+    .packages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 860px; margin: 0 auto 48px; }
+    .package-card {
+      background: var(--glass-bg); border: 2px solid var(--glass-border);
+      border-radius: var(--radius-xl); padding: 32px 24px;
+      cursor: pointer; transition: all var(--transition);
+      text-align: center; position: relative;
+    }
+    .package-card:hover { background: var(--glass-bg-hover); border-color: rgba(124,58,237,0.3); transform: translateY(-6px); box-shadow: var(--shadow-md); }
+    .package-card.selected { border-color: rgba(124,58,237,0.6); background: linear-gradient(135deg,rgba(124,58,237,0.1),rgba(37,99,235,0.1)); box-shadow: 0 0 40px rgba(124,58,237,0.15); }
+    .package-card.popular .popular-badge { display: block; }
+    .popular-badge { display: none; position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: var(--accent-gradient); color: white; font-size: 11px; font-weight: 700; padding: 4px 16px; border-radius: var(--radius-full); white-space: nowrap; letter-spacing: 0.5px; }
+    .package-emoji { font-size: 44px; margin-bottom: 12px; }
+    .package-name { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+    .package-credits { font-size: 42px; font-weight: 900; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px; margin-bottom: 4px; }
+    .package-credits-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; }
+    .package-price { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
+    .package-unit-price { font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; }
+    .package-features { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .package-features li { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .payment-section { max-width: 500px; margin: 0 auto; }
+    .payment-section-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; text-align: center; }
+    #payment-widget { min-height: 100px; }
+    #payment-widget-empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 15px; }
+    .credits-info-bar { background: linear-gradient(135deg,rgba(124,58,237,0.08),rgba(37,99,235,0.08)); border: 1px solid rgba(124,58,237,0.2); border-radius: var(--radius-lg); padding: 16px 24px; display: flex; align-items: center; gap: 16px; margin-bottom: 32px; max-width: 860px; margin-left: auto; margin-right: auto; }
+    .credits-info-icon { font-size: 28px; }
+    .credits-info-text { flex: 1; font-size: 15px; }
+    .credits-info-count { font-size: 24px; font-weight: 800; color: #a78bfa; }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">📚</div>
+        <span class="nav-logo-text">GWATOP</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">홈</a></li>
+        <li><a href="/history.html">내 퀴즈</a></li>
+        <li><a href="/payment.html" class="active">크레딧 충전</a></li>
+      </ul>
+      <div class="nav-right">
+        <div id="nav-auth-logged-out">
+          <button class="btn btn-primary btn-sm" id="nav-login-btn">🔑 로그인</button>
+        </div>
+        <div id="nav-auth-logged-in" class="nav-user" style="display:none">
+          <img class="nav-avatar" id="nav-avatar" src="" alt="avatar" />
+          <span class="nav-username" id="nav-username"></span>
+          <span style="font-size:13px;font-weight:700;color:#a78bfa;">⚡ <span id="nav-credits">0</span>회</span>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="payment-page">
+    <div class="container">
+      <!-- Header -->
+      <div class="payment-header">
+        <div class="hero-badge" style="margin-bottom:20px">⚡ 크레딧 충전</div>
+        <h1>원하는 만큼만 충전하고<br /><span class="gradient-text">자유롭게 퀴즈 생성</span></h1>
+        <p>월정액 없이 사용한 만큼만 결제합니다.</p>
+      </div>
+
+      <!-- 현재 크레딧 -->
+      <div class="credits-info-bar" id="credits-info-bar" style="display:none">
+        <span class="credits-info-icon">⚡</span>
+        <div class="credits-info-text">현재 보유 크레딧</div>
+        <div class="credits-info-count"><span id="current-credits">0</span>회</div>
+      </div>
+
+      <!-- 패키지 선택 -->
+      <div class="packages-grid" id="packages-grid">
+        <div class="package-card" data-package="starter" data-credits="10" data-price="500">
+          <div class="package-emoji">🌱</div>
+          <div class="package-name">스타터</div>
+          <div class="package-credits">10</div>
+          <div class="package-credits-label">크레딧</div>
+          <div class="package-price">₩500</div>
+          <div class="package-unit-price">회당 ₩50</div>
+          <ul class="package-features">
+            <li>✅ 퀴즈 10회 생성</li>
+            <li>✅ 모든 문제 유형</li>
+            <li>✅ 유효기간 없음</li>
+          </ul>
+        </div>
+
+        <div class="package-card popular" data-package="standard" data-credits="30" data-price="1000">
+          <div class="popular-badge">🔥 인기</div>
+          <div class="package-emoji">⚡</div>
+          <div class="package-name">스탠다드</div>
+          <div class="package-credits">30</div>
+          <div class="package-credits-label">크레딧</div>
+          <div class="package-price">₩1,000</div>
+          <div class="package-unit-price">회당 ₩33</div>
+          <ul class="package-features">
+            <li>✅ 퀴즈 30회 생성</li>
+            <li>✅ 모든 문제 유형</li>
+            <li>✅ 유효기간 없음</li>
+          </ul>
+        </div>
+
+        <div class="package-card" data-package="premium" data-credits="100" data-price="2500">
+          <div class="package-emoji">👑</div>
+          <div class="package-name">프리미엄</div>
+          <div class="package-credits">100</div>
+          <div class="package-credits-label">크레딧</div>
+          <div class="package-price">₩2,500</div>
+          <div class="package-unit-price">회당 ₩25</div>
+          <ul class="package-features">
+            <li>✅ 퀴즈 100회 생성</li>
+            <li>✅ 모든 문제 유형</li>
+            <li>✅ 유효기간 없음</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Toss 결제 위젯 -->
+      <div class="payment-section glass" style="padding:32px;border-radius:var(--radius-xl);">
+        <div class="payment-section-title">💳 결제 수단 선택</div>
+        <div id="payment-widget">
+          <div id="payment-widget-empty">⬆️ 위에서 패키지를 먼저 선택해주세요.</div>
+        </div>
+        <div id="payment-agreement" style="margin-top:20px;display:none"></div>
+        <button class="btn-generate" id="pay-btn" style="display:none;margin-top:16px">
+          <span>💳</span> <span id="pay-btn-text">결제하기</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Login Required Modal -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <div class="modal-icon">🔑</div>
+      <h2 class="modal-title">로그인이 필요합니다</h2>
+      <p class="modal-desc">크레딧을 충전하려면 먼저 로그인해주세요.</p>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-lg" id="modal-login-btn">🔑 구글로 로그인</button>
+        <a href="/" class="btn btn-ghost">홈으로</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://js.tosspayments.com/v2/standard"></script>
+  <script type="module" src="/payment.js"></script>
+</body>
+</html>

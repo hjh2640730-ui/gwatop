@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 결제 완료</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">📚</div>
+        <span class="nav-logo-text">GWATOP</span>
+      </a>
+    </div>
+  </nav>
+
+  <div style="padding-top:var(--nav-height);min-height:100vh;display:flex;align-items:center;justify-content:center;padding-left:20px;padding-right:20px;">
+    <div class="glass" style="max-width:480px;width:100%;border-radius:var(--radius-xl);padding:clamp(32px,6vw,56px);text-align:center;">
+      <div id="loading-state">
+        <div style="font-size:52px;margin-bottom:20px">⏳</div>
+        <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">결제 확인 중...</h1>
+        <p style="color:var(--text-secondary);font-size:15px">잠시만 기다려주세요.</p>
+        <div class="loading-dots" style="justify-content:center;margin-top:20px">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div id="success-state" style="display:none">
+        <div style="font-size:64px;margin-bottom:20px">🎉</div>
+        <h1 style="font-size:28px;font-weight:900;margin-bottom:8px">결제 완료!</h1>
+        <p style="color:var(--text-secondary);font-size:15px;margin-bottom:28px">크레딧이 충전되었습니다.</p>
+        <div style="background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(37,99,235,0.1));border:1px solid rgba(124,58,237,0.2);border-radius:var(--radius-lg);padding:24px;margin-bottom:28px;">
+          <div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">충전된 크레딧</div>
+          <div style="font-size:48px;font-weight:900;background:var(--accent-gradient);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;" id="credited-amount">+0</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">현재 보유: <span id="total-credits" style="color:#a78bfa;font-weight:700">0</span>회</div>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+          <a href="/" class="btn btn-primary btn-lg">⚡ 퀴즈 만들러 가기</a>
+          <a href="/payment.html" class="btn btn-glass">추가 충전</a>
+        </div>
+      </div>
+
+      <div id="error-state" style="display:none">
+        <div style="font-size:52px;margin-bottom:20px">❌</div>
+        <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">결제 확인 실패</h1>
+        <p style="color:var(--text-secondary);font-size:15px;margin-bottom:28px" id="error-msg">오류가 발생했습니다.</p>
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <a href="/payment.html" class="btn btn-primary">다시 시도</a>
+          <a href="/" class="btn btn-glass">홈으로</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { onUserChange } from '/auth.js';
+    import { getCredits } from '/auth.js';
+
+    async function confirmPayment() {
+      const params = new URLSearchParams(window.location.search);
+      const paymentKey = params.get('paymentKey');
+      const orderId = params.get('orderId');
+      const amount = params.get('amount');
+
+      if (!paymentKey || !orderId || !amount) {
+        showError('결제 정보가 올바르지 않습니다.');
+        return;
+      }
+
+      // 로그인 대기
+      onUserChange(async (user) => {
+        if (!user) {
+          showError('로그인이 필요합니다.');
+          return;
+        }
+
+        try {
+          const idToken = await user.getIdToken();
+          const res = await fetch('/api/confirm-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paymentKey, orderId, amount: parseInt(amount), uid: user.uid, idToken })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok || data.error) {
+            showError(data.error || '결제 확인 중 오류가 발생했습니다.');
+            return;
+          }
+
+          // 성공
+          const newCredits = await getCredits(user.uid);
+          document.getElementById('credited-amount').textContent = `+${data.credits}`;
+          document.getElementById('total-credits').textContent = newCredits;
+          document.getElementById('loading-state').style.display = 'none';
+          document.getElementById('success-state').style.display = '';
+
+        } catch (e) {
+          showError('네트워크 오류가 발생했습니다: ' + e.message);
+        }
+      });
+    }
+
+    function showError(msg) {
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('error-msg').textContent = msg;
+      document.getElementById('error-state').style.display = '';
+    }
+
+    confirmPayment();
+  </script>
+</body>
+</html>
