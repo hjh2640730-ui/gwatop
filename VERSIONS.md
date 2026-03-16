@@ -1,5 +1,12 @@
 # GWATOP - Version History
 
+## v1.1.0 (2026-03-16) - 복수 문제 유형 선택 지원
+- 문제 유형 다중 선택 (체크박스 방식)
+- 선택한 유형별 문제 수 자동 분배
+- Cloudflare Function API 키 처리 강화
+
+---
+
 ## v1.0.2 (2026-03-16) - 구글 로그인 방식 변경
 - signInWithRedirect → signInWithPopup 변경 (Cloudflare 환경 호환성)
 - Auth 에러 처리 강화 (Firestore 오류 시에도 로그인 상태 유지)

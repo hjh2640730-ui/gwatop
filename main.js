@@ -230,7 +230,8 @@ async function extractTextFromPDF(file) {
 
 // ─── Core: Generate Quiz via API ───
 async function generateQuiz() {
-  const type = document.querySelector('input[name="quiz-type"]:checked')?.value || 'mcq';
+  const checked = [...document.querySelectorAll('input[name="quiz-type"]:checked')].map(el => el.value);
+  const types = checked.length > 0 ? checked : ['mcq'];
   const count = parseInt(countSlider?.value || 15);
 
   showLoading(true);
@@ -252,7 +253,7 @@ async function generateQuiz() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: extractedText.slice(0, 60000),
-        type,
+        types,
         count
       })
     });
@@ -275,7 +276,7 @@ async function generateQuiz() {
       docId,
       docName: selectedFile.name,
       questions: data.questions,
-      type
+      type: types.join(',')
     });
 
     showToast(`✅ ${data.questions.length}문제 생성 완료!`, 'success');

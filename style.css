@@ -240,7 +240,8 @@ body {
   font-size: 13px; font-weight: 600; color: var(--text-secondary); text-align: center;
 }
 .type-option-label .type-icon { font-size: 22px; }
-.type-option input:checked + .type-option-label {
+.type-option input[type="checkbox"]:checked + .type-option-label,
+.type-option input[type="radio"]:checked + .type-option-label {
   background: linear-gradient(135deg,rgba(124,58,237,0.12),rgba(37,99,235,0.12));
   border-color: rgba(124,58,237,0.4); color: #a78bfa;
   box-shadow: 0 0 20px rgba(124,58,237,0.08);
