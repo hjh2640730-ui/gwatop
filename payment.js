@@ -89,7 +89,7 @@ document.getElementById('pay-btn')?.addEventListener('click', async () => {
 
     const payment = tossPayments.payment({ customerKey: currentUser.uid });
     await payment.requestPayment({
-      method: '카드',
+      method: 'CARD',
       amount: { currency: 'KRW', value: price },
       orderId,
       orderName: `GWATOP ${packageName} 크레딧 ${credits}회`,
