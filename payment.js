@@ -1,24 +1,20 @@
 // ============================================================
-// GWATOP - Payment Page Logic v1.2.0
-// Toss Payments 크레딧 충전
+// GWATOP - Payment Page Logic v1.3.0
+// Toss Payments API 개별 연동 (위젯 없음)
 // ============================================================
 
-import { signInWithGoogle, onUserChange, getCredits } from './auth.js';
+import { signInWithGoogle, onUserChange } from './auth.js';
 
 const TOSS_CLIENT_KEY = 'test_ck_DnyRpQWGrN2jDYK5Wa0LrKwv1M9E';
 
 let currentUser = null;
 let selectedCard = null;
 let tossPayments = null;
-let paymentWidget = null;
 
 // ─── Init ───
 async function init() {
-  setupNav();
-
-  // Toss Payments SDK 초기화
   tossPayments = TossPayments(TOSS_CLIENT_KEY);
-
+  setupNav();
   setupPackageCards();
 }
 
@@ -59,66 +55,31 @@ function setupPackageCards() {
   });
 }
 
-async function selectPackage(card) {
+function selectPackage(card) {
   if (!currentUser) {
     document.getElementById('login-modal').classList.add('visible');
     return;
   }
 
-  // UI 선택 표시
   document.querySelectorAll('.package-card').forEach(c => c.classList.remove('selected'));
   card.classList.add('selected');
   selectedCard = card;
 
-  const credits = parseInt(card.dataset.credits);
+  const credits = card.dataset.credits;
   const price = parseInt(card.dataset.price);
   const packageName = card.querySelector('.package-name').textContent;
 
-  // 결제 버튼 표시
   const payBtn = document.getElementById('pay-btn');
   const payBtnText = document.getElementById('pay-btn-text');
   payBtn.style.display = 'flex';
   payBtnText.textContent = `${packageName} ₩${price.toLocaleString()} 결제하기`;
-
-  // Toss 위젯 렌더링
-  await renderPaymentWidget(credits, price, packageName);
-}
-
-// ─── Render Toss Payment Widget ───
-async function renderPaymentWidget(credits, price, packageName) {
-  const widgetContainer = document.getElementById('payment-widget');
-  const agreementContainer = document.getElementById('payment-agreement');
-
-  widgetContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">결제 위젯 로딩 중...</div>';
-
-  try {
-    // widgets() 방식 사용 (Toss v2 위젯 SDK)
-    paymentWidget = tossPayments.widgets({ customerKey: currentUser.uid });
-
-    // 금액 설정
-    await paymentWidget.setAmount({ currency: 'KRW', value: price });
-
-    // 결제 UI 렌더링
-    await paymentWidget.renderPaymentMethods({
-      selector: '#payment-widget',
-      variantKey: 'DEFAULT',
-    });
-
-    // 약관 렌더링
-    agreementContainer.style.display = '';
-    await paymentWidget.renderAgreement({ selector: '#payment-agreement' });
-
-  } catch (e) {
-    console.error('Toss widget error:', e);
-    widgetContainer.innerHTML = `<div style="padding:20px;color:var(--error);text-align:center">결제 위젯 로드 실패: ${e.message}</div>`;
-  }
 }
 
 // ─── Pay Button ───
 document.getElementById('pay-btn')?.addEventListener('click', async () => {
-  if (!currentUser || !selectedCard || !paymentWidget) return;
+  if (!currentUser || !selectedCard) return;
 
-  const credits = parseInt(selectedCard.dataset.credits);
+  const credits = selectedCard.dataset.credits;
   const price = parseInt(selectedCard.dataset.price);
   const packageName = selectedCard.querySelector('.package-name').textContent;
   const orderId = `gwatop_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -126,7 +87,9 @@ document.getElementById('pay-btn')?.addEventListener('click', async () => {
   try {
     document.getElementById('pay-btn').disabled = true;
 
-    await paymentWidget.requestPayment({
+    await tossPayments.requestPayment({
+      method: '카드',
+      amount: { currency: 'KRW', value: price },
       orderId,
       orderName: `GWATOP ${packageName} 크레딧 ${credits}회`,
       successUrl: `${window.location.origin}/payment-success.html`,

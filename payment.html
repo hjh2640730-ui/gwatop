@@ -130,16 +130,12 @@
         </div>
       </div>
 
-      <!-- Toss 결제 위젯 -->
-      <div class="payment-section glass" style="padding:32px;border-radius:var(--radius-xl);">
-        <div class="payment-section-title">💳 결제 수단 선택</div>
-        <div id="payment-widget">
-          <div id="payment-widget-empty">⬆️ 위에서 패키지를 먼저 선택해주세요.</div>
-        </div>
-        <div id="payment-agreement" style="margin-top:20px;display:none"></div>
-        <button class="btn-generate" id="pay-btn" style="display:none;margin-top:16px">
+      <!-- 결제 버튼 -->
+      <div style="max-width:500px;margin:0 auto;text-align:center;">
+        <button class="btn-generate" id="pay-btn" style="display:none;width:100%">
           <span>💳</span> <span id="pay-btn-text">결제하기</span>
         </button>
+        <p style="margin-top:16px;font-size:13px;color:var(--text-muted)">카드 결제 · 안전한 Toss Payments 연동</p>
       </div>
     </div>
   </main>
