@@ -224,7 +224,7 @@ function setupControls() {
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !answered && !submitBtn.disabled) handleSubmit();
-    if (e.key === 'Enter' && answered) handleNext();
+    else if (e.key === 'Enter' && answered) handleNext();
     if (e.key === 'Escape' && !answered) quitModal.classList.toggle('visible');
     // MCQ shortcuts 1-4
     if (!answered) {
