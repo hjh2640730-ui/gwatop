@@ -95,6 +95,7 @@ body {
   max-width: 1200px; margin: 0 auto;
   padding: 0 clamp(16px,4vw,32px); height: 100%;
   display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  position: relative;
 }
 .nav-logo {
   display: flex; align-items: center; gap: 10px;
@@ -115,7 +116,7 @@ body {
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.5px;
 }
-.nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
+.nav-links { display: flex; align-items: center; gap: 4px; list-style: none; position: absolute; left: 50%; transform: translateX(-50%); }
 .nav-links a {
   text-decoration: none; color: var(--text-secondary);
   font-size: 14px; font-weight: 500;
