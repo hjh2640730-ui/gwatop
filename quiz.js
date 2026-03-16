@@ -161,7 +161,7 @@ function renderMCQ(q) {
       if (answered) return;
       mcqOptions.querySelectorAll('.quiz-option').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      currentAnswer = marker;
+      currentAnswer = originalMarker;
       submitBtn.disabled = false;
     });
     mcqOptions.appendChild(btn);
