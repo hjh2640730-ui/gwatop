@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 관리자</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .admin-page { padding: calc(var(--nav-height) + 40px) clamp(16px,4vw,32px) 80px; min-height: 100vh; }
+    .admin-header { margin-bottom: 32px; }
+    .admin-title { font-size: clamp(24px,4vw,36px); font-weight: 900; letter-spacing: -1px; margin-bottom: 6px; }
+    .admin-subtitle { font-size: 14px; color: var(--text-muted); }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 24px; text-align: center; }
+    .stat-value { font-size: 36px; font-weight: 900; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; }
+    .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+
+    /* Search */
+    .search-bar { display: flex; gap: 12px; margin-bottom: 20px; }
+    .search-input {
+      flex: 1; background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 12px 18px;
+      font-family: var(--font); font-size: 14px; color: var(--text-primary); outline: none;
+      transition: border-color var(--transition);
+    }
+    .search-input:focus { border-color: rgba(124,58,237,0.4); }
+    .search-input::placeholder { color: var(--text-muted); }
+
+    /* Table */
+    .table-wrap { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); overflow: hidden; }
+    .table-header { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr 80px; gap: 0; padding: 14px 20px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--glass-border); }
+    .th { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+    .table-body { }
+    .table-row {
+      display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr 80px;
+      gap: 0; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.04);
+      align-items: center; transition: background var(--transition); cursor: pointer;
+    }
+    .table-row:last-child { border-bottom: none; }
+    .table-row:hover { background: var(--glass-bg-hover); }
+    .td { font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 12px; }
+    .td-name { font-weight: 600; color: var(--text-primary); }
+    .td-credits { font-weight: 700; color: #a78bfa; font-size: 14px; }
+    .td-date { font-size: 12px; color: var(--text-muted); }
+    .empty-row { padding: 60px 20px; text-align: center; color: var(--text-muted); font-size: 15px; }
+
+    /* Edit Modal */
+    .edit-modal-content { text-align: left; }
+    .edit-user-info { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px; }
+    .edit-user-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .edit-user-email { font-size: 13px; color: var(--text-muted); }
+    .edit-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .edit-credits-input {
+      width: 100%; background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 14px 18px; font-family: var(--font);
+      font-size: 20px; font-weight: 700; color: #a78bfa; outline: none;
+      transition: border-color var(--transition); text-align: center;
+    }
+    .edit-credits-input:focus { border-color: rgba(124,58,237,0.4); }
+
+    @media (max-width: 768px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .stat-value { font-size: 26px; }
+      .table-header { display: none; }
+      .table-row { grid-template-columns: 1fr; padding: 16px 16px; gap: 4px; }
+      .td { white-space: normal; padding-right: 0; }
+      .td::before { content: attr(data-label) ': '; font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+      .td-name::before { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">📚</div>
+        <span class="nav-logo-text">GWATOP</span>
+      </a>
+      <div class="nav-right">
+        <span style="font-size:13px;color:var(--text-muted);font-weight:600;">🔐 관리자</span>
+        <a href="/" class="btn btn-ghost btn-sm">홈으로</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 접근 차단 화면 -->
+  <div id="access-denied" style="display:none; padding-top:var(--nav-height); min-height:100vh; display:none; align-items:center; justify-content:center;">
+    <div style="text-align:center; padding: 40px;">
+      <div style="font-size:64px; margin-bottom:20px">🔒</div>
+      <h1 style="font-size:24px; font-weight:800; margin-bottom:8px">접근 권한 없음</h1>
+      <p style="color:var(--text-secondary)">관리자 계정으로 로그인해주세요.</p>
+    </div>
+  </div>
+
+  <!-- 로딩 -->
+  <div id="loading-state" style="display:none; padding-top:var(--nav-height); min-height:100vh; align-items:center; justify-content:center; flex-direction:column; gap:16px;">
+    <div class="loading-spinner"></div>
+    <p style="color:var(--text-secondary)">데이터 불러오는 중...</p>
+  </div>
+
+  <!-- 메인 어드민 -->
+  <main class="admin-page container" id="admin-main" style="display:none">
+    <div class="admin-header">
+      <h1 class="admin-title">🔐 관리자 대시보드</h1>
+      <p class="admin-subtitle">전체 유저 현황을 확인하고 크레딧을 조정합니다.</p>
+    </div>
+
+    <!-- 통계 -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-users">0</div>
+        <div class="stat-label">전체 유저</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-quizzes">0</div>
+        <div class="stat-label">총 퀴즈 생성</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-credits">0</div>
+        <div class="stat-label">잔여 크레딧 합계</div>
+      </div>
+    </div>
+
+    <!-- 검색 -->
+    <div class="search-bar">
+      <input class="search-input" id="search-input" placeholder="🔍  이름 또는 이메일로 검색..." />
+      <button class="btn btn-glass" id="refresh-btn">🔄 새로고침</button>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="th">이름</div>
+        <div class="th">이메일</div>
+        <div class="th">크레딧</div>
+        <div class="th">퀴즈 수</div>
+        <div class="th">추천</div>
+        <div class="th">가입일</div>
+        <div class="th">수정</div>
+      </div>
+      <div class="table-body" id="table-body">
+        <div class="empty-row">데이터 로딩 중...</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 크레딧 수정 모달 -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal" style="text-align:left; max-width:400px;">
+      <div class="edit-user-info">
+        <div class="edit-user-name" id="edit-name"></div>
+        <div class="edit-user-email" id="edit-email"></div>
+      </div>
+      <div class="edit-label">크레딧 조정</div>
+      <input class="edit-credits-input" id="edit-credits-input" type="number" min="0" />
+      <div class="modal-actions" style="margin-top:20px;">
+        <button class="btn btn-primary btn-lg" id="edit-save-btn" style="flex:1">저장</button>
+        <button class="btn btn-ghost" id="edit-cancel-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+  <script type="module" src="/admin.js"></script>
+</body>
+</html>
