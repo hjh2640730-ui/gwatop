@@ -104,8 +104,14 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
 
   const signingInput = `${encode(header)}.${encode(payload)}`;
 
-  // PEM → CryptoKey
-  const pem = privateKey.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
+  // PEM → CryptoKey (Cloudflare env에서 \n이 literal로 저장될 수 있음)
+  const pem = privateKey
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\\n/g, '')
+    .replace(/\n/g, '')
+    .replace(/\r/g, '')
+    .replace(/\s/g, '');
   const keyData = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
 
   const cryptoKey = await crypto.subtle.importKey(
