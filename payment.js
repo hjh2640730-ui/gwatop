@@ -92,14 +92,16 @@ async function renderPaymentWidget(credits, price, packageName) {
   widgetContainer.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">결제 위젯 로딩 중...</div>';
 
   try {
-    // 이전 위젯 인스턴스 초기화
-    paymentWidget = tossPayments.payment({ customerKey: currentUser.uid });
+    // widgets() 방식 사용 (Toss v2 위젯 SDK)
+    paymentWidget = tossPayments.widgets({ customerKey: currentUser.uid });
+
+    // 금액 설정
+    await paymentWidget.setAmount({ currency: 'KRW', value: price });
 
     // 결제 UI 렌더링
     await paymentWidget.renderPaymentMethods({
       selector: '#payment-widget',
       variantKey: 'DEFAULT',
-      amount: { currency: 'KRW', value: price },
     });
 
     // 약관 렌더링
@@ -127,7 +129,6 @@ document.getElementById('pay-btn')?.addEventListener('click', async () => {
     await paymentWidget.requestPayment({
       orderId,
       orderName: `GWATOP ${packageName} 크레딧 ${credits}회`,
-      amount: { currency: 'KRW', value: price },
       successUrl: `${window.location.origin}/payment-success.html`,
       failUrl: `${window.location.origin}/payment-fail.html`,
       customerEmail: currentUser.email,
