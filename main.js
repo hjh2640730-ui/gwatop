@@ -326,11 +326,10 @@ function showUpgradeInfo() {
 
 // ─── Pricing ───
 function setupPricing() {
-  document.getElementById('pricing-free-btn')?.addEventListener('click', () => {
-    if (!currentUser) { signInWithGoogle(); } else { showToast('이미 무료 플랜을 사용 중입니다.', 'success'); }
-  });
-  document.getElementById('pricing-premium-btn')?.addEventListener('click', () => {
-    window.location.href = '/payment.html';
+  ['pricing-starter-btn', 'pricing-standard-btn', 'pricing-premium-btn'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', () => {
+      if (!currentUser) { signInWithGoogle(); } else { window.location.href = '/payment.html'; }
+    });
   });
 }
 
