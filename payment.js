@@ -87,7 +87,8 @@ document.getElementById('pay-btn')?.addEventListener('click', async () => {
   try {
     document.getElementById('pay-btn').disabled = true;
 
-    await tossPayments.requestPayment({
+    const payment = tossPayments.payment({ customerKey: currentUser.uid });
+    await payment.requestPayment({
       method: '카드',
       amount: { currency: 'KRW', value: price },
       orderId,
