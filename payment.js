@@ -99,7 +99,7 @@ async function renderPaymentWidget(credits, price, packageName) {
     await paymentWidget.renderPaymentMethods({
       selector: '#payment-widget',
       variantKey: 'DEFAULT',
-      theme: { variables: { colorPrimary: '#7c3aed' } }
+      amount: { currency: 'KRW', value: price },
     });
 
     // 약관 렌더링
@@ -127,6 +127,7 @@ document.getElementById('pay-btn')?.addEventListener('click', async () => {
     await paymentWidget.requestPayment({
       orderId,
       orderName: `GWATOP ${packageName} 크레딧 ${credits}회`,
+      amount: { currency: 'KRW', value: price },
       successUrl: `${window.location.origin}/payment-success.html`,
       failUrl: `${window.location.origin}/payment-fail.html`,
       customerEmail: currentUser.email,
