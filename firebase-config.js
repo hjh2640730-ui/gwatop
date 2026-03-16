@@ -5,12 +5,13 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyAsxkIpwlBa0rD6FyzsrB0sdlovQoCPtcQ",
+  authDomain: "gwatop-8edaf.firebaseapp.com",
+  projectId: "gwatop-8edaf",
+  storageBucket: "gwatop-8edaf.firebasestorage.app",
+  messagingSenderId: "482465884386",
+  appId: "1:482465884386:web:cf86579ef85c20382216bb",
+  measurementId: "G-LE2L73BXBL"
 };
 
 export default firebaseConfig;
