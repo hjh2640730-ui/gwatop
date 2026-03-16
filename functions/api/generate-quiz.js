@@ -17,12 +17,15 @@ export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
-// 디버그용 (env 변수 키 목록 확인)
+// 디버그용 (사용 가능한 Gemini 모델 목록 확인)
 export async function onRequestGet(context) {
   const { env } = context;
-  const keys = Object.keys(env || {});
-  const hasKey = !!(env.GEMINI_API_KEY);
-  return new Response(JSON.stringify({ keys, hasKey }), { status: 200, headers: CORS_HEADERS });
+  const apiKey = env.GEMINI_API_KEY || env['GEMINI_API_KEY '] || '';
+  if (!apiKey) return new Response(JSON.stringify({ error: 'no key' }), { status: 200, headers: CORS_HEADERS });
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+  const data = await res.json();
+  const models = (data.models || []).map(m => m.name);
+  return new Response(JSON.stringify({ models }), { status: 200, headers: CORS_HEADERS });
 }
 
 export async function onRequestPost(context) {
