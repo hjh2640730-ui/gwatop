@@ -274,11 +274,9 @@ function handleSubmit() {
   // Show result on options
   revealAnswer(q, isCorrect);
 
-  // Show explanation
-  if (q.explanation) {
-    explanationText.textContent = q.explanation;
-    explanationBox.classList.add('visible');
-  }
+  // Show explanation (항상 표시)
+  explanationText.textContent = q.explanation || '해설이 제공되지 않았습니다.';
+  explanationBox.classList.add('visible');
 
   // For short answer and OX, show correct answer if wrong
   if (!isCorrect && (q.type === 'short' || q.type === 'ox')) {
