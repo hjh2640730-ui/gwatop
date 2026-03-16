@@ -1,6 +1,6 @@
 // ============================================================
-// GWATOP - Firebase Auth Module v1.2.0
-// 크레딧 기반 과금 시스템 추가
+// GWATOP - Firebase Auth Module v1.3.0
+// 크레딧 기반 과금 + 추천인 시스템
 // ============================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -37,6 +37,10 @@ try {
   console.warn('Firebase initialization failed:', e);
 }
 
+// ─── 추천인 파라미터 저장 ───
+const refParam = new URLSearchParams(window.location.search).get('ref');
+if (refParam) localStorage.setItem('gwatop_ref', refParam);
+
 // ─── Google Sign-In ───
 export async function signInWithGoogle() {
   if (!isConfigured) {
@@ -63,7 +67,7 @@ export async function logOut() {
 
 export async function handleRedirectResult() { return null; }
 
-// ─── Ensure User Document (신규 가입 시 3 크레딧 무료 지급) ───
+// ─── Ensure User Document (신규 가입 시 2 크레딧 무료 지급) ───
 export async function ensureUserDoc(user) {
   if (!isConfigured || !db) return;
   try {
@@ -75,19 +79,47 @@ export async function ensureUserDoc(user) {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        credits: 3,           // 신규 가입 무료 크레딧
+        credits: 2,           // 신규 가입 무료 크레딧
+        referralCredits: 0,   // 추천으로 얻은 크레딧 합계
         totalQuizzes: 0,
         createdAt: serverTimestamp()
       });
-    } else {
-      // 기존 유저 중 credits 필드 없는 경우 마이그레이션
-      const data = snap.data();
-      if (data.credits === undefined) {
-        await updateDoc(ref, { credits: 3 });
+
+      // 추천인 처리
+      const refUid = localStorage.getItem('gwatop_ref');
+      if (refUid && refUid !== user.uid) {
+        await addReferralCredit(refUid);
+        localStorage.removeItem('gwatop_ref');
       }
+    } else {
+      // 기존 유저 credits 필드 마이그레이션
+      const data = snap.data();
+      const updates = {};
+      if (data.credits === undefined) updates.credits = 2;
+      if (data.referralCredits === undefined) updates.referralCredits = 0;
+      if (Object.keys(updates).length > 0) await updateDoc(ref, updates);
     }
   } catch (e) {
     console.warn('ensureUserDoc error:', e);
+  }
+}
+
+// ─── 추천인 크레딧 지급 (최대 3회) ───
+export async function addReferralCredit(referrerUid) {
+  if (!isConfigured || !db) return;
+  try {
+    const ref = doc(db, 'users', referrerUid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const referralCredits = data.referralCredits ?? 0;
+    if (referralCredits >= 3) return; // 최대 3회 제한
+    await updateDoc(ref, {
+      credits: increment(1),
+      referralCredits: increment(1)
+    });
+  } catch (e) {
+    console.warn('addReferralCredit error:', e);
   }
 }
 

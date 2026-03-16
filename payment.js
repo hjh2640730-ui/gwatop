@@ -40,6 +40,7 @@ function setupNav() {
       document.getElementById('nav-credits').textContent = credits;
       document.getElementById('current-credits').textContent = credits;
       document.getElementById('credits-info-bar').style.display = 'flex';
+      setupReferral(user, userData);
     } else {
       lo.style.display = '';
       li.style.display = 'none';
@@ -105,6 +106,40 @@ document.getElementById('pay-btn')?.addEventListener('click', async () => {
     document.getElementById('pay-btn').disabled = false;
   }
 });
+
+// ─── Referral ───
+function setupReferral(user, userData) {
+  const section = document.getElementById('referral-section');
+  section.style.display = '';
+
+  const referralUrl = `${window.location.origin}/?ref=${user.uid}`;
+  document.getElementById('referral-link').value = referralUrl;
+  document.getElementById('referral-credits-count').textContent = userData?.referralCredits ?? 0;
+
+  document.getElementById('copy-referral-btn')?.addEventListener('click', () => {
+    copyToClipboard(referralUrl);
+  });
+  document.getElementById('share-copy-btn')?.addEventListener('click', () => {
+    copyToClipboard(referralUrl);
+  });
+  document.getElementById('share-kakao-btn')?.addEventListener('click', () => {
+    const msg = `GWATOP - AI 퀴즈 생성기\nPDF 업로드 한 번으로 시험 문제 자동 생성!\n${referralUrl}`;
+    if (navigator.share) {
+      navigator.share({ title: 'GWATOP', text: msg, url: referralUrl });
+    } else {
+      copyToClipboard(referralUrl);
+      showToast('링크가 복사됐습니다. 카카오톡에 붙여넣기 하세요!', 'success');
+    }
+  });
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('추천 링크가 복사됐습니다!', 'success');
+  }).catch(() => {
+    showToast('복사 실패. 직접 선택해서 복사해주세요.', 'error');
+  });
+}
 
 // ─── Toast ───
 function showToast(msg, type = 'success') {
