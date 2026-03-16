@@ -1,5 +1,11 @@
 # GWATOP - Version History
 
+## v1.0.2 (2026-03-16) - 구글 로그인 방식 변경
+- signInWithRedirect → signInWithPopup 변경 (Cloudflare 환경 호환성)
+- Auth 에러 처리 강화 (Firestore 오류 시에도 로그인 상태 유지)
+
+---
+
 ## v1.0.1 (2026-03-16) - Firebase 설정 적용
 - Firebase 프로젝트 연동 (gwatop-8edaf)
 - 구글 로그인 활성화

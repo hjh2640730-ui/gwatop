@@ -1,13 +1,13 @@
 // ============================================================
-// GWATOP - Firebase Auth Module v1.0.0
+// GWATOP - Firebase Auth Module v1.0.2
+// Popup 방식으로 변경 (redirect 방식 호환성 문제 해결)
 // ============================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
   getAuth,
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut,
   onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
@@ -37,57 +37,62 @@ try {
   console.warn('Firebase initialization failed:', e);
 }
 
-// ─── Google Sign-In ───
+// ─── Google Sign-In (Popup 방식) ───
 export async function signInWithGoogle() {
   if (!isConfigured) {
-    showFirebaseWarning();
+    alert('Firebase가 설정되지 않았습니다.\nfirebase-config.js 파일을 확인해주세요.');
     return;
   }
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  await signInWithRedirect(auth, provider);
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const result = await signInWithPopup(auth, provider);
+    if (result.user) {
+      await ensureUserDoc(result.user);
+    }
+  } catch (e) {
+    if (e.code === 'auth/popup-closed-by-user') return; // 사용자가 닫은 경우 무시
+    console.error('Sign in error:', e);
+    alert('로그인 중 오류가 발생했습니다: ' + e.message);
+  }
 }
 
 // ─── Sign Out ───
 export async function logOut() {
   if (!isConfigured) return;
-  await signOut(auth);
-  window.location.reload();
+  try {
+    await signOut(auth);
+  } catch (e) {
+    console.error('Sign out error:', e);
+  }
 }
 
-// ─── Handle Redirect Result ───
+// ─── Redirect Result (더 이상 사용 안 하지만 호환성 유지) ───
 export async function handleRedirectResult() {
-  if (!isConfigured) return null;
-  try {
-    const result = await getRedirectResult(auth);
-    if (result && result.user) {
-      await ensureUserDoc(result.user);
-      return result.user;
-    }
-    return null;
-  } catch (e) {
-    console.error('Redirect result error:', e);
-    return null;
-  }
+  return null;
 }
 
 // ─── Ensure User Document in Firestore ───
 export async function ensureUserDoc(user) {
   if (!isConfigured || !db) return;
-  const ref = doc(db, 'users', user.uid);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) {
-    await setDoc(ref, {
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      plan: 'free',
-      quizGeneratedToday: 0,
-      lastQuizDate: null,
-      totalQuizzes: 0,
-      createdAt: serverTimestamp()
-    });
+  try {
+    const ref = doc(db, 'users', user.uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        plan: 'free',
+        quizGeneratedToday: 0,
+        lastQuizDate: null,
+        totalQuizzes: 0,
+        createdAt: serverTimestamp()
+      });
+    }
+  } catch (e) {
+    console.warn('ensureUserDoc error (non-critical):', e);
   }
 }
 
@@ -99,7 +104,7 @@ export async function getUserData(uid) {
     const snap = await getDoc(ref);
     return snap.exists() ? snap.data() : null;
   } catch (e) {
-    console.error('Get user data error:', e);
+    console.warn('getUserData error:', e);
     return null;
   }
 }
@@ -115,12 +120,9 @@ export async function checkAndIncrementQuizCount(uid) {
     const data = snap.data();
     const today = new Date().toDateString();
     const lastDate = data.lastQuizDate?.toDate?.()?.toDateString?.() || '';
-
-    // Reset count if new day
     let count = lastDate === today ? (data.quizGeneratedToday || 0) : 0;
 
     if (data.plan === 'premium') {
-      // Premium: unlimited
       await updateDoc(ref, {
         quizGeneratedToday: count + 1,
         lastQuizDate: serverTimestamp(),
@@ -129,7 +131,6 @@ export async function checkAndIncrementQuizCount(uid) {
       return { allowed: true, plan: 'premium' };
     }
 
-    // Free: 1 per day
     if (count >= 1) {
       return { allowed: false, plan: 'free', reason: 'limit' };
     }
@@ -141,16 +142,20 @@ export async function checkAndIncrementQuizCount(uid) {
     });
     return { allowed: true, plan: 'free' };
   } catch (e) {
-    console.error('Check quiz count error:', e);
+    console.warn('checkAndIncrementQuizCount error:', e);
     return { allowed: true };
   }
 }
 
-// ─── Upgrade to Premium (placeholder) ───
+// ─── Upgrade to Premium ───
 export async function upgradeToPremium(uid) {
   if (!isConfigured || !db) return;
-  const ref = doc(db, 'users', uid);
-  await updateDoc(ref, { plan: 'premium' });
+  try {
+    const ref = doc(db, 'users', uid);
+    await updateDoc(ref, { plan: 'premium' });
+  } catch (e) {
+    console.error('upgradeToPremium error:', e);
+  }
 }
 
 // ─── Auth State Observer ───
@@ -160,20 +165,20 @@ export function onUserChange(callback) {
     return () => {};
   }
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      await ensureUserDoc(user);
-      const userData = await getUserData(user.uid);
-      callback(user, userData);
-    } else {
-      callback(null, null);
+    try {
+      if (user) {
+        await ensureUserDoc(user);
+        const userData = await getUserData(user.uid);
+        callback(user, userData);
+      } else {
+        callback(null, null);
+      }
+    } catch (e) {
+      console.warn('onUserChange handler error:', e);
+      callback(user || null, null);
     }
   });
   return unsubscribe;
-}
-
-// ─── Firebase Warning ───
-function showFirebaseWarning() {
-  alert('Firebase가 설정되지 않았습니다.\nfirebase-config.js 파일에 Firebase 프로젝트 정보를 입력해주세요.');
 }
 
 export { isConfigured, auth, db };
