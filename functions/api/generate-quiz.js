@@ -79,7 +79,10 @@ export async function onRequestPost(context) {
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
-      console.error('Gemini API error:', errText);
+      console.error('Gemini API error:', geminiRes.status, errText);
+      if (geminiRes.status === 429) {
+        return json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요. (1~2분 대기)' }, 429);
+      }
       return json({ error: `Gemini API 오류 (${geminiRes.status}). API 키를 확인해주세요.` }, 502);
     }
 
