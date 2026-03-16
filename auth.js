@@ -50,8 +50,8 @@ export async function signInWithGoogle() {
   try {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    const result = await signInWithPopup(auth, provider);
-    if (result.user) await ensureUserDoc(result.user);
+    await signInWithPopup(auth, provider);
+    // ensureUserDoc은 onAuthStateChanged에서만 호출 (중복 방지)
   } catch (e) {
     if (e.code === 'auth/popup-closed-by-user') return;
     console.error('Sign in error:', e);
