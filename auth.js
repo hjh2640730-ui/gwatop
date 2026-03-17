@@ -300,10 +300,22 @@ async function _forceSocialProfile(uid, email, displayName, photoURL) {
     if (displayName) updates.displayName = displayName;
     if (photoURL) updates.photoURL = photoURL;
     if (Object.keys(updates).length > 0) {
+      console.log('[forceSocialProfile] updating', uid, updates);
       await updateDoc(doc(db, 'users', uid), updates);
+      console.log('[forceSocialProfile] success');
     }
   } catch (e) {
-    console.warn('_forceSocialProfile error:', e);
+    console.error('[forceSocialProfile] ERROR:', e.code, e.message);
+    // updateDoc 실패 시 (문서 없음 등) setDoc으로 재시도
+    try {
+      const ref = doc(db, 'users', uid);
+      const snap = await getDoc(ref);
+      const existing = snap.exists() ? snap.data() : {};
+      await setDoc(ref, { ...existing, ...(email && { email }), ...(displayName && { displayName }), ...(photoURL && { photoURL }) }, { merge: true });
+      console.log('[forceSocialProfile] setDoc merge success');
+    } catch (e2) {
+      console.error('[forceSocialProfile] setDoc also failed:', e2.code, e2.message);
+    }
   }
 }
 
