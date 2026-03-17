@@ -49,9 +49,9 @@ function setupNav() {
       li.style.display = 'none';
     }
     checkAndShowNicknameModal(user, userData);
-    // Re-render like button and comment form after auth state changes
+    // Re-render after auth state changes
     if (postData) {
-      renderLikeButton();
+      renderPostFooter();
       renderCommentForm();
       loadComments();
     }
@@ -102,7 +102,7 @@ function renderPost() {
       </div>` : ''}
     <div class="post-detail-footer" id="post-detail-footer">
       <div id="post-like-wrap"></div>
-      ${currentUser?.uid === postData.uid ? `<button id="post-delete-btn" style="margin-left:auto;font-size:13px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px 8px;font-family:var(--font);transition:color var(--transition);" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text-muted)'">삭제</button>` : ''}
+      <div id="post-action-wrap"></div>
     </div>
   `;
 
@@ -115,9 +115,24 @@ function renderPost() {
     });
   }
 
-  document.getElementById('post-delete-btn')?.addEventListener('click', deletePost);
+  renderPostFooter();
+}
 
+// ─── Render Post Footer (like + delete) ───
+function renderPostFooter() {
   renderLikeButton();
+
+  const wrap = document.getElementById('post-action-wrap');
+  if (!wrap || !postData) return;
+
+  if (currentUser?.uid === postData.uid) {
+    wrap.innerHTML = `<button id="post-delete-btn" style="margin-left:8px;font-size:13px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px 8px;font-family:var(--font);">삭제</button>`;
+    document.getElementById('post-delete-btn').addEventListener('click', deletePost);
+    document.getElementById('post-delete-btn').addEventListener('mouseover', e => e.target.style.color = '#f87171');
+    document.getElementById('post-delete-btn').addEventListener('mouseout', e => e.target.style.color = 'var(--text-muted)');
+  } else {
+    wrap.innerHTML = '';
+  }
 }
 
 // ─── Delete Post ───
@@ -149,7 +164,7 @@ function renderLikeButton() {
     </button>
   `;
 
-  document.getElementById('detail-like-btn').addEventListener('click', handleLike);
+  document.getElementById('detail-like-btn')?.addEventListener('click', handleLike);
 }
 
 // ─── Like ───
