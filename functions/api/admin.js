@@ -1,6 +1,7 @@
 // ============================================================
-// GWATOP - Admin API v1.0.0
-// 유저 목록 조회 및 크레딧 수동 조정
+// GWATOP - Admin API v2.0.0
+// 유저 목록 조회, 크레딧/닉네임 수정, 유저 삭제
+// 게시글 목록 조회, 게시글 삭제
 // ENV: FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
 // ============================================================
 
@@ -27,11 +28,12 @@ function decodeJWT(token) {
   } catch { return null; }
 }
 
-// ─── GET: 유저 목록 조회 ───
+// ─── GET: 유저 목록 또는 게시글 목록 조회 ───
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const token = url.searchParams.get('token');
+  const type = url.searchParams.get('type');
 
   if (!token) return json({ error: '인증 토큰이 없습니다.' }, 401);
   const payload = decodeJWT(token);
@@ -41,6 +43,13 @@ export async function onRequestGet(context) {
 
   try {
     const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+
+    if (type === 'posts') {
+      const posts = await getPosts(accessToken);
+      return json({ posts });
+    }
+
+    // 기본: 유저 목록 + 통계
     const users = await getUsers(accessToken);
     const stats = {
       totalUsers: users.length,
@@ -53,24 +62,41 @@ export async function onRequestGet(context) {
   }
 }
 
-// ─── POST: 크레딧 수정 ───
+// ─── POST: 크레딧/닉네임 수정, 유저/게시글 삭제 ───
 export async function onRequestPost(context) {
   const { request, env } = context;
   let body;
   try { body = await request.json(); } catch { return json({ error: '파싱 실패' }, 400); }
 
-  const { token, action, uid, credits } = body;
+  const { token, action } = body;
   if (!token) return json({ error: '인증 토큰이 없습니다.' }, 401);
   const payload = decodeJWT(token);
   if (!payload || payload.email !== ADMIN_EMAIL) {
     return json({ error: '관리자 권한이 없습니다.' }, 403);
   }
 
+  // 기존 updateCredits 호환 유지
   if (action === 'updateCredits') {
+    const { uid, credits } = body;
     if (!uid || credits === undefined) return json({ error: '파라미터 누락' }, 400);
     try {
       const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
-      await updateUserCredits(uid, parseInt(credits), accessToken);
+      await updateUserFields(uid, { credits: parseInt(credits) }, accessToken);
+      return json({ success: true });
+    } catch (e) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
+  if (action === 'updateUser') {
+    const { uid, credits, nickname } = body;
+    if (!uid) return json({ error: 'uid 누락' }, 400);
+    const fields = {};
+    if (credits !== undefined) fields.credits = parseInt(credits);
+    if (nickname !== undefined) fields.nickname = nickname;
+    try {
+      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      await updateUserFields(uid, fields, accessToken);
       return json({ success: true });
     } catch (e) {
       return json({ error: e.message }, 500);
@@ -78,10 +104,23 @@ export async function onRequestPost(context) {
   }
 
   if (action === 'deleteUser') {
+    const { uid } = body;
     if (!uid) return json({ error: 'uid 누락' }, 400);
     try {
       const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
       await deleteUserDoc(uid, accessToken);
+      return json({ success: true });
+    } catch (e) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
+  if (action === 'deletePost') {
+    const { postId } = body;
+    if (!postId) return json({ error: 'postId 누락' }, 400);
+    try {
+      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      await deletePostDoc(postId, accessToken);
       return json({ success: true });
     } catch (e) {
       return json({ error: e.message }, 500);
@@ -109,12 +148,50 @@ async function getUsers(accessToken) {
       phone: f.phone?.stringValue || '',
       displayName: f.displayName?.stringValue || '',
       nickname: f.nickname?.stringValue || '',
+      university: f.university?.stringValue || '',
       credits: parseInt(f.credits?.integerValue || 0),
       totalQuizzes: parseInt(f.totalQuizzes?.integerValue || 0),
       referralCredits: parseInt(f.referralCredits?.integerValue || 0),
       createdAt: f.createdAt?.timestampValue || null,
     };
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// ─── Firestore: 게시글 목록 (최신순 100개) ───
+async function getPosts(accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const body = {
+    structuredQuery: {
+      from: [{ collectionId: 'community_posts' }],
+      orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+      limit: 100
+    }
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error('게시글 목록 조회 실패');
+  const data = await res.json();
+  return data
+    .filter(r => r.document)
+    .map(r => {
+      const f = r.document.fields || {};
+      const docId = r.document.name.split('/').pop();
+      return {
+        id: docId,
+        title: f.title?.stringValue || '',
+        content: f.content?.stringValue || '',
+        uid: f.uid?.stringValue || '',
+        nickname: f.nickname?.stringValue || '',
+        isAnonymous: f.isAnonymous?.booleanValue || false,
+        university: f.university?.stringValue || '',
+        likes: parseInt(f.likes?.integerValue || 0),
+        commentCount: parseInt(f.commentCount?.integerValue || 0),
+        createdAt: f.createdAt?.timestampValue || null,
+      };
+    });
 }
 
 // ─── Firestore: 유저 삭제 ───
@@ -127,20 +204,38 @@ async function deleteUserDoc(uid, accessToken) {
   if (!res.ok && res.status !== 404) throw new Error('유저 삭제 실패');
 }
 
-// ─── Firestore: 크레딧 업데이트 ───
-async function updateUserCredits(uid, credits, accessToken) {
-  const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}?updateMask.fieldPaths=credits`;
-  const res = await fetch(baseUrl, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      fields: { credits: { integerValue: String(credits) } }
-    }),
+// ─── Firestore: 게시글 삭제 ───
+async function deletePostDoc(postId, accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/community_posts/${postId}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${accessToken}` }
   });
-  if (!res.ok) throw new Error('크레딧 업데이트 실패');
+  if (!res.ok && res.status !== 404) throw new Error('게시글 삭제 실패');
+}
+
+// ─── Firestore: 유저 필드 업데이트 (credits + nickname) ───
+async function updateUserFields(uid, fields, accessToken) {
+  // fields: { credits?: number, nickname?: string }
+  const firestoreFields = {};
+  const updateMasks = [];
+  if (fields.credits !== undefined) {
+    firestoreFields.credits = { integerValue: String(fields.credits) };
+    updateMasks.push('credits');
+  }
+  if (fields.nickname !== undefined) {
+    firestoreFields.nickname = { stringValue: fields.nickname };
+    updateMasks.push('nickname');
+  }
+  if (updateMasks.length === 0) return;
+  const maskQuery = updateMasks.map(f => `updateMask.fieldPaths=${f}`).join('&');
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}?${maskQuery}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: firestoreFields })
+  });
+  if (!res.ok) throw new Error('유저 정보 업데이트 실패');
 }
 
 // ─── Firebase JWT ───

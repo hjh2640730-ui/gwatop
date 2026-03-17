@@ -1,5 +1,5 @@
 // ============================================================
-// GWATOP - Admin Page Logic v1.1.0
+// GWATOP - Admin Page Logic v2.0.0
 // ============================================================
 
 import { onAdminUserChange, signInWithGoogleAdmin, logOutAdmin } from './auth-admin.js';
@@ -8,8 +8,29 @@ const ADMIN_EMAIL = 'hjh2640730@gmail.com';
 
 let currentUser = null;
 let allUsers = [];
+let allPosts = [];
 let editingUid = null;
 let deletingUid = null;
+let deletingPostId = null;
+let activeTab = 'dashboard';
+let dashboardLoaded = false;
+let usersLoaded = false;
+let postsLoaded = false;
+
+// ─── 탭 시스템 ───
+const TABS = ['dashboard', 'users', 'posts'];
+
+function switchTab(tabName) {
+  TABS.forEach(t => {
+    document.getElementById(`tab-${t}`).style.display = t === tabName ? '' : 'none';
+    document.querySelector(`[data-tab="${t}"]`).classList.toggle('active', t === tabName);
+  });
+  activeTab = tabName;
+
+  if (tabName === 'dashboard' && !dashboardLoaded) loadDashboard();
+  if (tabName === 'users' && !usersLoaded) loadUsers();
+  if (tabName === 'posts' && !postsLoaded) loadPosts();
+}
 
 async function init() {
   showState('loading');
@@ -35,8 +56,8 @@ async function init() {
 
     document.getElementById('admin-logout-btn').style.display = '';
     showState('main');
-    await loadUsers();
     setupEvents();
+    switchTab('dashboard');
   });
 }
 
@@ -47,8 +68,56 @@ function showState(state) {
   document.getElementById('admin-main').style.display     = state === 'main'    ? ''     : 'none';
 }
 
+// ─── Load Dashboard ───
+async function loadDashboard() {
+  dashboardLoaded = false;
+  try {
+    const idToken = await currentUser.getIdToken();
+    const [usersRes, postsRes] = await Promise.all([
+      fetch(`/api/admin?token=${idToken}`),
+      fetch(`/api/admin?token=${idToken}&type=posts`),
+    ]);
+
+    const usersData = await usersRes.json();
+    const postsData = await postsRes.json();
+
+    if (!usersRes.ok || usersData.error) {
+      showToast(usersData.error || '유저 데이터 로드 실패', 'error');
+      return;
+    }
+    if (!postsRes.ok || postsData.error) {
+      showToast(postsData.error || '게시글 데이터 로드 실패', 'error');
+      return;
+    }
+
+    const users = usersData.users;
+    const posts = postsData.posts;
+
+    // 오늘 신규 가입자
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayUsers = users.filter(u => {
+      if (!u.createdAt) return false;
+      return u.createdAt.slice(0, 10) === todayStr;
+    }).length;
+
+    const totalLikes = posts.reduce((s, p) => s + (p.likes || 0), 0);
+
+    document.getElementById('stat-total-users').textContent = users.length.toLocaleString();
+    document.getElementById('stat-today-users').textContent = todayUsers.toLocaleString();
+    document.getElementById('stat-total-quizzes').textContent = users.reduce((s, u) => s + u.totalQuizzes, 0).toLocaleString();
+    document.getElementById('stat-total-credits').textContent = users.reduce((s, u) => s + u.credits, 0).toLocaleString();
+    document.getElementById('stat-total-posts').textContent = posts.length.toLocaleString();
+    document.getElementById('stat-total-likes').textContent = totalLikes.toLocaleString();
+
+    dashboardLoaded = true;
+  } catch (e) {
+    showToast('네트워크 오류: ' + e.message, 'error');
+  }
+}
+
 // ─── Load Users ───
 async function loadUsers() {
+  usersLoaded = false;
   try {
     const idToken = await currentUser.getIdToken();
     const res = await fetch(`/api/admin?token=${idToken}`);
@@ -60,12 +129,8 @@ async function loadUsers() {
     }
 
     allUsers = data.users;
-
-    document.getElementById('stat-users').textContent = data.stats.totalUsers.toLocaleString();
-    document.getElementById('stat-quizzes').textContent = data.stats.totalQuizzes.toLocaleString();
-    document.getElementById('stat-credits').textContent = data.stats.totalCredits.toLocaleString();
-
     renderTable(allUsers);
+    usersLoaded = true;
   } catch (e) {
     showToast('네트워크 오류: ' + e.message, 'error');
   }
@@ -103,8 +168,64 @@ function renderTable(users) {
   });
 }
 
+// ─── Load Posts ───
+async function loadPosts() {
+  postsLoaded = false;
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`/api/admin?token=${idToken}&type=posts`);
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showToast(data.error || '게시글 데이터 로드 실패', 'error');
+      return;
+    }
+
+    allPosts = data.posts;
+    renderPosts(allPosts);
+    postsLoaded = true;
+  } catch (e) {
+    showToast('네트워크 오류: ' + e.message, 'error');
+  }
+}
+
+// ─── Render Posts ───
+function renderPosts(posts) {
+  const body = document.getElementById('posts-table-body');
+
+  if (posts.length === 0) {
+    body.innerHTML = '<div class="empty-row">게시글이 없습니다.</div>';
+    return;
+  }
+
+  body.innerHTML = posts.map(p => `
+    <div class="posts-table-row" data-id="${p.id}">
+      <div class="td" style="padding-right:12px;">
+        <div class="td-title">${p.title || '제목없음'}</div>
+        <div class="td-preview">${p.content || ''}</div>
+      </div>
+      <div class="td" data-label="작성자">${p.isAnonymous ? '익명' : (p.nickname || '-')}</div>
+      <div class="td" data-label="대학교">${p.university || '-'}</div>
+      <div class="td" data-label="좋아요">❤️ ${p.likes}</div>
+      <div class="td" data-label="댓글">💬 ${p.commentCount}</div>
+      <div class="td td-date" data-label="날짜">${formatDate(p.createdAt)}</div>
+      <div class="td"><button class="btn-delete post-delete-btn" data-id="${p.id}">삭제</button></div>
+    </div>
+  `).join('');
+
+  body.querySelectorAll('.post-delete-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openPostDeleteModal(btn.dataset.id); });
+  });
+}
+
 // ─── Search ───
 function setupEvents() {
+  // 탭 전환
+  document.querySelectorAll('.admin-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
+  // 유저 검색
   document.getElementById('search-input').addEventListener('input', (e) => {
     const q = e.target.value.toLowerCase();
     const filtered = allUsers.filter(u =>
@@ -114,21 +235,46 @@ function setupEvents() {
     renderTable(filtered);
   });
 
-  document.getElementById('refresh-btn').addEventListener('click', () => loadUsers());
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    usersLoaded = false;
+    loadUsers();
+  });
+
+  // 게시글 검색
+  document.getElementById('post-search-input').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    const filtered = allPosts.filter(p =>
+      (p.title || '').toLowerCase().includes(q) ||
+      (p.nickname || '').toLowerCase().includes(q)
+    );
+    renderPosts(filtered);
+  });
+
+  document.getElementById('posts-refresh-btn').addEventListener('click', () => {
+    postsLoaded = false;
+    loadPosts();
+  });
 
   // Edit modal
   document.getElementById('edit-cancel-btn').addEventListener('click', closeEditModal);
   document.getElementById('edit-modal').addEventListener('click', (e) => {
     if (e.target === document.getElementById('edit-modal')) closeEditModal();
   });
-  document.getElementById('edit-save-btn').addEventListener('click', saveCredits);
+  document.getElementById('edit-save-btn').addEventListener('click', saveEdits);
 
-  // Delete modal
+  // Delete modal (user)
   document.getElementById('delete-cancel-btn').addEventListener('click', closeDeleteModal);
   document.getElementById('delete-modal').addEventListener('click', (e) => {
     if (e.target === document.getElementById('delete-modal')) closeDeleteModal();
   });
   document.getElementById('delete-confirm-btn').addEventListener('click', confirmDelete);
+
+  // Delete modal (post)
+  document.getElementById('post-delete-cancel-btn').addEventListener('click', closePostDeleteModal);
+  document.getElementById('post-delete-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('post-delete-modal')) closePostDeleteModal();
+  });
+  document.getElementById('post-delete-confirm-btn').addEventListener('click', confirmPostDelete);
 }
 
 // ─── Edit Modal ───
@@ -138,6 +284,9 @@ function openEditModal(uid) {
   editingUid = uid;
   document.getElementById('edit-name').textContent = user.displayName || '(이름 없음)';
   document.getElementById('edit-email').textContent = user.email || '-';
+  document.getElementById('edit-phone').textContent = formatPhone(user.phone) || '-';
+  document.getElementById('edit-university').textContent = user.university || '-';
+  document.getElementById('edit-nickname-input').value = user.nickname || '';
   document.getElementById('edit-credits-input').value = user.credits;
   document.getElementById('edit-modal').classList.add('visible');
 }
@@ -147,9 +296,11 @@ function closeEditModal() {
   editingUid = null;
 }
 
-async function saveCredits() {
+async function saveEdits() {
   if (!editingUid) return;
   const credits = parseInt(document.getElementById('edit-credits-input').value);
+  const nickname = document.getElementById('edit-nickname-input').value.trim();
+
   if (isNaN(credits) || credits < 0) {
     showToast('올바른 크레딧 값을 입력해주세요.', 'error');
     return;
@@ -163,7 +314,7 @@ async function saveCredits() {
     const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: idToken, action: 'updateCredits', uid: editingUid, credits }),
+      body: JSON.stringify({ token: idToken, action: 'updateUser', uid: editingUid, credits, nickname }),
     });
     const data = await res.json();
 
@@ -173,10 +324,16 @@ async function saveCredits() {
     }
 
     const user = allUsers.find(u => u.uid === editingUid);
-    if (user) user.credits = credits;
-    showToast('크레딧이 업데이트됐습니다.', 'success');
+    if (user) {
+      user.credits = credits;
+      user.nickname = nickname;
+    }
+    showToast('유저 정보가 업데이트됐습니다.', 'success');
     closeEditModal();
     renderTable(allUsers);
+
+    // 대시보드 통계 갱신 필요
+    dashboardLoaded = false;
   } catch (e) {
     showToast('네트워크 오류: ' + e.message, 'error');
   } finally {
@@ -184,7 +341,7 @@ async function saveCredits() {
   }
 }
 
-// ─── Delete Modal ───
+// ─── Delete Modal (User) ───
 function openDeleteModal(uid) {
   const user = allUsers.find(u => u.uid === uid);
   if (!user) return;
@@ -224,11 +381,54 @@ async function confirmDelete() {
     showToast('유저가 삭제됐습니다.', 'success');
     closeDeleteModal();
     renderTable(allUsers);
+    dashboardLoaded = false;
+  } catch (e) {
+    showToast('네트워크 오류: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '삭제';
+  }
+}
 
-    // 통계 업데이트
-    document.getElementById('stat-users').textContent = allUsers.length.toLocaleString();
-    document.getElementById('stat-credits').textContent = allUsers.reduce((s, u) => s + u.credits, 0).toLocaleString();
-    document.getElementById('stat-quizzes').textContent = allUsers.reduce((s, u) => s + u.totalQuizzes, 0).toLocaleString();
+// ─── Delete Modal (Post) ───
+function openPostDeleteModal(postId) {
+  const post = allPosts.find(p => p.id === postId);
+  deletingPostId = postId;
+  const title = post?.title || '제목없음';
+  document.getElementById('post-delete-desc').innerHTML = `<strong>${title}</strong><br/>이 게시글을 삭제하시겠습니까?<br/><span style="color:#f87171;font-size:13px">이 작업은 되돌릴 수 없습니다.</span>`;
+  document.getElementById('post-delete-modal').classList.add('visible');
+}
+
+function closePostDeleteModal() {
+  document.getElementById('post-delete-modal').classList.remove('visible');
+  deletingPostId = null;
+}
+
+async function confirmPostDelete() {
+  if (!deletingPostId) return;
+  const btn = document.getElementById('post-delete-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = '삭제 중...';
+
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: idToken, action: 'deletePost', postId: deletingPostId }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      showToast(data.error || '삭제 실패', 'error');
+      return;
+    }
+
+    allPosts = allPosts.filter(p => p.id !== deletingPostId);
+    showToast('게시글이 삭제됐습니다.', 'success');
+    closePostDeleteModal();
+    renderPosts(allPosts);
+    dashboardLoaded = false;
   } catch (e) {
     showToast('네트워크 오류: ' + e.message, 'error');
   } finally {
@@ -240,7 +440,6 @@ async function confirmDelete() {
 // ─── Utils ───
 function formatPhone(phone) {
   if (!phone) return '-';
-  // 01012345678 → 010-1234-5678
   return phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, '$1-$2-$3');
 }
 

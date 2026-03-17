@@ -8,12 +8,20 @@
   <link rel="stylesheet" href="/style.css" />
   <style>
     .admin-page { padding: calc(var(--nav-height) + 40px) clamp(16px,4vw,32px) 80px; min-height: 100vh; }
-    .admin-header { margin-bottom: 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .admin-header { margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .admin-title { font-size: clamp(24px,4vw,36px); font-weight: 900; letter-spacing: -1px; margin-bottom: 6px; }
     .admin-subtitle { font-size: 14px; color: var(--text-muted); }
 
+    /* 탭 */
+    .admin-tabs { display:flex; gap:4px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:var(--radius-lg); padding:4px; margin-bottom:28px; overflow-x:auto; scrollbar-width:none; }
+    .admin-tabs::-webkit-scrollbar { display:none; }
+    .admin-tab { flex-shrink:0; padding:10px 22px; border-radius:var(--radius-md); border:none; background:transparent; color:var(--text-muted); font-family:var(--font); font-size:14px; font-weight:600; cursor:pointer; transition:all var(--transition); white-space:nowrap; }
+    .admin-tab:hover { color:var(--text-primary); }
+    .admin-tab.active { background:linear-gradient(135deg,rgba(124,58,237,0.18),rgba(37,99,235,0.18)); border:1px solid rgba(124,58,237,0.3); color:var(--text-primary); }
+
     /* Stats */
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stats-grid-6 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:0; }
     .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 24px; text-align: center; }
     .stat-value { font-size: 36px; font-weight: 900; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; }
     .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
@@ -54,23 +62,49 @@
     .edit-user-info { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px; }
     .edit-user-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
     .edit-user-email { font-size: 13px; color: var(--text-muted); }
-    .edit-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .edit-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; margin-top: 16px; }
+    .edit-label:first-of-type { margin-top: 0; }
     .edit-credits-input {
       width: 100%; background: var(--glass-bg); border: 1px solid var(--glass-border);
       border-radius: var(--radius-md); padding: 14px 18px; font-family: var(--font);
       font-size: 20px; font-weight: 700; color: #a78bfa; outline: none;
       transition: border-color var(--transition); text-align: center;
+      box-sizing: border-box;
     }
     .edit-credits-input:focus { border-color: rgba(124,58,237,0.4); }
+    .edit-nickname-input {
+      width: 100%; background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 12px 18px; font-family: var(--font);
+      font-size: 15px; font-weight: 600; color: var(--text-primary); outline: none;
+      transition: border-color var(--transition);
+      box-sizing: border-box;
+    }
+    .edit-nickname-input:focus { border-color: rgba(124,58,237,0.4); }
+    .edit-info-field {
+      width: 100%; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 12px 18px; font-family: var(--font);
+      font-size: 14px; color: var(--text-muted); box-sizing: border-box;
+    }
+
+    /* Posts 테이블 */
+    .posts-table-header { display:grid; grid-template-columns:2fr 1fr 1fr 0.6fr 0.6fr 1fr 65px; gap:0; padding:14px 20px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--glass-border); }
+    .posts-table-row { display:grid; grid-template-columns:2fr 1fr 1fr 0.6fr 0.6fr 1fr 65px; gap:0; padding:14px 20px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; transition:background var(--transition); }
+    .posts-table-row:last-child { border-bottom:none; }
+    .posts-table-row:hover { background:var(--glass-bg-hover); }
+    .td-title { font-size:13px; color:var(--text-primary); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:12px; }
+    .td-preview { font-size:11px; color:var(--text-muted); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
     @media (max-width: 768px) {
       .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .stats-grid-6 { grid-template-columns:repeat(2,1fr); }
       .stat-value { font-size: 26px; }
       .table-header { display: none; }
       .table-row { grid-template-columns: 1fr; padding: 16px 16px; gap: 4px; }
       .td { white-space: normal; padding-right: 0; }
       .td::before { content: attr(data-label) ': '; font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
       .td-name::before { display: none; }
+      .posts-table-header { display:none; }
+      .posts-table-row { grid-template-columns:1fr; padding:16px; gap:4px; }
     }
   </style>
 </head>
@@ -125,59 +159,114 @@
     <div class="admin-header">
       <div>
         <h1 class="admin-title">🔐 관리자 대시보드</h1>
-        <p class="admin-subtitle">전체 유저 현황을 확인하고 크레딧을 조정합니다.</p>
+        <p class="admin-subtitle">전체 현황을 확인하고 데이터를 관리합니다.</p>
       </div>
     </div>
 
-    <!-- 통계 -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="stat-users">0</div>
-        <div class="stat-label">전체 유저</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-quizzes">0</div>
-        <div class="stat-label">총 퀴즈 생성</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="stat-credits">0</div>
-        <div class="stat-label">잔여 크레딧 합계</div>
+    <!-- 탭 네비게이션 -->
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-tab="dashboard">📊 대시보드</button>
+      <button class="admin-tab" data-tab="users">👥 유저 관리</button>
+      <button class="admin-tab" data-tab="posts">🏛️ 놀이터 관리</button>
+    </div>
+
+    <!-- 탭 1: 대시보드 -->
+    <div id="tab-dashboard" class="tab-pane">
+      <div class="stats-grid-6">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total-users">-</div>
+          <div class="stat-label">전체 유저 수</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-today-users">-</div>
+          <div class="stat-label">오늘 신규 가입</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total-quizzes">-</div>
+          <div class="stat-label">총 퀴즈 생성</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total-credits">-</div>
+          <div class="stat-label">잔여 크레딧 합계</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total-posts">-</div>
+          <div class="stat-label">총 게시글 수</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total-likes">-</div>
+          <div class="stat-label">총 좋아요 수</div>
+        </div>
       </div>
     </div>
 
-    <!-- 검색 -->
-    <div class="search-bar">
-      <input class="search-input" id="search-input" placeholder="🔍  이름 또는 이메일로 검색..." />
-      <button class="btn btn-glass" id="refresh-btn">🔄 새로고침</button>
+    <!-- 탭 2: 유저 관리 -->
+    <div id="tab-users" class="tab-pane" style="display:none">
+      <!-- 검색 -->
+      <div class="search-bar">
+        <input class="search-input" id="search-input" placeholder="🔍  이름 또는 이메일로 검색..." />
+        <button class="btn btn-glass" id="refresh-btn">🔄 새로고침</button>
+      </div>
+
+      <!-- 테이블 -->
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="th">이름</div>
+          <div class="th">닉네임</div>
+          <div class="th">이메일</div>
+          <div class="th">전화번호</div>
+          <div class="th">크레딧</div>
+          <div class="th">퀴즈 수</div>
+          <div class="th">추천</div>
+          <div class="th">가입일</div>
+          <div class="th">수정</div>
+          <div class="th">삭제</div>
+        </div>
+        <div class="table-body" id="table-body">
+          <div class="empty-row">데이터 로딩 중...</div>
+        </div>
+      </div>
     </div>
 
-    <!-- 테이블 -->
-    <div class="table-wrap">
-      <div class="table-header">
-        <div class="th">이름</div>
-        <div class="th">닉네임</div>
-        <div class="th">이메일</div>
-        <div class="th">전화번호</div>
-        <div class="th">크레딧</div>
-        <div class="th">퀴즈 수</div>
-        <div class="th">추천</div>
-        <div class="th">가입일</div>
-        <div class="th">수정</div>
-        <div class="th">삭제</div>
+    <!-- 탭 3: 놀이터 관리 -->
+    <div id="tab-posts" class="tab-pane" style="display:none">
+      <!-- 검색 -->
+      <div class="search-bar">
+        <input class="search-input" id="post-search-input" placeholder="🔍  제목 또는 작성자로 검색..." />
+        <button class="btn btn-glass" id="posts-refresh-btn">🔄 새로고침</button>
       </div>
-      <div class="table-body" id="table-body">
-        <div class="empty-row">데이터 로딩 중...</div>
+
+      <!-- 테이블 -->
+      <div class="table-wrap">
+        <div class="posts-table-header">
+          <div class="th">제목</div>
+          <div class="th">작성자</div>
+          <div class="th">대학교</div>
+          <div class="th">❤️</div>
+          <div class="th">💬</div>
+          <div class="th">날짜</div>
+          <div class="th">삭제</div>
+        </div>
+        <div class="table-body" id="posts-table-body">
+          <div class="empty-row">데이터 로딩 중...</div>
+        </div>
       </div>
     </div>
   </main>
 
-  <!-- 크레딧 수정 모달 -->
+  <!-- 유저 수정 모달 -->
   <div class="modal-overlay" id="edit-modal">
-    <div class="modal" style="text-align:left; max-width:400px;">
+    <div class="modal" style="text-align:left; max-width:440px;">
       <div class="edit-user-info">
         <div class="edit-user-name" id="edit-name"></div>
         <div class="edit-user-email" id="edit-email"></div>
       </div>
+      <div class="edit-label">전화번호</div>
+      <div class="edit-info-field" id="edit-phone">-</div>
+      <div class="edit-label">대학교</div>
+      <div class="edit-info-field" id="edit-university">-</div>
+      <div class="edit-label">닉네임</div>
+      <input class="edit-nickname-input" id="edit-nickname-input" type="text" placeholder="닉네임 입력..." />
       <div class="edit-label">크레딧 조정</div>
       <input class="edit-credits-input" id="edit-credits-input" type="number" min="0" />
       <div class="modal-actions" style="margin-top:20px;">
@@ -196,6 +285,19 @@
       <div class="modal-actions" style="margin-top:24px;">
         <button class="btn btn-lg" id="delete-confirm-btn" style="flex:1; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;">삭제</button>
         <button class="btn btn-ghost" id="delete-cancel-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 게시글 삭제 확인 모달 -->
+  <div class="modal-overlay" id="post-delete-modal">
+    <div class="modal" style="max-width:400px; text-align:center;">
+      <div class="modal-icon">🗑️</div>
+      <h2 class="modal-title">게시글 삭제</h2>
+      <p class="modal-desc" id="post-delete-desc">이 게시글을 삭제하시겠습니까?<br/>이 작업은 되돌릴 수 없습니다.</p>
+      <div class="modal-actions" style="margin-top:24px;">
+        <button class="btn btn-lg" id="post-delete-confirm-btn" style="flex:1; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;">삭제</button>
+        <button class="btn btn-ghost" id="post-delete-cancel-btn">취소</button>
       </div>
     </div>
   </div>
