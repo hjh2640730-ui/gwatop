@@ -2,7 +2,7 @@
 // GWATOP - Admin Page Logic v1.1.0
 // ============================================================
 
-import { onUserChange, signInWithGoogle, logOut } from './auth.js';
+import { onAdminUserChange, signInWithGoogleAdmin, logOutAdmin } from './auth-admin.js';
 
 const ADMIN_EMAIL = 'hjh2640730@gmail.com';
 
@@ -14,11 +14,11 @@ let deletingUid = null;
 async function init() {
   showState('loading');
 
-  document.getElementById('admin-login-btn').addEventListener('click', () => signInWithGoogle());
-  document.getElementById('admin-logout-btn').addEventListener('click', () => logOut());
-  document.getElementById('denied-logout-btn').addEventListener('click', () => logOut());
+  document.getElementById('admin-login-btn').addEventListener('click', () => signInWithGoogleAdmin());
+  document.getElementById('admin-logout-btn').addEventListener('click', () => logOutAdmin());
+  document.getElementById('denied-logout-btn').addEventListener('click', () => logOutAdmin());
 
-  onUserChange(async (user) => {
+  onAdminUserChange(async (user) => {
     currentUser = user;
 
     if (!user) {
