@@ -3,7 +3,7 @@
 // PDF 업로드, 텍스트 추출, 퀴즈 생성, 크레딧 기반 과금
 // ============================================================
 
-import { signInWithGoogle, logOut, handleRedirectResult, onUserChange, deductCredit, calcCredits } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange, deductCredit, calcCredits } from './auth.js';
 import { saveDocument, savePendingQuiz } from './db.js';
 
 // ─── PDF.js Setup ───
@@ -76,7 +76,7 @@ async function init() {
 
 // ─── Navigation Auth ───
 function setupNav() {
-  navLoginBtn?.addEventListener('click', () => signInWithGoogle());
+  navLoginBtn?.addEventListener('click', () => openModal(loginModal));
   navLogoutBtn?.addEventListener('click', () => logOut());
 
   onUserChange((user, userData) => {
@@ -311,11 +311,11 @@ async function generateQuiz() {
 
 // ─── Modals ───
 function setupModals() {
-  document.getElementById('modal-login-btn')?.addEventListener('click', () => {
-    closeModal(loginModal);
-    signInWithGoogle();
-  });
-  document.getElementById('modal-close-btn')?.addEventListener('click', () => closeModal(loginModal));
+  const closeLogin = () => closeModal(loginModal);
+  document.getElementById('modal-login-google')?.addEventListener('click', () => { closeLogin(); signInWithGoogle(); });
+  document.getElementById('modal-login-kakao')?.addEventListener('click', () => { closeLogin(); signInWithKakao(); });
+  document.getElementById('modal-login-naver')?.addEventListener('click', () => { closeLogin(); signInWithNaver(); });
+  document.getElementById('modal-close-btn')?.addEventListener('click', closeLogin);
   document.getElementById('modal-upgrade-btn')?.addEventListener('click', () => {
     closeModal(upgradeModal);
     window.location.href = '/payment.html';

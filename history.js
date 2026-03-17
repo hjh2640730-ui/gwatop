@@ -3,7 +3,7 @@
 // 저장된 퀴즈 및 문서 관리
 // ============================================================
 
-import { signInWithGoogle, logOut, handleRedirectResult, onUserChange } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange } from './auth.js';
 import {
   getAllQuizzes, getAllDocuments,
   deleteQuiz, deleteDocument,
@@ -19,12 +19,15 @@ async function init() {
   setupNav();
   setupTabs();
   setupDeleteModal();
+  setupLoginModal();
   await loadAll();
 }
 
 // ─── Nav ───
 function setupNav() {
-  document.getElementById('nav-login-btn')?.addEventListener('click', () => signInWithGoogle());
+  document.getElementById('nav-login-btn')?.addEventListener('click', () => {
+    document.getElementById('login-modal')?.classList.add('visible');
+  });
   document.getElementById('nav-logout-btn')?.addEventListener('click', () => logOut());
 
   onUserChange((user, userData) => {
@@ -213,6 +216,16 @@ function setupDeleteModal() {
   modal?.addEventListener('click', (e) => {
     if (e.target === modal) { modal.classList.remove('visible'); pendingDelete = null; }
   });
+}
+
+function setupLoginModal() {
+  const modal = document.getElementById('login-modal');
+  const close = () => modal?.classList.remove('visible');
+  document.getElementById('modal-login-google')?.addEventListener('click', () => { close(); signInWithGoogle(); });
+  document.getElementById('modal-login-kakao')?.addEventListener('click', () => { close(); signInWithKakao(); });
+  document.getElementById('modal-login-naver')?.addEventListener('click', () => { close(); signInWithNaver(); });
+  document.getElementById('modal-close-btn')?.addEventListener('click', close);
+  modal?.addEventListener('click', (e) => { if (e.target === modal) close(); });
 }
 
 function confirmDelete(type, id, desc) {

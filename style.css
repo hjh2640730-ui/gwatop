@@ -508,6 +508,16 @@ body {
 /* ─── Mobile Bottom Navigation ─── */
 .mobile-bottom-nav { display: none; }
 
+/* ─── Social Login ─── */
+.social-login-btns { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-bottom: 4px; }
+.btn-google { background: #fff; color: #3c4043; border: 1px solid #dadce0 !important; font-weight: 600; }
+.btn-google:hover:not(:disabled) { background: #f8f9fa; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+.btn-kakao { background: #FEE500; color: #191919; border: none !important; font-weight: 700; }
+.btn-kakao:hover:not(:disabled) { background: #F0D900; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(254,229,0,0.35); }
+.btn-naver { background: #03C75A; color: #fff; border: none !important; font-weight: 700; }
+.btn-naver:hover:not(:disabled) { background: #02B351; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(3,199,90,0.35); }
+.naver-n { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; background: white; color: #03C75A; font-size: 11px; font-weight: 900; border-radius: 2px; flex-shrink: 0; }
+
 /* ─── Responsive ─── */
 @media (max-width: 768px) {
   /* Nav */

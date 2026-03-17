@@ -20,11 +20,7 @@ async function init() {
 
 // ─── Nav ───
 function setupNav() {
-  document.getElementById('nav-login-btn')?.addEventListener('click', () => signInWithGoogle());
-  document.getElementById('modal-login-btn')?.addEventListener('click', () => {
-    document.getElementById('login-modal').classList.remove('visible');
-    signInWithGoogle();
-  });
+  // nav-login-btn and modal login buttons are handled by inline script in payment.html
 
   onUserChange(async (user, userData) => {
     currentUser = user;

@@ -8,8 +8,10 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithCustomToken,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  updateProfile
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   getFirestore,
@@ -21,6 +23,12 @@ import {
   increment
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import firebaseConfig from './firebase-config.js';
+
+// ─── 소셜 로그인 공개 키 ───
+// TODO: Kakao Developers (developers.kakao.com) → 앱 → 앱 키 → JavaScript 키
+const KAKAO_APP_KEY = '';
+// TODO: Naver Developers (developers.naver.com) → 앱 등록 → Client ID
+const NAVER_CLIENT_ID = '';
 
 // ─── Firebase Init ───
 let app, auth, db;
@@ -184,6 +192,84 @@ export function onUserChange(callback) {
     }
   });
   return unsubscribe;
+}
+
+// ─── Kakao Sign-In ───
+export async function signInWithKakao() {
+  if (!isConfigured) { alert('Firebase가 설정되지 않았습니다.'); return; }
+  if (!KAKAO_APP_KEY) { alert('카카오 앱 키가 설정되지 않았습니다.\nauth.js의 KAKAO_APP_KEY를 설정해주세요.'); return; }
+  try {
+    if (!window.Kakao) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js';
+        s.crossOrigin = 'anonymous';
+        s.onload = resolve;
+        s.onerror = () => reject(new Error('카카오 SDK 로드 실패'));
+        document.head.appendChild(s);
+      });
+    }
+    if (!window.Kakao.isInitialized()) window.Kakao.init(KAKAO_APP_KEY);
+
+    const accessToken = await new Promise((resolve, reject) => {
+      window.Kakao.Auth.login({
+        success: (a) => resolve(a.access_token),
+        fail: (e) => reject(new Error(JSON.stringify(e)))
+      });
+    });
+
+    const res = await fetch('/api/auth-social', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'kakao', accessToken })
+    });
+    const data = await res.json();
+    if (!data.customToken) throw new Error(data.error || '카카오 로그인 실패');
+
+    const credential = await signInWithCustomToken(auth, data.customToken);
+    if (data.displayName || data.photoURL) {
+      await updateProfile(credential.user, {
+        displayName: data.displayName || '',
+        photoURL: data.photoURL || ''
+      });
+    }
+    await ensureUserDoc(auth.currentUser);
+  } catch (e) {
+    if (e.message?.includes('closed') || e.message?.includes('cancel')) return;
+    console.error('Kakao login error:', e);
+    alert('카카오 로그인 오류: ' + e.message);
+  }
+}
+
+// ─── Naver Sign-In ───
+export function signInWithNaver() {
+  if (!isConfigured) { alert('Firebase가 설정되지 않았습니다.'); return; }
+  if (!NAVER_CLIENT_ID) { alert('네이버 클라이언트 ID가 설정되지 않았습니다.\nauth.js의 NAVER_CLIENT_ID를 설정해주세요.'); return; }
+
+  const redirectUri = encodeURIComponent(`${window.location.origin}/naver-callback.html`);
+  const authUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${redirectUri}&state=gwatop`;
+
+  const popup = window.open(authUrl, 'naver-login', 'width=500,height=600,scrollbars=yes,resizable=yes');
+  if (!popup) { alert('팝업이 차단되었습니다. 팝업을 허용해주세요.'); return; }
+
+  const handleMessage = async (e) => {
+    if (e.origin !== window.location.origin || !e.data?.naverCustomToken) return;
+    window.removeEventListener('message', handleMessage);
+    try {
+      const credential = await signInWithCustomToken(auth, e.data.naverCustomToken);
+      if (e.data.displayName || e.data.photoURL) {
+        await updateProfile(credential.user, {
+          displayName: e.data.displayName || '',
+          photoURL: e.data.photoURL || ''
+        });
+      }
+      await ensureUserDoc(auth.currentUser);
+    } catch (err) {
+      console.error('Naver sign-in error:', err);
+      alert('네이버 로그인 처리 중 오류가 발생했습니다.');
+    }
+  };
+  window.addEventListener('message', handleMessage);
 }
 
 export { isConfigured, auth, db };
