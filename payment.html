@@ -13,7 +13,7 @@
     .packages-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 860px; margin: 0 auto 48px; }
     @media (max-width: 768px) {
       .packages-grid { grid-template-columns: 1fr; max-width: 400px; }
-      .payment-page { padding-top: calc(var(--nav-height) + 32px); padding-bottom: 60px; }
+      .payment-page { padding-top: calc(var(--nav-height) + 32px); padding-bottom: calc(72px + 40px); }
       .payment-header h1 { font-size: 26px; }
       #referral-section { padding: 24px 16px !important; }
     }
@@ -163,6 +163,13 @@
       </div>
     </div>
   </main>
+
+  <nav class="mobile-bottom-nav">
+    <a href="/" class="mbn-item"><span class="mbn-icon">🏠</span>홈</a>
+    <a href="/create.html" class="mbn-item"><span class="mbn-icon">⚡</span>퀴즈 만들기</a>
+    <a href="/history.html" class="mbn-item"><span class="mbn-icon">📋</span>내 퀴즈</a>
+    <a href="/payment.html" class="mbn-item active"><span class="mbn-icon">💳</span>충전</a>
+  </nav>
 
   <div class="toast-container" id="toast-container"></div>
 

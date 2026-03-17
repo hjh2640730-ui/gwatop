@@ -505,25 +505,31 @@ body {
 @keyframes slideInRight { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
 @keyframes slideOutRight { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(24px)} }
 
+/* ─── Mobile Bottom Navigation ─── */
+.mobile-bottom-nav { display: none; }
+
 /* ─── Responsive ─── */
 @media (max-width: 768px) {
   /* Nav */
   .nav-links { display: none; }
   .nav-username { display: none; }
-  .nav-inner { gap: 12px; }
+  .nav-logout-btn { display: none; }
+  .nav-inner { gap: 8px; }
+  .nav-plan-badge { font-size: 11px; padding: 4px 10px; }
 
   /* Hero */
   .hero-title { letter-spacing: -1px; }
   .hero-subtitle { margin-bottom: 32px; }
 
   /* Upload */
-  .upload-card { padding: 20px; }
+  .upload-card { padding: 20px 16px; border-radius: var(--radius-lg); }
   .upload-zone { padding: 28px 16px; }
   .upload-icon { font-size: 36px; }
   .upload-title { font-size: 15px; }
   .type-options { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .type-option-label { padding: 10px 6px; font-size: 12px; gap: 4px; }
   .type-option-label .type-icon { font-size: 18px; }
+  .count-slider::-webkit-slider-thumb { width: 26px; height: 26px; }
 
   /* Pricing */
   .pricing-grid { grid-template-columns: 1fr !important; max-width: 400px !important; }
@@ -536,18 +542,24 @@ body {
   .modal-actions { flex-direction: column; }
   .modal-actions .btn { width: 100%; justify-content: center; }
 
+  /* Quiz Topbar */
+  .quiz-topbar { padding: 10px 16px; }
+  .quiz-topbar-inner { gap: 12px; }
+
   /* Quiz */
-  .quiz-main { padding-top: calc(var(--nav-height) + 66px); padding-bottom: 32px; }
+  .quiz-main { padding-top: calc(var(--nav-height) + 58px); padding-bottom: calc(72px + 16px); }
   .quiz-card { padding: 20px 16px; }
   .quiz-question { font-size: 16px; margin-bottom: 20px; }
-  .quiz-option { padding: 12px 14px; font-size: 14px; }
+  .quiz-option { padding: 13px 14px; font-size: 14px; }
+  .option-marker { width: 28px; height: 28px; font-size: 12px; flex-shrink: 0; }
   .ox-options { gap: 12px; }
-  .ox-option { padding: 20px 12px; font-size: 44px; }
+  .ox-option { padding: 24px 12px; font-size: 48px; }
   .quiz-actions { flex-direction: column-reverse; }
   .quiz-actions .btn { width: 100%; justify-content: center; }
+  .short-answer-input { min-height: 90px; font-size: 16px; /* 16px prevents iOS zoom */ }
 
   /* Results */
-  .results-wrap { padding-top: calc(var(--nav-height) + 24px); padding-bottom: 40px; }
+  .results-wrap { padding-top: calc(var(--nav-height) + 24px); padding-bottom: calc(72px + 20px); }
   .results-card { padding: 28px 20px; }
   .results-actions { flex-direction: column; }
   .results-actions .btn { width: 100%; justify-content: center; }
@@ -555,8 +567,8 @@ body {
   .results-stat { padding: 12px 8px; }
   .results-stat-num { font-size: 22px; }
 
-  /* Toast */
-  .toast-container { bottom: 16px; right: 12px; left: 12px; }
+  /* Toast — above bottom nav */
+  .toast-container { bottom: 84px; right: 12px; left: 12px; }
   .toast { min-width: unset; max-width: 100%; width: 100%; }
 
   /* History */
@@ -566,8 +578,35 @@ body {
   .upgrade-banner { flex-direction: column; text-align: center; }
 
   /* Footer */
-  .footer { padding: 28px 0; }
+  .footer { padding: 28px 0 calc(72px + 20px); }
   .footer-links { gap: 16px; }
+
+  /* Bottom nav padding for pages */
+  .page { padding-bottom: 72px; }
+
+  /* Mobile Bottom Nav */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(6,6,15,0.97);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--glass-border);
+    padding: 4px 0 env(safe-area-inset-bottom, 4px);
+    justify-content: space-around;
+    align-items: stretch;
+  }
+  .mbn-item {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; padding: 8px 4px 6px; text-decoration: none;
+    color: var(--text-muted); font-size: 10px; font-weight: 600;
+    flex: 1; min-height: 56px;
+    transition: color var(--transition);
+    letter-spacing: 0.2px;
+  }
+  .mbn-item.active { color: #a78bfa; }
+  .mbn-icon { font-size: 22px; line-height: 1; display: block; }
 }
 
 /* ─── Scrollbar & Selection ─── */

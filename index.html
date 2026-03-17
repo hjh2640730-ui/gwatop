@@ -75,8 +75,11 @@
     @media (max-width: 600px) {
       .hero-pills { gap: 8px; }
       .hero-pill { font-size: 12px; padding: 7px 14px; }
-      .pricing-insight { padding: 24px 20px; }
-      .pricing-insight-grid { gap: 8px; }
+      .pricing-insight { padding: 24px 16px; }
+      .pricing-insight-grid { grid-template-columns: 1fr !important; gap: 8px; }
+      .pricing-insight-item + .pricing-insight-item { border-left: none; border-top: 1px solid var(--glass-border); }
+      .steps-grid { grid-template-columns: 1fr 1fr !important; }
+      .scenario-grid { grid-template-columns: 1fr !important; }
     }
   </style>
 </head>
@@ -293,6 +296,13 @@
       <p style="margin-top:12px">© 2026 GWATOP · AI로 더 스마트하게 공부하기</p>
     </div>
   </footer>
+
+  <nav class="mobile-bottom-nav">
+    <a href="/" class="mbn-item active"><span class="mbn-icon">🏠</span>홈</a>
+    <a href="/create.html" class="mbn-item"><span class="mbn-icon">⚡</span>퀴즈 만들기</a>
+    <a href="/history.html" class="mbn-item"><span class="mbn-icon">📋</span>내 퀴즈</a>
+    <a href="/payment.html" class="mbn-item"><span class="mbn-icon">💳</span>충전</a>
+  </nav>
 
   <div class="toast-container" id="toast-container"></div>
 
