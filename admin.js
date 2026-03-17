@@ -84,6 +84,7 @@ function renderTable(users) {
     <div class="table-row" data-uid="${u.uid}">
       <div class="td td-name" data-label="이름">${u.displayName || '(이름 없음)'}</div>
       <div class="td" data-label="이메일">${u.email || '-'}</div>
+      <div class="td" data-label="전화번호">${formatPhone(u.phone)}</div>
       <div class="td td-credits" data-label="크레딧">${u.credits}</div>
       <div class="td" data-label="퀴즈 수">${u.totalQuizzes}</div>
       <div class="td" data-label="추천">${u.referralCredits}</div>
@@ -236,6 +237,12 @@ async function confirmDelete() {
 }
 
 // ─── Utils ───
+function formatPhone(phone) {
+  if (!phone) return '-';
+  // 01012345678 → 010-1234-5678
+  return phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, '$1-$2-$3');
+}
+
 function formatDate(ts) {
   if (!ts) return '-';
   const d = new Date(ts);

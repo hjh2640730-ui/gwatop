@@ -106,6 +106,7 @@ async function getUsers(accessToken) {
     return {
       uid: f.uid?.stringValue || doc.name.split('/').pop(),
       email: f.email?.stringValue || '',
+      phone: f.phone?.stringValue || '',
       displayName: f.displayName?.stringValue || '',
       credits: parseInt(f.credits?.integerValue || 0),
       totalQuizzes: parseInt(f.totalQuizzes?.integerValue || 0),
