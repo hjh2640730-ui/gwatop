@@ -8,33 +8,23 @@
       <stop offset="0%" stop-color="#a855f7"/>
       <stop offset="100%" stop-color="#3b82f6"/>
     </linearGradient>
-    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#c084fc"/>
-      <stop offset="100%" stop-color="#60a5fa"/>
-    </linearGradient>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="0" stdDeviation="18" flood-color="#7c3aed" flood-opacity="0.6"/>
+    <filter id="glow">
+      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#a855f7" flood-opacity="0.7"/>
     </filter>
   </defs>
 
-  <!-- Background rounded square -->
+  <!-- Background -->
   <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="110" fill="none" stroke="url(#accent)" stroke-width="5" opacity="0.35"/>
 
-  <!-- Outer glow ring -->
-  <rect width="512" height="512" rx="110" fill="none" stroke="url(#accent)" stroke-width="6" opacity="0.4"/>
-
-  <!-- Lightning bolt (퀴즈 생성 = 에너지/번개) -->
-  <g filter="url(#shadow)">
-    <polygon
-      points="295,60 175,280 245,280 215,452 340,220 268,220"
-      fill="url(#glow)"
-    />
-  </g>
-
-  <!-- Inner white highlight on bolt -->
-  <polygon
-    points="285,90 195,268 252,268 228,408 320,238 262,238"
-    fill="white"
-    opacity="0.15"
-  />
+  <!-- G letter -->
+  <text
+    x="256" y="355"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="320"
+    font-weight="700"
+    text-anchor="middle"
+    fill="url(#accent)"
+    filter="url(#glow)"
+  >G</text>
 </svg>
