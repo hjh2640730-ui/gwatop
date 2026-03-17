@@ -3,7 +3,7 @@
 // Toss Payments API 개별 연동 (위젯 없음)
 // ============================================================
 
-import { signInWithGoogle, onUserChange } from './auth.js';
+import { signInWithGoogle, logOut, onUserChange } from './auth.js';
 
 const TOSS_CLIENT_KEY = 'test_ck_DnyRpQWGrN2jDYK5Wa0LrKwv1M9E';
 
@@ -20,6 +20,7 @@ async function init() {
 
 // ─── Nav ───
 function setupNav() {
+  document.getElementById('nav-logout-btn')?.addEventListener('click', () => logOut());
   // nav-login-btn and modal login buttons are handled by inline script in payment.html
 
   onUserChange(async (user, userData) => {
