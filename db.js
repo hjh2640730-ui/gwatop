@@ -4,7 +4,7 @@
 // ============================================================
 
 const DB_NAME = 'gwatop_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_DOCS = 'documents';
 const STORE_QUIZZES = 'quizzes';
 
@@ -17,14 +17,23 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_DOCS)) {
+      const tx = e.target.transaction;
+      const oldVersion = e.oldVersion;
+
+      if (oldVersion < 1) {
         const docs = db.createObjectStore(STORE_DOCS, { keyPath: 'id', autoIncrement: true });
         docs.createIndex('createdAt', 'createdAt', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(STORE_QUIZZES)) {
         const quizzes = db.createObjectStore(STORE_QUIZZES, { keyPath: 'id', autoIncrement: true });
         quizzes.createIndex('docId', 'docId', { unique: false });
         quizzes.createIndex('createdAt', 'createdAt', { unique: false });
+      }
+
+      if (oldVersion < 2) {
+        // uid 인덱스 추가 (유저별 데이터 분리)
+        const docs = tx.objectStore(STORE_DOCS);
+        if (!docs.indexNames.contains('uid')) docs.createIndex('uid', 'uid', { unique: false });
+        const quizzes = tx.objectStore(STORE_QUIZZES);
+        if (!quizzes.indexNames.contains('uid')) quizzes.createIndex('uid', 'uid', { unique: false });
       }
     };
     req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
@@ -85,8 +94,9 @@ async function txDelete(store, key) {
 }
 
 // ─── Documents ───
-export async function saveDocument(name, text, fileSize) {
+export async function saveDocument(uid, name, text, fileSize) {
   return txAdd(STORE_DOCS, {
+    uid,
     name,
     text,
     fileSize,
@@ -98,8 +108,9 @@ export async function getDocument(id) {
   return txGet(STORE_DOCS, id);
 }
 
-export async function getAllDocuments() {
-  const docs = await txGetAll(STORE_DOCS);
+export async function getAllDocuments(uid) {
+  if (!uid) return [];
+  const docs = await txGetAll(STORE_DOCS, 'uid', uid);
   return docs.sort((a, b) => b.createdAt - a.createdAt);
 }
 
@@ -113,8 +124,9 @@ export async function deleteDocument(id) {
 }
 
 // ─── Quizzes ───
-export async function saveQuiz(docId, docName, questions, type, score) {
+export async function saveQuiz(uid, docId, docName, questions, type, score) {
   return txAdd(STORE_QUIZZES, {
+    uid,
     docId,
     docName,
     questions,
@@ -129,8 +141,9 @@ export async function getQuiz(id) {
   return txGet(STORE_QUIZZES, id);
 }
 
-export async function getAllQuizzes() {
-  const quizzes = await txGetAll(STORE_QUIZZES);
+export async function getAllQuizzes(uid) {
+  if (!uid) return [];
+  const quizzes = await txGetAll(STORE_QUIZZES, 'uid', uid);
   return quizzes.sort((a, b) => b.createdAt - a.createdAt);
 }
 

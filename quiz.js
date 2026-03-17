@@ -52,7 +52,7 @@ async function init() {
   questions = data.questions;
 
   // Save quiz to IndexedDB early
-  savedQuizId = await saveQuiz(data.docId, data.docName, data.questions, data.type, 0);
+  savedQuizId = await saveQuiz(data.uid || '', data.docId, data.docName, data.questions, data.type, 0);
 
   showArea('quiz');
   renderQuestion(0);

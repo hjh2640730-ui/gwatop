@@ -287,10 +287,11 @@ async function generateQuiz() {
     }
 
     // 4) Save document
-    const docId = await saveDocument(selectedFile.name, extractedText, selectedFile.size);
+    const docId = await saveDocument(currentUser.uid, selectedFile.name, extractedText, selectedFile.size);
 
     // 5) Pass to quiz page via sessionStorage
     savePendingQuiz({
+      uid: currentUser.uid,
       docId,
       docName: selectedFile.name,
       questions: data.questions,

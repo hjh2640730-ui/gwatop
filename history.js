@@ -12,6 +12,7 @@ import {
 
 // ─── State ───
 let pendingDelete = null; // { type: 'quiz'|'doc', id }
+let currentUid = null;
 
 // ─── Init ───
 async function init() {
@@ -33,6 +34,7 @@ function setupNav() {
     const lo = document.getElementById('nav-auth-logged-out');
     const li = document.getElementById('nav-auth-logged-in');
     if (user) {
+      currentUid = user.uid;
       lo.style.display = 'none';
       li.style.display = 'flex';
       document.getElementById('nav-avatar').src = user.photoURL || '';
@@ -41,7 +43,7 @@ function setupNav() {
       const badge = document.getElementById('nav-plan-badge');
       badge.textContent = plan === 'premium' ? 'Premium' : 'Free';
       badge.className = `nav-plan-badge ${plan}`;
-      loadAll();
+      loadAll(currentUid);
     } else {
       lo.style.display = '';
       li.style.display = 'none';
@@ -74,16 +76,16 @@ function setupTabs() {
 }
 
 // ─── Load All ───
-async function loadAll() {
-  await loadQuizzes();
-  await loadDocuments();
+async function loadAll(uid) {
+  await loadQuizzes(uid);
+  await loadDocuments(uid);
 }
 
 // ─── Load Quizzes ───
-async function loadQuizzes() {
+async function loadQuizzes(uid) {
   const grid = document.getElementById('quizzes-grid');
   const empty = document.getElementById('quizzes-empty');
-  const quizzes = await getAllQuizzes();
+  const quizzes = await getAllQuizzes(uid);
 
   if (quizzes.length === 0) {
     grid.style.display = 'none';
@@ -134,10 +136,10 @@ function renderQuizCard(q) {
 }
 
 // ─── Load Documents ───
-async function loadDocuments() {
+async function loadDocuments(uid) {
   const grid = document.getElementById('documents-grid');
   const empty = document.getElementById('documents-empty');
-  const docs = await getAllDocuments();
+  const docs = await getAllDocuments(uid);
 
   if (docs.length === 0) {
     grid.style.display = 'none';
@@ -212,7 +214,7 @@ function setupDeleteModal() {
       showToast('문서가 삭제되었습니다.', 'success');
     }
     pendingDelete = null;
-    await loadAll();
+    await loadAll(currentUid);
   });
   document.getElementById('delete-cancel-btn')?.addEventListener('click', () => {
     modal.classList.remove('visible');
