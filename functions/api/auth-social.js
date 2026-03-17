@@ -29,7 +29,7 @@ export async function onRequestPost(context) {
     return json({ error: 'Firebase 서비스 계정 환경 변수가 없습니다.' }, 500);
   }
 
-  let uid, displayName = '', email = '', photoURL = '';
+  let uid, displayName = '', email = '', photoURL = '', phone = '';
 
   if (provider === 'kakao') {
     if (!code) return json({ error: 'code가 필요합니다.' }, 400);
@@ -59,6 +59,9 @@ export async function onRequestPost(context) {
     email = kakaoUser.kakao_account?.email || '';
     displayName = kakaoUser.kakao_account?.profile?.nickname || '';
     photoURL = kakaoUser.kakao_account?.profile?.profile_image_url || '';
+    // 전화번호: 카카오는 사업자 인증 후 동의항목 추가 시 제공 (+82 10-xxxx-xxxx 형식)
+    const kakaoPhone = kakaoUser.kakao_account?.phone_number || '';
+    phone = normalizePhone(kakaoPhone);
 
   } else if (provider === 'naver') {
     if (!code) return json({ error: 'code가 필요합니다.' }, 400);
@@ -85,6 +88,8 @@ export async function onRequestPost(context) {
     email = naverUser.email || '';
     displayName = naverUser.name || naverUser.nickname || '';
     photoURL = naverUser.profile_image || '';
+    // 전화번호: 네이버 동의항목에서 휴대전화 추가 시 제공 (010-xxxx-xxxx 형식)
+    phone = normalizePhone(naverUser.mobile || '');
 
   } else {
     return json({ error: '지원하지 않는 소셜 로그인입니다.' }, 400);
@@ -92,10 +97,19 @@ export async function onRequestPost(context) {
 
   try {
     const customToken = await createFirebaseCustomToken(uid, clientEmail, privateKey);
-    return json({ customToken, displayName, email, photoURL });
+    return json({ customToken, displayName, email, photoURL, phone });
   } catch (e) {
     return json({ error: `커스텀 토큰 생성 실패: ${e.message}` }, 500);
   }
+}
+
+// 전화번호 정규화: 숫자만 추출, 국제번호(+82) → 0으로 변환
+function normalizePhone(raw) {
+  if (!raw) return '';
+  // +82 10-xxxx-xxxx → 01012345678
+  let digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('82') && digits.length >= 11) digits = '0' + digits.slice(2);
+  return digits;
 }
 
 async function createFirebaseCustomToken(uid, clientEmail, privateKey) {

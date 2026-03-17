@@ -81,29 +81,35 @@ export async function handleRedirectResult() { return null; }
 // ─── Ensure User Document (신규 가입 시 2 크레딧 무료 지급) ───
 export async function ensureUserDoc(user, extra = {}) {
   if (!isConfigured || !db) return;
-  // extra: 카카오/네이버처럼 Firebase Auth에 이메일이 없을 때 직접 전달
+  // extra: 카카오/네이버처럼 Firebase Auth에 이메일/전화번호가 없을 때 직접 전달
   const email = user.email || extra.email || '';
   const displayName = user.displayName || extra.displayName || '';
   const photoURL = user.photoURL || extra.photoURL || '';
+  const phone = extra.phone || '';
   try {
     const ref = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
-      // 이메일 중복 확인: 같은 이메일로 이미 다른 계정이 있으면 무료 크레딧 미지급
+      // 중복 확인: 전화번호 우선, 없으면 이메일로 체크
       let freeCredits = 10;
-      if (email) {
-        try {
+      try {
+        if (phone) {
+          const phoneQ = query(collection(db, 'users'), where('phone', '==', phone), limit(1));
+          const phoneSnap = await getDocs(phoneQ);
+          if (!phoneSnap.empty) freeCredits = 0;
+        } else if (email) {
           const emailQ = query(collection(db, 'users'), where('email', '==', email), limit(1));
           const emailSnap = await getDocs(emailQ);
           if (!emailSnap.empty) freeCredits = 0;
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
 
       await setDoc(ref, {
         uid: user.uid,
         email,
         displayName,
         photoURL,
+        phone,
         credits: freeCredits,
         referralCredits: 0,
         totalQuizzes: 0,
@@ -121,10 +127,10 @@ export async function ensureUserDoc(user, extra = {}) {
       const updates = {};
       if (data.credits === undefined) updates.credits = 10;
       if (data.referralCredits === undefined) updates.referralCredits = 0;
-      // 소셜 로그인 유저 프로필 업데이트 (이름/이메일/사진 누락 시 채우기)
       if (displayName && !data.displayName) updates.displayName = displayName;
       if (email && !data.email) updates.email = email;
       if (photoURL && !data.photoURL) updates.photoURL = photoURL;
+      if (phone && !data.phone) updates.phone = phone;
       if (Object.keys(updates).length > 0) await updateDoc(ref, updates);
     }
   } catch (e) {
@@ -237,12 +243,11 @@ export function signInWithKakao() {
       }
       await ensureUserDoc(auth.currentUser, {
         email: e.data.email,
+        phone: e.data.phone,
         displayName: e.data.displayName,
         photoURL: e.data.photoURL
       });
-      // 레이스 컨디션 방지: onAuthStateChanged가 null email로 덮어쓸 수 있어 강제 업데이트
-      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.displayName, e.data.photoURL);
-      console.log('[Kakao] uid:', auth.currentUser.uid, 'email:', e.data.email, 'displayName:', e.data.displayName);
+      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Kakao sign-in error:', err);
@@ -276,12 +281,11 @@ export function signInWithNaver() {
       }
       await ensureUserDoc(auth.currentUser, {
         email: e.data.email,
+        phone: e.data.phone,
         displayName: e.data.displayName,
         photoURL: e.data.photoURL
       });
-      // 레이스 컨디션 방지: onAuthStateChanged가 null email로 덮어쓸 수 있어 강제 업데이트
-      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.displayName, e.data.photoURL);
-      console.log('[Naver] uid:', auth.currentUser.uid, 'email:', e.data.email, 'displayName:', e.data.displayName);
+      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Naver sign-in error:', err);
@@ -292,30 +296,19 @@ export function signInWithNaver() {
 }
 
 // ─── 소셜 로그인 프로필 강제 저장 (레이스 컨디션 방지) ───
-async function _forceSocialProfile(uid, email, displayName, photoURL) {
+async function _forceSocialProfile(uid, email, phone, displayName, photoURL) {
   if (!db) return;
   try {
     const updates = {};
     if (email) updates.email = email;
+    if (phone) updates.phone = phone;
     if (displayName) updates.displayName = displayName;
     if (photoURL) updates.photoURL = photoURL;
     if (Object.keys(updates).length > 0) {
-      console.log('[forceSocialProfile] updating', uid, updates);
-      await updateDoc(doc(db, 'users', uid), updates);
-      console.log('[forceSocialProfile] success');
+      await setDoc(doc(db, 'users', uid), updates, { merge: true });
     }
   } catch (e) {
-    console.error('[forceSocialProfile] ERROR:', e.code, e.message);
-    // updateDoc 실패 시 (문서 없음 등) setDoc으로 재시도
-    try {
-      const ref = doc(db, 'users', uid);
-      const snap = await getDoc(ref);
-      const existing = snap.exists() ? snap.data() : {};
-      await setDoc(ref, { ...existing, ...(email && { email }), ...(displayName && { displayName }), ...(photoURL && { photoURL }) }, { merge: true });
-      console.log('[forceSocialProfile] setDoc merge success');
-    } catch (e2) {
-      console.error('[forceSocialProfile] setDoc also failed:', e2.code, e2.message);
-    }
+    console.warn('_forceSocialProfile error:', e.code, e.message);
   }
 }
 
