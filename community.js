@@ -1,5 +1,5 @@
 // ============================================================
-// GWATOP - Community Page Logic v2.0.0
+// GWATOP - Community Page Logic v3.0.0
 // ============================================================
 
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
@@ -8,7 +8,7 @@ import { db, app } from './auth.js';
 import {
   collection, doc, addDoc, getDocs, updateDoc,
   query, orderBy, limit, startAfter, increment,
-  arrayUnion, arrayRemove, serverTimestamp, where
+  arrayUnion, arrayRemove, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
@@ -74,6 +74,8 @@ function setupNav() {
     }
     checkAndShowNicknameModal(user, userData);
     checkAndShowUniversityModal(user, userData);
+    // Reload posts so liked state is correct after login/logout
+    loadPosts(true);
   });
 
   // 닉네임 설정 직후 대학 모달 체크
@@ -217,6 +219,7 @@ function renderPostCard(post) {
   const card = document.createElement('article');
   card.className = 'post-card';
   card.dataset.id = post.id;
+  card.style.cursor = 'pointer';
 
   const isLiked = currentUser && Array.isArray(post.likedBy) && post.likedBy.includes(currentUser.uid);
   const isMine = currentUser?.uid === post.uid;
@@ -224,6 +227,10 @@ function renderPostCard(post) {
   const avatarColor = post.isAnonymous ? '#374151' : getAvatarColor(post.uid || displayName);
   const avatarChar = post.isAnonymous ? '?' : displayName[0];
   const likeCount = post.likes || 0;
+
+  // Content preview: first 120 chars
+  const rawContent = post.content || '';
+  const previewText = rawContent.length > 120 ? rawContent.slice(0, 120) + '...' : rawContent;
 
   card.innerHTML = `
     <div class="post-header">
@@ -236,29 +243,40 @@ function renderPostCard(post) {
       </div>
       <span class="post-time">${timeAgo(post.createdAt)}</span>
     </div>
-    <div class="post-content">${formatContent(post.content || '')}</div>
-    ${post.imageUrl ? `<div class="post-image-wrap"><img class="post-image" src="${escapeHtml(post.imageUrl)}" alt="이미지" loading="lazy" /></div>` : ''}
+    <div class="post-card-body">
+      ${post.title ? `<div class="post-card-title">${escapeHtml(post.title)}</div>` : ''}
+      <div class="post-card-preview">${escapeHtml(previewText)}</div>
+      ${post.imageUrl ? `<img class="post-card-thumb" src="${escapeHtml(post.imageUrl)}" alt="이미지" loading="lazy" />` : ''}
+    </div>
     <div class="post-footer">
       <button class="post-like-btn${isLiked ? ' liked' : ''}" data-id="${post.id}" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>
         <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
         <span class="like-count">${likeCount}</span>
         ${likeCount >= 10 ? '<span class="like-maxed">MAX</span>' : ''}
       </button>
-      <button class="post-comment-btn" data-id="${post.id}">
+      <span class="post-comment-count-wrap">
         <span>💬</span>
         <span class="comment-count">${post.commentCount || 0}</span>
-      </button>
+      </span>
     </div>
-    <div class="post-comments" id="comments-${post.id}" style="display:none"></div>
   `;
 
-  card.querySelector('.post-like-btn').addEventListener('click', () => handleLike(post.id, post.uid, likeCount));
-  card.querySelector('.post-comment-btn').addEventListener('click', () => toggleComments(post.id));
+  // Like button: stop propagation so card click doesn't navigate
+  card.querySelector('.post-like-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    handleLike(post.id, post.uid);
+  });
+
+  // Card click → navigate to post detail
+  card.addEventListener('click', () => {
+    window.location.href = `/post.html?id=${post.id}`;
+  });
+
   feed.appendChild(card);
 }
 
 // ─── Like (최대 10 크레딧) ───
-async function handleLike(postId, authorUid, initialLikes) {
+async function handleLike(postId, authorUid) {
   if (!currentUser) { openLoginModal(); return; }
 
   const card = document.querySelector(`[data-id="${postId}"]`);
@@ -268,7 +286,7 @@ async function handleLike(postId, authorUid, initialLikes) {
   const countEl = btn.querySelector('.like-count');
   const maxedEl = btn.querySelector('.like-maxed');
   const wasLiked = btn.classList.contains('liked');
-  const beforeCount = parseInt(countEl.textContent);
+  const beforeCount = parseInt(countEl.textContent) || 0;
 
   // Optimistic
   btn.classList.toggle('liked');
@@ -291,13 +309,11 @@ async function handleLike(postId, authorUid, initialLikes) {
     const giveCredit = authorUid && authorUid !== currentUser.uid;
     if (wasLiked) {
       await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
-      // 크레딧 회수: 좋아요가 10개 이하였을 때만 (그 좋아요가 크레딧을 줬으므로)
       if (giveCredit && beforeCount <= 10) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1) });
       }
     } else {
       await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
-      // 크레딧 지급: 이 좋아요로 총 좋아요가 10 이하가 될 때만
       if (giveCredit && beforeCount < 10) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(1) });
       }
@@ -308,106 +324,6 @@ async function handleLike(postId, authorUid, initialLikes) {
     countEl.textContent = beforeCount;
     heart.textContent = wasLiked ? '❤️' : '🤍';
     console.error('like error:', e);
-  }
-}
-
-// ─── Comments ───
-async function toggleComments(postId) {
-  const section = document.getElementById(`comments-${postId}`);
-  if (!section) return;
-  if (section.style.display !== 'none') { section.style.display = 'none'; return; }
-  section.style.display = '';
-  if (section.dataset.loaded) return;
-  section.dataset.loaded = '1';
-  section.innerHTML = '<div class="comments-loading">댓글 불러오는 중...</div>';
-  await renderComments(postId, section);
-}
-
-async function renderComments(postId, section) {
-  try {
-    const snap = await getDocs(
-      query(collection(db, 'community_posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(50))
-    );
-    let html = '<div class="comments-list">';
-    if (snap.empty) {
-      html += '<p class="comments-empty">첫 댓글을 남겨보세요!</p>';
-    } else {
-      snap.docs.forEach(d => {
-        const c = d.data();
-        const name = c.isAnonymous ? '익명' : (c.nickname || '알 수 없음');
-        const clr = c.isAnonymous ? '#374151' : getAvatarColor(c.uid || name);
-        html += `
-          <div class="comment-item">
-            <div class="comment-avatar" style="background:${clr}">${c.isAnonymous ? '?' : escapeHtml(name[0])}</div>
-            <div class="comment-body">
-              <div class="comment-meta">
-                <span class="comment-author">${escapeHtml(name)}</span>
-                <span class="comment-uni">${escapeHtml(c.university || '')}</span>
-                <span class="comment-time">${timeAgo(c.createdAt)}</span>
-              </div>
-              <div class="comment-text">${formatContent(c.content || '')}</div>
-            </div>
-          </div>`;
-      });
-    }
-    html += '</div>';
-    if (currentUser) {
-      html += `
-        <div class="comment-input-wrap">
-          <label class="comment-anon-label"><input type="checkbox" class="comment-anon-cb"> 익명</label>
-          <input type="text" class="comment-input-field" placeholder="댓글을 입력하세요..." maxlength="300" />
-          <button class="btn btn-primary btn-sm comment-send-btn">전송</button>
-        </div>`;
-    } else {
-      html += `<div class="comments-login"><button class="btn btn-glass btn-sm comment-login-btn">로그인 후 댓글 달기</button></div>`;
-    }
-    section.innerHTML = html;
-    if (currentUser) {
-      const input = section.querySelector('.comment-input-field');
-      const sendBtn = section.querySelector('.comment-send-btn');
-      const anonCb = section.querySelector('.comment-anon-cb');
-      const submit = async () => {
-        const text = input.value.trim();
-        if (!text) return;
-        sendBtn.disabled = true;
-        await submitComment(postId, text, anonCb.checked, section);
-        input.value = '';
-        sendBtn.disabled = false;
-        input.focus();
-      };
-      sendBtn.addEventListener('click', submit);
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-    } else {
-      section.querySelector('.comment-login-btn')?.addEventListener('click', openLoginModal);
-    }
-  } catch (e) {
-    section.innerHTML = '<p class="comments-error">댓글을 불러오지 못했습니다.</p>';
-    console.error('renderComments:', e);
-  }
-}
-
-async function submitComment(postId, content, isAnonymous, section) {
-  if (!currentUser) return;
-  const university = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser.uid}`) || '';
-  try {
-    await addDoc(collection(db, 'community_posts', postId, 'comments'), {
-      uid: currentUser.uid,
-      isAnonymous,
-      nickname: currentUserData?.nickname || currentUser.displayName || '',
-      university,
-      content,
-      createdAt: serverTimestamp()
-    });
-    await updateDoc(doc(db, 'community_posts', postId), { commentCount: increment(1) });
-    const card = document.querySelector(`[data-id="${postId}"]`);
-    if (card) {
-      const el = card.querySelector('.comment-count');
-      if (el) el.textContent = parseInt(el.textContent) + 1;
-    }
-    section.dataset.loaded = '';
-    await renderComments(postId, section);
-  } catch (e) {
-    showToast('댓글 등록 실패', 'error');
   }
 }
 
@@ -471,6 +387,7 @@ function setupWriteModal() {
 function openWriteModal() {
   const uni = currentUserData?.university || '';
   document.getElementById('write-modal-uni').textContent = uni || '학교 미설정';
+  document.getElementById('post-title').value = '';
   document.getElementById('post-content').value = '';
   document.getElementById('post-char-count').textContent = '0 / 1000';
   document.getElementById('anon-toggle').checked = false;
@@ -480,7 +397,7 @@ function openWriteModal() {
   document.getElementById('post-image-input').value = '';
   document.getElementById('image-preview-wrap').style.display = 'none';
   document.getElementById('write-modal').classList.add('visible');
-  setTimeout(() => document.getElementById('post-content').focus(), 120);
+  setTimeout(() => document.getElementById('post-title').focus(), 120);
 }
 
 function closeWriteModal() {
@@ -488,6 +405,7 @@ function closeWriteModal() {
 }
 
 async function submitPost() {
+  const title = document.getElementById('post-title').value.trim();
   const content = document.getElementById('post-content').value.trim();
   const isAnonymous = document.getElementById('anon-toggle').checked;
   const university = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser?.uid}`) || '';
@@ -519,10 +437,13 @@ async function submitPost() {
       isAnonymous,
       nickname: currentUserData?.nickname || currentUser.displayName || '',
       university,
+      title: title || '',
       content,
       likes: 0,
       likedBy: [],
       commentCount: 0,
+      anonymousCounter: 0,
+      anonymousMap: {},
       createdAt: serverTimestamp()
     };
     if (imageUrl) postData.imageUrl = imageUrl;
@@ -585,10 +506,6 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-function formatContent(str) {
-  return escapeHtml(str).replace(/\n/g, '<br>');
 }
 
 function getAvatarColor(seed) {

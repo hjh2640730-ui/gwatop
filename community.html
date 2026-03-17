@@ -53,10 +53,15 @@
       border-radius: var(--radius-lg);
       padding: 20px;
       margin-bottom: 12px;
-      transition: border-color var(--transition), box-shadow var(--transition);
+      transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
       animation: fadeInUp 0.25s ease both;
+      cursor: pointer;
     }
-    .post-card:hover { border-color: var(--glass-border-hover); box-shadow: var(--shadow-md); }
+    .post-card:hover {
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
     .post-header {
       display: flex;
       align-items: center;
@@ -83,20 +88,42 @@
       vertical-align: middle;
     }
     .post-time { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
-    .post-content {
-      font-size: 15px; line-height: 1.7;
-      color: var(--text-primary);
+
+    /* ── Card Body (title + preview + thumb) ── */
+    .post-card-body {
       margin-bottom: 14px;
+    }
+    .post-card-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      line-height: 1.4;
       word-break: break-word;
     }
-    .post-image-wrap { margin-bottom: 14px; border-radius: var(--radius-md); overflow: hidden; }
-    .post-image { width: 100%; max-height: 420px; object-fit: cover; display: block; border-radius: var(--radius-md); cursor: zoom-in; }
+    .post-card-preview {
+      font-size: 14px;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      word-break: break-word;
+      white-space: pre-line;
+    }
+    .post-card-thumb {
+      display: block;
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: var(--radius-md);
+      margin-top: 10px;
+      border: 1px solid var(--glass-border);
+    }
+
     .post-footer {
       display: flex; align-items: center; gap: 8px;
       padding-top: 12px;
       border-top: 1px solid var(--glass-border);
     }
-    .post-like-btn, .post-comment-btn {
+    .post-like-btn {
       display: flex; align-items: center; gap: 5px;
       padding: 6px 12px;
       border-radius: var(--radius-full);
@@ -107,7 +134,7 @@
       color: var(--text-secondary);
       transition: all var(--transition), transform 0.15s var(--transition-bounce);
     }
-    .post-like-btn:hover:not(:disabled), .post-comment-btn:hover {
+    .post-like-btn:hover:not(:disabled) {
       background: var(--glass-bg); color: var(--text-primary); border-color: var(--glass-border-hover);
     }
     .post-like-btn.liked {
@@ -123,42 +150,14 @@
       -webkit-text-fill-color: transparent;
       margin-left: 2px;
     }
-
-    /* ── Comments ── */
-    .post-comments {
-      margin-top: 16px; padding-top: 16px;
-      border-top: 1px solid var(--glass-border);
-    }
-    .comments-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
-    .comment-item { display: flex; gap: 10px; }
-    .comment-avatar {
-      width: 28px; height: 28px;
+    .post-comment-count-wrap {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 12px;
       border-radius: var(--radius-full);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 800; color: white;
-      flex-shrink: 0; margin-top: 2px;
+      border: 1px solid var(--glass-border);
+      font-size: 13px; font-weight: 600;
+      color: var(--text-secondary);
     }
-    .comment-body { flex: 1; min-width: 0; }
-    .comment-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
-    .comment-author { font-size: 13px; font-weight: 700; }
-    .comment-uni { font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: var(--radius-full); background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.15); color: #a78bfa; }
-    .comment-time { font-size: 11px; color: var(--text-muted); }
-    .comment-text { font-size: 14px; line-height: 1.6; color: var(--text-secondary); word-break: break-word; }
-    .comment-input-wrap { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-    .comment-anon-label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
-    .comment-anon-label input { cursor: pointer; accent-color: #7c3aed; }
-    .comment-input-field {
-      flex: 1; background: var(--glass-bg); border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md); padding: 9px 14px;
-      font-family: var(--font); font-size: 14px; color: var(--text-primary); outline: none;
-      transition: border-color var(--transition);
-    }
-    .comment-input-field:focus { border-color: rgba(124,58,237,0.4); }
-    .comment-input-field::placeholder { color: var(--text-muted); }
-    .comments-loading, .comments-empty, .comments-error, .comments-login {
-      text-align: center; padding: 16px; font-size: 13px; color: var(--text-muted);
-    }
-    .comments-error { color: #f87171; }
 
     /* ── Skeleton ── */
     .post-skeleton {
@@ -236,6 +235,17 @@
     }
     .write-uni-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
     #write-modal-uni { font-size: 13px; font-weight: 700; color: #a78bfa; }
+    #post-title {
+      width: 100%;
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 12px 16px;
+      font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--text-primary);
+      outline: none; box-sizing: border-box;
+      transition: border-color var(--transition);
+      margin-bottom: 10px;
+    }
+    #post-title:focus { border-color: rgba(124,58,237,0.4); }
+    #post-title::placeholder { color: var(--text-muted); font-weight: 400; }
     .anon-toggle-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 16px; background: var(--glass-bg);
@@ -279,14 +289,6 @@
       font-size: 14px; display: flex; align-items: center; justify-content: center;
     }
     .write-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
-
-    /* ── Image Lightbox ── */
-    .img-lightbox {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.9);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 300; cursor: zoom-out;
-    }
-    .img-lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: var(--radius-md); }
 
     /* ── Mobile ── */
     @media (max-width: 768px) {
@@ -399,6 +401,9 @@
         <span id="write-modal-uni"></span>
       </div>
 
+      <!-- Title -->
+      <input type="text" id="post-title" placeholder="제목 (선택사항)" maxlength="100" />
+
       <!-- Anonymous Toggle -->
       <div class="anon-toggle-row">
         <div>
@@ -462,23 +467,6 @@
 
   <div class="toast-container" id="toast-container"></div>
 
-  <!-- Image Lightbox -->
-  <div class="img-lightbox" id="img-lightbox" style="display:none">
-    <img id="lightbox-img" src="" alt="" />
-  </div>
-
-  <script>
-    // Image lightbox
-    document.addEventListener('click', e => {
-      if (e.target.classList.contains('post-image')) {
-        document.getElementById('lightbox-img').src = e.target.src;
-        document.getElementById('img-lightbox').style.display = 'flex';
-      }
-    });
-    document.getElementById('img-lightbox').addEventListener('click', () => {
-      document.getElementById('img-lightbox').style.display = 'none';
-    });
-  </script>
   <script type="module" src="/community.js"></script>
 </body>
 </html>
