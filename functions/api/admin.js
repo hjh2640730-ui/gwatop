@@ -89,11 +89,12 @@ export async function onRequestPost(context) {
   }
 
   if (action === 'updateUser') {
-    const { uid, credits, nickname } = body;
+    const { uid, credits, nickname, university } = body;
     if (!uid) return json({ error: 'uid 누락' }, 400);
     const fields = {};
     if (credits !== undefined) fields.credits = parseInt(credits);
     if (nickname !== undefined) fields.nickname = nickname;
+    if (university !== undefined) fields.university = university;
     try {
       const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
       await updateUserFields(uid, fields, accessToken);
@@ -120,7 +121,8 @@ export async function onRequestPost(context) {
     if (!postId) return json({ error: 'postId 누락' }, 400);
     try {
       const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
-      await deletePostDoc(postId, accessToken);
+      // 게시글 조회 → 좋아요 수만큼 작성자 크레딧 회수 후 삭제
+      await deletePostAndRevokeCredits(postId, accessToken);
       return json({ success: true });
     } catch (e) {
       return json({ error: e.message }, 500);
@@ -204,19 +206,46 @@ async function deleteUserDoc(uid, accessToken) {
   if (!res.ok && res.status !== 404) throw new Error('유저 삭제 실패');
 }
 
-// ─── Firestore: 게시글 삭제 ───
-async function deletePostDoc(postId, accessToken) {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/community_posts/${postId}`;
-  const res = await fetch(url, {
+// ─── Firestore: 게시글 삭제 + 크레딧 회수 ───
+async function deletePostAndRevokeCredits(postId, accessToken) {
+  const getUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/community_posts/${postId}`;
+  const getRes = await fetch(getUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+
+  if (getRes.ok) {
+    const postDoc = await getRes.json();
+    const f = postDoc.fields || {};
+    const authorUid = f.uid?.stringValue;
+    const likes = Math.min(parseInt(f.likes?.integerValue || 0), 10); // 최대 10 크레딧만 지급됐으므로
+
+    // 작성자가 있고 좋아요가 1개 이상이면 크레딧 회수
+    if (authorUid && likes > 0) {
+      try {
+        // 현재 크레딧 조회
+        const userUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${authorUid}`;
+        const userRes = await fetch(userUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+        if (userRes.ok) {
+          const userDoc = await userRes.json();
+          const currentCredits = parseInt(userDoc.fields?.credits?.integerValue || 0);
+          const newCredits = Math.max(0, currentCredits - likes);
+          await fetch(`${userUrl}?updateMask.fieldPaths=credits`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fields: { credits: { integerValue: String(newCredits) } } })
+          });
+        }
+      } catch (_) { /* 크레딧 회수 실패해도 게시글 삭제는 진행 */ }
+    }
+  }
+
+  const delRes = await fetch(getUrl, {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
-  if (!res.ok && res.status !== 404) throw new Error('게시글 삭제 실패');
+  if (!delRes.ok && delRes.status !== 404) throw new Error('게시글 삭제 실패');
 }
 
-// ─── Firestore: 유저 필드 업데이트 (credits + nickname) ───
+// ─── Firestore: 유저 필드 업데이트 (credits + nickname + university) ───
 async function updateUserFields(uid, fields, accessToken) {
-  // fields: { credits?: number, nickname?: string }
   const firestoreFields = {};
   const updateMasks = [];
   if (fields.credits !== undefined) {
@@ -226,6 +255,10 @@ async function updateUserFields(uid, fields, accessToken) {
   if (fields.nickname !== undefined) {
     firestoreFields.nickname = { stringValue: fields.nickname };
     updateMasks.push('nickname');
+  }
+  if (fields.university !== undefined) {
+    firestoreFields.university = { stringValue: fields.university };
+    updateMasks.push('university');
   }
   if (updateMasks.length === 0) return;
   const maskQuery = updateMasks.map(f => `updateMask.fieldPaths=${f}`).join('&');

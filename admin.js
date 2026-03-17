@@ -285,7 +285,7 @@ function openEditModal(uid) {
   document.getElementById('edit-name').textContent = user.displayName || '(이름 없음)';
   document.getElementById('edit-email').textContent = user.email || '-';
   document.getElementById('edit-phone').textContent = formatPhone(user.phone) || '-';
-  document.getElementById('edit-university').textContent = user.university || '-';
+  document.getElementById('edit-university-input').value = user.university || '';
   document.getElementById('edit-nickname-input').value = user.nickname || '';
   document.getElementById('edit-credits-input').value = user.credits;
   document.getElementById('edit-modal').classList.add('visible');
@@ -300,6 +300,7 @@ async function saveEdits() {
   if (!editingUid) return;
   const credits = parseInt(document.getElementById('edit-credits-input').value);
   const nickname = document.getElementById('edit-nickname-input').value.trim();
+  const university = document.getElementById('edit-university-input').value.trim();
 
   if (isNaN(credits) || credits < 0) {
     showToast('올바른 크레딧 값을 입력해주세요.', 'error');
@@ -314,7 +315,7 @@ async function saveEdits() {
     const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: idToken, action: 'updateUser', uid: editingUid, credits, nickname }),
+      body: JSON.stringify({ token: idToken, action: 'updateUser', uid: editingUid, credits, nickname, university }),
     });
     const data = await res.json();
 
@@ -327,6 +328,7 @@ async function saveEdits() {
     if (user) {
       user.credits = credits;
       user.nickname = nickname;
+      user.university = university;
     }
     showToast('유저 정보가 업데이트됐습니다.', 'success');
     closeEditModal();
