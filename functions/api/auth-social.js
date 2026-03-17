@@ -21,7 +21,7 @@ export async function onRequestPost(context) {
   try { body = await request.json(); }
   catch { return json({ error: '요청 파싱 실패' }, 400); }
 
-  const { provider, accessToken, code } = body;
+  const { provider, code, redirectUri } = body;
 
   const clientEmail = env.FIREBASE_CLIENT_EMAIL;
   const privateKey = env.FIREBASE_PRIVATE_KEY;
@@ -32,10 +32,23 @@ export async function onRequestPost(context) {
   let uid, displayName = '', email = '', photoURL = '';
 
   if (provider === 'kakao') {
-    if (!accessToken) return json({ error: 'accessToken이 필요합니다.' }, 400);
+    if (!code) return json({ error: 'code가 필요합니다.' }, 400);
+
+    const kakaoKey = env.KAKAO_REST_API_KEY;
+    if (!kakaoKey) return json({ error: '카카오 환경 변수가 없습니다.' }, 500);
+
+    const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=authorization_code&client_id=${kakaoKey}&redirect_uri=${encodeURIComponent(redirectUri)}&code=${code}`
+    });
+    const tokenData = await tokenRes.json();
+    if (!tokenData.access_token) {
+      return json({ error: `카카오 토큰 발급 실패: ${tokenData.error_description || ''}` }, 401);
+    }
 
     const kakaoRes = await fetch('https://kapi.kakao.com/v2/user/me', {
-      headers: { Authorization: `Bearer ${accessToken}` }
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
     });
     if (!kakaoRes.ok) return json({ error: '카카오 인증 실패' }, 401);
     const kakaoUser = await kakaoRes.json();

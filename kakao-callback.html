@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>카카오 로그인 처리 중</title>
+  <style>
+    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #06060f; color: #f1f5f9; }
+    .wrap { text-align: center; }
+    .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #FEE500; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .err { color: #ef4444; margin-top: 12px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="spinner"></div>
+    <p>카카오 로그인 처리 중입니다...</p>
+    <p class="err" id="err"></p>
+  </div>
+  <script>
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+
+      if (!code) {
+        document.getElementById('err').textContent = '로그인이 취소되었습니다.';
+        setTimeout(() => window.close(), 2000);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth-social', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: 'kakao',
+            code,
+            redirectUri: window.location.origin + '/kakao-callback.html'
+          })
+        });
+        const data = await res.json();
+
+        if (!data.customToken) {
+          document.getElementById('err').textContent = data.error || '로그인 실패';
+          setTimeout(() => window.close(), 3000);
+          return;
+        }
+
+        window.opener?.postMessage({
+          kakaoCustomToken: data.customToken,
+          displayName: data.displayName,
+          photoURL: data.photoURL
+        }, window.location.origin);
+
+      } catch (e) {
+        document.getElementById('err').textContent = '네트워크 오류가 발생했습니다.';
+        setTimeout(() => window.close(), 3000);
+        return;
+      }
+
+      window.close();
+    })();
+  </script>
+</body>
+</html>
