@@ -37,10 +37,12 @@ export async function onRequestPost(context) {
     const kakaoKey = env.KAKAO_REST_API_KEY;
     if (!kakaoKey) return json({ error: '카카오 환경 변수가 없습니다.' }, 500);
 
+    const kakaoSecret = env.KAKAO_CLIENT_SECRET || '';
+    const tokenBody = `grant_type=authorization_code&client_id=${kakaoKey}&redirect_uri=${encodeURIComponent(redirectUri)}&code=${code}${kakaoSecret ? `&client_secret=${kakaoSecret}` : ''}`;
     const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `grant_type=authorization_code&client_id=${kakaoKey}&redirect_uri=${encodeURIComponent(redirectUri)}&code=${code}`
+      body: tokenBody
     });
     const tokenData = await tokenRes.json();
     if (!tokenData.access_token) {
