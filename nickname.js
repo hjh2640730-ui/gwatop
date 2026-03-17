@@ -114,6 +114,7 @@ export function checkAndShowNicknameModal(user, userData) {
       // nav 닉네임 즉시 업데이트
       const navUsername = document.getElementById('nav-username');
       if (navUsername) navUsername.textContent = nickname;
+      window.dispatchEvent(new CustomEvent('nickname-set', { detail: { nickname } }));
     } catch (e) {
       msg.textContent = '오류가 발생했습니다. 다시 시도해주세요.';
       msg.style.color = '#f87171';

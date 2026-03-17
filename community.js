@@ -1,15 +1,18 @@
 // ============================================================
-// GWATOP - Community Page Logic v1.0.0
+// GWATOP - Community Page Logic v2.0.0
 // ============================================================
 
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
 import { checkAndShowNicknameModal } from './nickname.js';
-import { db } from './auth.js';
+import { db, app } from './auth.js';
 import {
   collection, doc, addDoc, getDocs, updateDoc,
   query, orderBy, limit, startAfter, increment,
   arrayUnion, arrayRemove, serverTimestamp, where
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ─── Universities ───
 const UNIVERSITIES = [
@@ -37,13 +40,13 @@ let lastVisible = null;
 let isLoading = false;
 let hasMore = true;
 let currentSort = 'latest';
-let filterMyUniv = false;
-let writeUni = '';
+let selectedImageFile = null;
 
 // ─── Init ───
 async function init() {
   setupNav();
   setupFilters();
+  setupUniversityModal();
   setupWriteModal();
   setupLoginModal();
   loadPosts(true);
@@ -70,24 +73,80 @@ function setupNav() {
       li.style.display = 'none';
     }
     checkAndShowNicknameModal(user, userData);
+    checkAndShowUniversityModal(user, userData);
+  });
+
+  // 닉네임 설정 직후 대학 모달 체크
+  window.addEventListener('nickname-set', e => {
+    if (currentUserData) currentUserData.nickname = e.detail.nickname;
+    checkAndShowUniversityModal(currentUser, currentUserData);
   });
 }
 
-// ─── Filters & Sort ───
+// ─── University Setup Modal ───
+function checkAndShowUniversityModal(user, userData) {
+  if (!user) return;
+  if (!userData?.nickname) return; // 닉네임 먼저
+  if (userData?.university) return; // 이미 설정됨
+  document.getElementById('university-setup-modal')?.classList.add('visible');
+  setTimeout(() => document.getElementById('setup-uni-search')?.focus(), 150);
+}
+
+function setupUniversityModal() {
+  const modal = document.getElementById('university-setup-modal');
+  const searchInput = document.getElementById('setup-uni-search');
+  const optionsList = document.getElementById('setup-uni-options');
+  const confirmBtn = document.getElementById('setup-uni-confirm-btn');
+  let selectedUni = '';
+
+  function renderOptions(filter) {
+    const matches = filter
+      ? UNIVERSITIES.filter(u => u.includes(filter))
+      : UNIVERSITIES;
+    optionsList.innerHTML = matches
+      .map(u => `<li class="uni-opt-item">${escapeHtml(u)}</li>`)
+      .join('');
+    optionsList.style.display = matches.length ? '' : 'none';
+  }
+
+  searchInput.addEventListener('focus', () => renderOptions(searchInput.value));
+  searchInput.addEventListener('input', () => {
+    selectedUni = '';
+    confirmBtn.disabled = true;
+    renderOptions(searchInput.value);
+  });
+  optionsList.addEventListener('click', e => {
+    const li = e.target.closest('.uni-opt-item');
+    if (!li) return;
+    selectedUni = li.textContent;
+    searchInput.value = selectedUni;
+    optionsList.style.display = 'none';
+    confirmBtn.disabled = false;
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#setup-uni-search') && !e.target.closest('#setup-uni-options'))
+      optionsList.style.display = 'none';
+  });
+
+  confirmBtn.addEventListener('click', async () => {
+    if (!selectedUni || !currentUser) return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '저장 중...';
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), { university: selectedUni });
+      localStorage.setItem(`gwatop_uni_${currentUser.uid}`, selectedUni);
+      if (currentUserData) currentUserData.university = selectedUni;
+      modal.classList.remove('visible');
+    } catch (e) {
+      showToast('저장 실패. 다시 시도해주세요.', 'error');
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '확인';
+    }
+  });
+}
+
+// ─── Sort Filters ───
 function setupFilters() {
-  document.getElementById('filter-all').addEventListener('click', () => {
-    filterMyUniv = false;
-    document.getElementById('filter-all').className = 'filter-btn active';
-    document.getElementById('filter-my').className = 'filter-btn';
-    loadPosts(true);
-  });
-  document.getElementById('filter-my').addEventListener('click', () => {
-    if (!currentUser) { openLoginModal(); return; }
-    filterMyUniv = true;
-    document.getElementById('filter-all').className = 'filter-btn';
-    document.getElementById('filter-my').className = 'filter-btn active';
-    loadPosts(true);
-  });
   document.getElementById('sort-latest').addEventListener('click', () => {
     currentSort = 'latest';
     document.getElementById('sort-latest').className = 'sort-btn active';
@@ -127,21 +186,9 @@ async function loadPosts(reset = false) {
   try {
     const postsRef = collection(db, 'community_posts');
     const sortField = currentSort === 'popular' ? 'likes' : 'createdAt';
-    let myUni = null;
-    if (filterMyUniv && currentUser) {
-      myUni = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser.uid}`);
-    }
-
-    let q;
-    if (myUni) {
-      q = lastVisible
-        ? query(postsRef, where('university', '==', myUni), orderBy(sortField, 'desc'), startAfter(lastVisible), limit(20))
-        : query(postsRef, where('university', '==', myUni), orderBy(sortField, 'desc'), limit(20));
-    } else {
-      q = lastVisible
-        ? query(postsRef, orderBy(sortField, 'desc'), startAfter(lastVisible), limit(20))
-        : query(postsRef, orderBy(sortField, 'desc'), limit(20));
-    }
+    const q = lastVisible
+      ? query(postsRef, orderBy(sortField, 'desc'), startAfter(lastVisible), limit(20))
+      : query(postsRef, orderBy(sortField, 'desc'), limit(20));
 
     const snap = await getDocs(q);
     if (reset) feed.innerHTML = '';
@@ -158,15 +205,7 @@ async function loadPosts(reset = false) {
   } catch (e) {
     if (reset) feed.innerHTML = '';
     console.error('loadPosts:', e);
-    if (String(e.message).includes('index') || String(e.code).includes('failed-precondition')) {
-      showToast('학교 필터 인덱스가 필요합니다. 잠시 후 다시 시도해주세요.', 'error');
-      filterMyUniv = false;
-      document.getElementById('filter-all').className = 'filter-btn active';
-      document.getElementById('filter-my').className = 'filter-btn';
-      loadPosts(true);
-    } else {
-      showToast('게시글을 불러오지 못했습니다.', 'error');
-    }
+    showToast('게시글을 불러오지 못했습니다.', 'error');
   } finally {
     isLoading = false;
   }
@@ -184,6 +223,7 @@ function renderPostCard(post) {
   const displayName = post.isAnonymous ? '익명' : (post.nickname || '알 수 없음');
   const avatarColor = post.isAnonymous ? '#374151' : getAvatarColor(post.uid || displayName);
   const avatarChar = post.isAnonymous ? '?' : displayName[0];
+  const likeCount = post.likes || 0;
 
   card.innerHTML = `
     <div class="post-header">
@@ -197,10 +237,12 @@ function renderPostCard(post) {
       <span class="post-time">${timeAgo(post.createdAt)}</span>
     </div>
     <div class="post-content">${formatContent(post.content || '')}</div>
+    ${post.imageUrl ? `<div class="post-image-wrap"><img class="post-image" src="${escapeHtml(post.imageUrl)}" alt="이미지" loading="lazy" /></div>` : ''}
     <div class="post-footer">
       <button class="post-like-btn${isLiked ? ' liked' : ''}" data-id="${post.id}" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>
         <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
-        <span class="like-count">${post.likes || 0}</span>
+        <span class="like-count">${likeCount}</span>
+        ${likeCount >= 10 ? '<span class="like-maxed">MAX</span>' : ''}
       </button>
       <button class="post-comment-btn" data-id="${post.id}">
         <span>💬</span>
@@ -210,13 +252,13 @@ function renderPostCard(post) {
     <div class="post-comments" id="comments-${post.id}" style="display:none"></div>
   `;
 
-  card.querySelector('.post-like-btn').addEventListener('click', () => handleLike(post.id, post.uid));
+  card.querySelector('.post-like-btn').addEventListener('click', () => handleLike(post.id, post.uid, likeCount));
   card.querySelector('.post-comment-btn').addEventListener('click', () => toggleComments(post.id));
   feed.appendChild(card);
 }
 
-// ─── Like ───
-async function handleLike(postId, authorUid) {
+// ─── Like (최대 10 크레딧) ───
+async function handleLike(postId, authorUid, initialLikes) {
   if (!currentUser) { openLoginModal(); return; }
 
   const card = document.querySelector(`[data-id="${postId}"]`);
@@ -224,29 +266,46 @@ async function handleLike(postId, authorUid) {
   const btn = card.querySelector('.post-like-btn');
   const heart = btn.querySelector('.like-heart');
   const countEl = btn.querySelector('.like-count');
+  const maxedEl = btn.querySelector('.like-maxed');
   const wasLiked = btn.classList.contains('liked');
+  const beforeCount = parseInt(countEl.textContent);
 
-  // Optimistic update
+  // Optimistic
   btn.classList.toggle('liked');
   const delta = wasLiked ? -1 : 1;
-  countEl.textContent = Math.max(0, parseInt(countEl.textContent) + delta);
+  const newCount = Math.max(0, beforeCount + delta);
+  countEl.textContent = newCount;
   heart.textContent = wasLiked ? '🤍' : '❤️';
+  if (maxedEl) maxedEl.remove();
+  if (newCount >= 10) {
+    const span = document.createElement('span');
+    span.className = 'like-maxed';
+    span.textContent = 'MAX';
+    btn.appendChild(span);
+  }
   btn.style.transform = 'scale(1.3)';
   setTimeout(() => btn.style.transform = '', 200);
 
   try {
     const postRef = doc(db, 'community_posts', postId);
+    const giveCredit = authorUid && authorUid !== currentUser.uid;
     if (wasLiked) {
       await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
-      if (authorUid) await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1) });
+      // 크레딧 회수: 좋아요가 10개 이하였을 때만 (그 좋아요가 크레딧을 줬으므로)
+      if (giveCredit && beforeCount <= 10) {
+        await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1) });
+      }
     } else {
       await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
-      if (authorUid) await updateDoc(doc(db, 'users', authorUid), { credits: increment(1) });
+      // 크레딧 지급: 이 좋아요로 총 좋아요가 10 이하가 될 때만
+      if (giveCredit && beforeCount < 10) {
+        await updateDoc(doc(db, 'users', authorUid), { credits: increment(1) });
+      }
     }
   } catch (e) {
     // Revert
     btn.classList.toggle('liked');
-    countEl.textContent = Math.max(0, parseInt(countEl.textContent) - delta);
+    countEl.textContent = beforeCount;
     heart.textContent = wasLiked ? '❤️' : '🤍';
     console.error('like error:', e);
   }
@@ -256,10 +315,7 @@ async function handleLike(postId, authorUid) {
 async function toggleComments(postId) {
   const section = document.getElementById(`comments-${postId}`);
   if (!section) return;
-  if (section.style.display !== 'none') {
-    section.style.display = 'none';
-    return;
-  }
+  if (section.style.display !== 'none') { section.style.display = 'none'; return; }
   section.style.display = '';
   if (section.dataset.loaded) return;
   section.dataset.loaded = '1';
@@ -272,7 +328,6 @@ async function renderComments(postId, section) {
     const snap = await getDocs(
       query(collection(db, 'community_posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(50))
     );
-
     let html = '<div class="comments-list">';
     if (snap.empty) {
       html += '<p class="comments-empty">첫 댓글을 남겨보세요!</p>';
@@ -296,7 +351,6 @@ async function renderComments(postId, section) {
       });
     }
     html += '</div>';
-
     if (currentUser) {
       html += `
         <div class="comment-input-wrap">
@@ -307,9 +361,7 @@ async function renderComments(postId, section) {
     } else {
       html += `<div class="comments-login"><button class="btn btn-glass btn-sm comment-login-btn">로그인 후 댓글 달기</button></div>`;
     }
-
     section.innerHTML = html;
-
     if (currentUser) {
       const input = section.querySelector('.comment-input-field');
       const sendBtn = section.querySelector('.comment-send-btn');
@@ -363,6 +415,7 @@ async function submitComment(postId, content, isAnonymous, section) {
 function setupWriteModal() {
   document.getElementById('write-fab').addEventListener('click', () => {
     if (!currentUser) { openLoginModal(); return; }
+    if (!currentUserData?.university) { checkAndShowUniversityModal(currentUser, currentUserData); return; }
     openWriteModal();
   });
 
@@ -371,7 +424,6 @@ function setupWriteModal() {
   document.getElementById('write-modal').addEventListener('click', e => {
     if (e.target === document.getElementById('write-modal')) closeWriteModal();
   });
-
   document.getElementById('write-modal-submit').addEventListener('click', submitPost);
 
   document.getElementById('post-content').addEventListener('input', () => {
@@ -388,19 +440,45 @@ function setupWriteModal() {
     thumb.style.left = cb.checked ? '22px' : '2px';
   });
 
-  setupUniversitySearch();
+  // Image upload
+  document.getElementById('image-upload-btn').addEventListener('click', () => {
+    document.getElementById('post-image-input').click();
+  });
+  document.getElementById('post-image-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('이미지는 5MB 이하만 가능합니다.', 'error');
+      e.target.value = '';
+      return;
+    }
+    selectedImageFile = file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('image-preview').src = ev.target.result;
+      document.getElementById('image-preview-wrap').style.display = '';
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('image-remove-btn').addEventListener('click', () => {
+    selectedImageFile = null;
+    document.getElementById('post-image-input').value = '';
+    document.getElementById('image-preview-wrap').style.display = 'none';
+    document.getElementById('image-preview').src = '';
+  });
 }
 
 function openWriteModal() {
-  const savedUni = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser?.uid}`) || '';
-  writeUni = savedUni;
-  document.getElementById('uni-search-input').value = savedUni;
-  document.getElementById('uni-hidden-val').value = savedUni;
+  const uni = currentUserData?.university || '';
+  document.getElementById('write-modal-uni').textContent = uni || '학교 미설정';
   document.getElementById('post-content').value = '';
   document.getElementById('post-char-count').textContent = '0 / 1000';
   document.getElementById('anon-toggle').checked = false;
   document.getElementById('toggle-track').style.background = 'var(--glass-border)';
   document.getElementById('toggle-thumb').style.left = '2px';
+  selectedImageFile = null;
+  document.getElementById('post-image-input').value = '';
+  document.getElementById('image-preview-wrap').style.display = 'none';
   document.getElementById('write-modal').classList.add('visible');
   setTimeout(() => document.getElementById('post-content').focus(), 120);
 }
@@ -411,19 +489,32 @@ function closeWriteModal() {
 
 async function submitPost() {
   const content = document.getElementById('post-content').value.trim();
-  const university = document.getElementById('uni-hidden-val').value || writeUni;
   const isAnonymous = document.getElementById('anon-toggle').checked;
+  const university = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser?.uid}`) || '';
   const btn = document.getElementById('write-modal-submit');
 
-  if (!content || content.length < 5) { showToast('내용을 5자 이상 입력해주세요.', 'error'); return; }
-  if (!university) { showToast('학교를 선택해주세요.', 'error'); return; }
+  if (!content) { showToast('내용을 입력해주세요.', 'error'); return; }
+  if (!university) { showToast('학교를 먼저 설정해주세요.', 'error'); return; }
   if (!currentUser || !currentUserData) { openLoginModal(); return; }
 
   btn.disabled = true;
-  btn.textContent = '게시 중...';
 
+  let imageUrl = null;
+  if (selectedImageFile) {
+    btn.textContent = '이미지 업로드 중...';
+    try {
+      imageUrl = await uploadImage(selectedImageFile);
+    } catch (e) {
+      showToast('이미지 업로드 실패. 다시 시도해주세요.', 'error');
+      btn.disabled = false;
+      btn.textContent = '게시하기';
+      return;
+    }
+  }
+
+  btn.textContent = '게시 중...';
   try {
-    await addDoc(collection(db, 'community_posts'), {
+    const postData = {
       uid: currentUser.uid,
       isAnonymous,
       nickname: currentUserData?.nickname || currentUser.displayName || '',
@@ -433,14 +524,10 @@ async function submitPost() {
       likedBy: [],
       commentCount: 0,
       createdAt: serverTimestamp()
-    });
+    };
+    if (imageUrl) postData.imageUrl = imageUrl;
 
-    if (university !== currentUserData?.university) {
-      await updateDoc(doc(db, 'users', currentUser.uid), { university });
-      localStorage.setItem(`gwatop_uni_${currentUser.uid}`, university);
-      if (currentUserData) currentUserData.university = university;
-    }
-
+    await addDoc(collection(db, 'community_posts'), postData);
     closeWriteModal();
     showToast('게시글이 등록됐습니다.', 'success');
     loadPosts(true);
@@ -452,39 +539,14 @@ async function submitPost() {
   }
 }
 
-// ─── University Search ───
-function setupUniversitySearch() {
-  const input = document.getElementById('uni-search-input');
-  const list = document.getElementById('uni-options');
-  const hidden = document.getElementById('uni-hidden-val');
-
-  function render(filter) {
-    const matches = UNIVERSITIES.filter(u => u.includes(filter));
-    list.innerHTML = matches.map(u => `<li class="uni-opt-item">${escapeHtml(u)}</li>`).join('');
-    list.style.display = matches.length ? '' : 'none';
-  }
-
-  input.addEventListener('focus', () => render(input.value));
-  input.addEventListener('input', () => {
-    writeUni = '';
-    hidden.value = '';
-    render(input.value);
-  });
-
-  list.addEventListener('click', e => {
-    const li = e.target.closest('.uni-opt-item');
-    if (!li) return;
-    const val = li.textContent;
-    writeUni = val;
-    hidden.value = val;
-    input.value = val;
-    list.style.display = 'none';
-  });
-
-  document.addEventListener('click', e => {
-    if (!e.target.closest('#uni-search-input') && !e.target.closest('#uni-options'))
-      list.style.display = 'none';
-  });
+// ─── Image Upload ───
+async function uploadImage(file) {
+  const storage = getStorage(app);
+  const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+  const path = `community_images/${currentUser.uid}_${Date.now()}.${ext}`;
+  const fileRef = storageRef(storage, path);
+  await uploadBytes(fileRef, file);
+  return await getDownloadURL(fileRef);
 }
 
 // ─── Login Modal ───

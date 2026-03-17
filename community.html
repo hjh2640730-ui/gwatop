@@ -7,7 +7,7 @@
   <title>GWATOP - 커뮤니티</title>
   <link rel="stylesheet" href="/style.css" />
   <style>
-    /* ── Community Page ── */
+    /* ── Community Layout ── */
     .community-header {
       padding: clamp(32px,5vw,56px) 0 28px;
     }
@@ -17,22 +17,17 @@
       letter-spacing: -1px;
       margin-bottom: 6px;
     }
-    .community-desc {
-      color: var(--text-secondary);
-      font-size: 15px;
-    }
+    .community-desc { color: var(--text-secondary); font-size: 15px; }
 
-    /* ── Controls ── */
+    /* ── Sort Controls ── */
     .community-controls {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 12px;
+      justify-content: flex-end;
+      gap: 6px;
       margin-bottom: 20px;
-      flex-wrap: wrap;
     }
-    .filter-group, .sort-group { display: flex; gap: 6px; }
-    .filter-btn, .sort-btn {
+    .sort-btn {
       padding: 8px 16px;
       border-radius: var(--radius-full);
       font-family: var(--font);
@@ -44,8 +39,8 @@
       color: var(--text-secondary);
       transition: all var(--transition);
     }
-    .filter-btn:hover, .sort-btn:hover { color: var(--text-primary); background: var(--glass-bg); }
-    .filter-btn.active, .sort-btn.active {
+    .sort-btn:hover { color: var(--text-primary); background: var(--glass-bg); }
+    .sort-btn.active {
       background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(37,99,235,0.15));
       border-color: rgba(124,58,237,0.35);
       color: #a78bfa;
@@ -59,12 +54,9 @@
       padding: 20px;
       margin-bottom: 12px;
       transition: border-color var(--transition), box-shadow var(--transition);
-      animation: fadeInUp 0.3s ease both;
+      animation: fadeInUp 0.25s ease both;
     }
-    .post-card:hover {
-      border-color: var(--glass-border-hover);
-      box-shadow: var(--shadow-md);
-    }
+    .post-card:hover { border-color: var(--glass-border-hover); box-shadow: var(--shadow-md); }
     .post-header {
       display: flex;
       align-items: center;
@@ -72,27 +64,17 @@
       margin-bottom: 14px;
       gap: 12px;
     }
-    .post-author-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    .post-author-row { display: flex; align-items: center; gap: 10px; }
     .post-avatar {
       width: 36px; height: 36px;
       border-radius: var(--radius-full);
       display: flex; align-items: center; justify-content: center;
-      font-size: 15px; font-weight: 800; color: white;
-      flex-shrink: 0;
+      font-size: 15px; font-weight: 800; color: white; flex-shrink: 0;
     }
-    .post-author-name {
-      font-size: 14px;
-      font-weight: 700;
-      margin-right: 6px;
-    }
+    .post-author-name { font-size: 14px; font-weight: 700; margin-right: 6px; }
     .post-uni-badge {
       display: inline-block;
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 11px; font-weight: 600;
       padding: 2px 9px;
       border-radius: var(--radius-full);
       background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(37,99,235,0.1));
@@ -100,22 +82,17 @@
       color: #a78bfa;
       vertical-align: middle;
     }
-    .post-time {
-      font-size: 12px;
-      color: var(--text-muted);
-      flex-shrink: 0;
-    }
+    .post-time { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
     .post-content {
-      font-size: 15px;
-      line-height: 1.7;
+      font-size: 15px; line-height: 1.7;
       color: var(--text-primary);
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       word-break: break-word;
     }
+    .post-image-wrap { margin-bottom: 14px; border-radius: var(--radius-md); overflow: hidden; }
+    .post-image { width: 100%; max-height: 420px; object-fit: cover; display: block; border-radius: var(--radius-md); cursor: zoom-in; }
     .post-footer {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      display: flex; align-items: center; gap: 8px;
       padding-top: 12px;
       border-top: 1px solid var(--glass-border);
     }
@@ -126,16 +103,12 @@
       background: transparent;
       border: 1px solid var(--glass-border);
       cursor: pointer;
-      font-family: var(--font);
-      font-size: 13px;
-      font-weight: 600;
+      font-family: var(--font); font-size: 13px; font-weight: 600;
       color: var(--text-secondary);
-      transition: all var(--transition);
+      transition: all var(--transition), transform 0.15s var(--transition-bounce);
     }
     .post-like-btn:hover:not(:disabled), .post-comment-btn:hover {
-      background: var(--glass-bg);
-      color: var(--text-primary);
-      border-color: var(--glass-border-hover);
+      background: var(--glass-bg); color: var(--text-primary); border-color: var(--glass-border-hover);
     }
     .post-like-btn.liked {
       background: rgba(239,68,68,0.08);
@@ -143,15 +116,20 @@
       color: #f87171;
     }
     .post-like-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .post-like-btn { transition: all var(--transition), transform 0.15s var(--transition-bounce); }
+    .like-maxed {
+      font-size: 9px; font-weight: 800;
+      background: linear-gradient(135deg,#7c3aed,#2563eb);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-left: 2px;
+    }
 
     /* ── Comments ── */
     .post-comments {
-      margin-top: 16px;
-      padding-top: 16px;
+      margin-top: 16px; padding-top: 16px;
       border-top: 1px solid var(--glass-border);
     }
-    .comments-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .comments-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
     .comment-item { display: flex; gap: 10px; }
     .comment-avatar {
       width: 28px; height: 28px;
@@ -161,235 +139,158 @@
       flex-shrink: 0; margin-top: 2px;
     }
     .comment-body { flex: 1; min-width: 0; }
-    .comment-meta {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 4px;
-      flex-wrap: wrap;
-    }
+    .comment-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
     .comment-author { font-size: 13px; font-weight: 700; }
     .comment-uni { font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: var(--radius-full); background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.15); color: #a78bfa; }
     .comment-time { font-size: 11px; color: var(--text-muted); }
     .comment-text { font-size: 14px; line-height: 1.6; color: var(--text-secondary); word-break: break-word; }
-    .comment-input-wrap {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    .comment-anon-label {
-      display: flex; align-items: center; gap: 4px;
-      font-size: 12px; color: var(--text-muted);
-      cursor: pointer; flex-shrink: 0; white-space: nowrap;
-    }
+    .comment-input-wrap { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .comment-anon-label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
     .comment-anon-label input { cursor: pointer; accent-color: #7c3aed; }
     .comment-input-field {
-      flex: 1;
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      padding: 9px 14px;
-      font-family: var(--font);
-      font-size: 14px;
-      color: var(--text-primary);
-      outline: none;
+      flex: 1; background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 9px 14px;
+      font-family: var(--font); font-size: 14px; color: var(--text-primary); outline: none;
       transition: border-color var(--transition);
     }
     .comment-input-field:focus { border-color: rgba(124,58,237,0.4); }
     .comment-input-field::placeholder { color: var(--text-muted); }
     .comments-loading, .comments-empty, .comments-error, .comments-login {
-      text-align: center;
-      padding: 16px;
-      font-size: 13px;
-      color: var(--text-muted);
+      text-align: center; padding: 16px; font-size: 13px; color: var(--text-muted);
     }
     .comments-error { color: #f87171; }
-    .comments-login { padding: 12px; }
 
     /* ── Skeleton ── */
     .post-skeleton {
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-lg);
-      padding: 20px;
-      margin-bottom: 12px;
-      min-height: 120px;
-      position: relative;
-      overflow: hidden;
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg); padding: 20px; margin-bottom: 12px;
+      min-height: 120px; position: relative; overflow: hidden;
     }
     .post-skeleton::after {
-      content: '';
-      position: absolute;
-      inset: 0;
+      content: ''; position: absolute; inset: 0;
       background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%);
       animation: shimmer 1.4s infinite;
     }
     @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 
-    /* ── Empty State ── */
-    .posts-empty {
-      text-align: center;
-      padding: 80px 0;
-    }
+    /* ── Empty ── */
+    .posts-empty { text-align: center; padding: 80px 0; }
     .posts-empty-icon { font-size: 52px; margin-bottom: 16px; }
     .posts-empty-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
     .posts-empty-desc { font-size: 15px; color: var(--text-secondary); }
 
     /* ── FAB ── */
     #write-fab {
-      position: fixed;
-      bottom: 32px;
-      right: 32px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      position: fixed; bottom: 32px; right: 32px;
+      display: flex; align-items: center; gap: 8px;
       padding: 14px 24px;
-      background: var(--accent-gradient);
-      color: white;
-      border: none;
-      border-radius: var(--radius-full);
-      font-family: var(--font);
-      font-size: 15px;
-      font-weight: 700;
+      background: var(--accent-gradient); color: white;
+      border: none; border-radius: var(--radius-full);
+      font-family: var(--font); font-size: 15px; font-weight: 700;
       cursor: pointer;
       box-shadow: 0 8px 32px rgba(124,58,237,0.45), 0 4px 12px rgba(0,0,0,0.3);
-      transition: all var(--transition-bounce);
-      z-index: 90;
+      transition: all var(--transition-bounce); z-index: 90;
     }
     #write-fab:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 12px 40px rgba(124,58,237,0.55); }
     #write-fab:active { transform: scale(0.97); }
 
-    /* ── Write Modal ── */
-    .write-modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
+    /* ── University Setup Modal ── */
+    #university-setup-modal { z-index: 210; }
+
+    /* ── Shared: Uni Search ── */
+    .uni-search-input {
+      width: 100%; background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 12px 16px;
+      font-family: var(--font); font-size: 14px; color: var(--text-primary);
+      outline: none; box-sizing: border-box; transition: border-color var(--transition);
     }
-    .write-modal-title { font-size: 18px; font-weight: 800; }
-    .write-modal-close-btn {
-      background: none; border: none;
-      color: var(--text-muted);
-      font-size: 20px;
-      cursor: pointer;
-      padding: 4px;
-      border-radius: var(--radius-sm);
-      transition: color var(--transition);
-      line-height: 1;
-    }
-    .write-modal-close-btn:hover { color: var(--text-primary); }
-    .write-field-label {
-      display: block;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 8px;
-    }
-    .uni-select-wrap { position: relative; margin-bottom: 16px; }
-    #uni-search-input {
-      width: 100%;
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      padding: 12px 16px;
-      font-family: var(--font);
-      font-size: 14px;
-      color: var(--text-primary);
-      outline: none;
-      box-sizing: border-box;
-      transition: border-color var(--transition);
-    }
-    #uni-search-input:focus { border-color: rgba(124,58,237,0.4); }
-    #uni-search-input::placeholder { color: var(--text-muted); }
-    #uni-options {
-      display: none;
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0; right: 0;
-      background: var(--bg-secondary);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      max-height: 220px;
-      overflow-y: auto;
-      z-index: 20;
-      list-style: none;
-      padding: 6px;
-      box-shadow: var(--shadow-md);
+    .uni-search-input:focus { border-color: rgba(124,58,237,0.4); }
+    .uni-search-input::placeholder { color: var(--text-muted); }
+    .uni-options-list {
+      display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: var(--bg-secondary); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); max-height: 220px; overflow-y: auto;
+      z-index: 20; list-style: none; padding: 6px; box-shadow: var(--shadow-md);
     }
     .uni-opt-item {
-      padding: 9px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 14px;
-      cursor: pointer;
-      transition: background var(--transition);
+      padding: 9px 14px; border-radius: var(--radius-sm);
+      font-size: 14px; cursor: pointer; transition: background var(--transition);
       color: var(--text-secondary);
     }
     .uni-opt-item:hover { background: var(--glass-bg-hover); color: var(--text-primary); }
+
+    /* ── Write Modal ── */
+    .write-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .write-modal-title { font-size: 18px; font-weight: 800; }
+    .write-modal-close-btn {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 20px; cursor: pointer; padding: 4px; border-radius: var(--radius-sm);
+      transition: color var(--transition); line-height: 1;
+    }
+    .write-modal-close-btn:hover { color: var(--text-primary); }
+    .write-uni-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; background: var(--glass-bg);
+      border: 1px solid var(--glass-border); border-radius: var(--radius-md);
+      margin-bottom: 14px;
+    }
+    .write-uni-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+    #write-modal-uni { font-size: 13px; font-weight: 700; color: #a78bfa; }
     .anon-toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; background: var(--glass-bg);
+      border: 1px solid var(--glass-border); border-radius: var(--radius-md); margin-bottom: 14px;
     }
     .anon-toggle-label { font-size: 14px; font-weight: 600; }
     .anon-toggle-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
     #toggle-track {
-      width: 44px; height: 24px;
-      border-radius: 12px;
-      background: var(--glass-border);
-      position: relative;
-      transition: background 0.2s;
-      cursor: pointer;
-      flex-shrink: 0;
+      width: 44px; height: 24px; border-radius: 12px;
+      background: var(--glass-border); position: relative;
+      transition: background 0.2s; cursor: pointer; flex-shrink: 0;
     }
     #toggle-thumb {
-      width: 20px; height: 20px;
-      background: white;
-      border-radius: 50%;
-      position: absolute;
-      top: 2px; left: 2px;
-      transition: left 0.2s;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      width: 20px; height: 20px; background: white; border-radius: 50%;
+      position: absolute; top: 2px; left: 2px;
+      transition: left 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
     #post-content {
-      width: 100%;
-      min-height: 140px;
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      padding: 14px 16px;
-      font-family: var(--font);
-      font-size: 15px;
-      color: var(--text-primary);
-      outline: none;
-      resize: vertical;
-      box-sizing: border-box;
-      line-height: 1.7;
+      width: 100%; min-height: 140px;
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 14px 16px;
+      font-family: var(--font); font-size: 15px; color: var(--text-primary);
+      outline: none; resize: vertical; box-sizing: border-box; line-height: 1.7;
       transition: border-color var(--transition);
     }
     #post-content:focus { border-color: rgba(124,58,237,0.4); }
     #post-content::placeholder { color: var(--text-muted); }
-    .write-modal-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 8px;
-    }
+    .write-footer-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
     #post-char-count { font-size: 12px; color: var(--text-muted); }
+    .image-upload-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+    .image-upload-label { font-size: 12px; color: var(--text-muted); }
+    #image-preview-wrap {
+      position: relative; margin-top: 10px;
+      border-radius: var(--radius-md); overflow: hidden;
+    }
+    #image-preview { width: 100%; max-height: 200px; object-fit: cover; display: block; border-radius: var(--radius-md); }
+    #image-remove-btn {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,0.6); border: none; color: white;
+      width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+      font-size: 14px; display: flex; align-items: center; justify-content: center;
+    }
     .write-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+    /* ── Image Lightbox ── */
+    .img-lightbox {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 300; cursor: zoom-out;
+    }
+    .img-lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: var(--radius-md); }
 
     /* ── Mobile ── */
     @media (max-width: 768px) {
       #write-fab { bottom: 80px; right: 16px; padding: 12px 18px; font-size: 14px; }
-      .community-controls { gap: 8px; }
-      .filter-btn, .sort-btn { padding: 7px 12px; font-size: 12px; }
     }
   </style>
 </head>
@@ -400,9 +301,7 @@
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-inner">
-      <a href="/" class="nav-logo">
-        <span class="nav-logo-text">GWATOP</span>
-      </a>
+      <a href="/" class="nav-logo"><span class="nav-logo-text">GWATOP</span></a>
       <ul class="nav-links">
         <li><a href="/">홈</a></li>
         <li><a href="/create.html">퀴즈 만들기</a></li>
@@ -427,22 +326,15 @@
   <main class="page">
     <div class="container" style="max-width:700px">
 
-      <!-- Header -->
       <div class="community-header">
         <h1 class="community-title">🏛️ 커뮤니티</h1>
-        <p class="community-desc">대학생들의 자유로운 이야기 공간 · 좋아요 1개당 크레딧 1개 지급</p>
+        <p class="community-desc">전국 대학생들의 자유로운 이야기 공간 · 좋아요 1개당 크레딧 1개 (게시물당 최대 10개)</p>
       </div>
 
-      <!-- Controls -->
+      <!-- Sort -->
       <div class="community-controls">
-        <div class="filter-group">
-          <button class="filter-btn active" id="filter-all">전체</button>
-          <button class="filter-btn" id="filter-my">내 학교</button>
-        </div>
-        <div class="sort-group">
-          <button class="sort-btn active" id="sort-latest">최신순</button>
-          <button class="sort-btn" id="sort-popular">인기순</button>
-        </div>
+        <button class="sort-btn active" id="sort-latest">최신순</button>
+        <button class="sort-btn" id="sort-popular">인기순</button>
       </div>
 
       <!-- Feed -->
@@ -474,6 +366,25 @@
     <a href="/payment.html" class="mbn-item"><span class="mbn-icon">💳</span>충전</a>
   </nav>
 
+  <!-- University Setup Modal (처음 1회만) -->
+  <div class="modal-overlay" id="university-setup-modal">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-icon">🏛️</div>
+      <h2 class="modal-title">커뮤니티 참여하기</h2>
+      <p class="modal-desc">
+        재학 중인 대학교를 선택해주세요.<br />
+        <span style="font-size:13px;color:var(--text-muted)">한 번 설정하면 변경할 수 없습니다</span>
+      </p>
+      <div style="position:relative;margin-bottom:8px">
+        <input type="text" id="setup-uni-search" class="uni-search-input" placeholder="대학교 이름을 검색하세요..." autocomplete="off" />
+        <ul class="uni-options-list" id="setup-uni-options"></ul>
+      </div>
+      <div class="modal-actions" style="margin-top:20px">
+        <button class="btn btn-primary btn-lg btn-full" id="setup-uni-confirm-btn" disabled>확인</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Write Modal -->
   <div class="modal-overlay" id="write-modal">
     <div class="modal" style="max-width:520px">
@@ -482,12 +393,10 @@
         <button class="write-modal-close-btn" id="write-modal-close">✕</button>
       </div>
 
-      <!-- University -->
-      <label class="write-field-label">학교 선택</label>
-      <div class="uni-select-wrap">
-        <input type="text" id="uni-search-input" placeholder="대학교 이름을 검색하세요..." autocomplete="off" />
-        <input type="hidden" id="uni-hidden-val" />
-        <ul id="uni-options"></ul>
+      <!-- 학교 (read-only) -->
+      <div class="write-uni-row">
+        <span class="write-uni-label">📍 학교</span>
+        <span id="write-modal-uni"></span>
       </div>
 
       <!-- Anonymous Toggle -->
@@ -503,10 +412,20 @@
       </div>
 
       <!-- Content -->
-      <label class="write-field-label">내용</label>
-      <textarea id="post-content" placeholder="자유롭게 이야기를 나눠보세요...&#10;(공부 팁, 시험 후기, 학교 생활 등)"></textarea>
-      <div class="write-modal-footer">
+      <textarea id="post-content" placeholder="자유롭게 이야기를 나눠보세요...&#10;공부 팁, 시험 후기, 학교 생활 등 무엇이든!"></textarea>
+      <div class="write-footer-row">
         <span id="post-char-count">0 / 1000</span>
+      </div>
+
+      <!-- Image Upload -->
+      <div class="image-upload-row">
+        <input type="file" id="post-image-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" />
+        <button type="button" class="btn btn-glass btn-sm" id="image-upload-btn">📎 사진 첨부</button>
+        <span class="image-upload-label">JPG · PNG · GIF · WEBP · 최대 5MB</span>
+      </div>
+      <div id="image-preview-wrap" style="display:none">
+        <img id="image-preview" src="" alt="미리보기" />
+        <button id="image-remove-btn" type="button">✕</button>
       </div>
 
       <!-- Actions -->
@@ -543,6 +462,23 @@
 
   <div class="toast-container" id="toast-container"></div>
 
+  <!-- Image Lightbox -->
+  <div class="img-lightbox" id="img-lightbox" style="display:none">
+    <img id="lightbox-img" src="" alt="" />
+  </div>
+
+  <script>
+    // Image lightbox
+    document.addEventListener('click', e => {
+      if (e.target.classList.contains('post-image')) {
+        document.getElementById('lightbox-img').src = e.target.src;
+        document.getElementById('img-lightbox').style.display = 'flex';
+      }
+    });
+    document.getElementById('img-lightbox').addEventListener('click', () => {
+      document.getElementById('img-lightbox').style.display = 'none';
+    });
+  </script>
   <script type="module" src="/community.js"></script>
 </body>
 </html>

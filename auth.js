@@ -338,4 +338,4 @@ function _updateNavAvatar(photoURL, displayName) {
   if (username && displayName) username.textContent = displayName;
 }
 
-export { isConfigured, auth, db };
+export { isConfigured, auth, db, app };
