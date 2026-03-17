@@ -98,11 +98,14 @@ export async function ensureUserDoc(user) {
         localStorage.removeItem('gwatop_ref');
       }
     } else {
-      // 기존 유저 credits 필드 마이그레이션
       const data = snap.data();
       const updates = {};
       if (data.credits === undefined) updates.credits = 10;
       if (data.referralCredits === undefined) updates.referralCredits = 0;
+      // 소셜 로그인 유저 프로필 업데이트 (이름/이메일/사진 누락 시 채우기)
+      if (user.displayName && !data.displayName) updates.displayName = user.displayName;
+      if (user.email && !data.email) updates.email = user.email;
+      if (user.photoURL && !data.photoURL) updates.photoURL = user.photoURL;
       if (Object.keys(updates).length > 0) await updateDoc(ref, updates);
     }
   } catch (e) {
