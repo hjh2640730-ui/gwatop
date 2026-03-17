@@ -214,6 +214,7 @@ export function signInWithKakao() {
         });
       }
       await ensureUserDoc(auth.currentUser);
+      _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Kakao sign-in error:', err);
       alert('카카오 로그인 처리 중 오류가 발생했습니다.');
@@ -245,12 +246,21 @@ export function signInWithNaver() {
         });
       }
       await ensureUserDoc(auth.currentUser);
+      _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Naver sign-in error:', err);
       alert('네이버 로그인 처리 중 오류가 발생했습니다.');
     }
   };
   window.addEventListener('message', handleMessage);
+}
+
+// ─── 소셜 로그인 후 nav 즉시 업데이트 ───
+function _updateNavAvatar(photoURL, displayName) {
+  const avatar = document.getElementById('nav-avatar');
+  const username = document.getElementById('nav-username');
+  if (avatar && photoURL) avatar.src = photoURL;
+  if (username && displayName) username.textContent = displayName;
 }
 
 export { isConfigured, auth, db };
