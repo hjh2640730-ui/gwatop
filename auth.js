@@ -271,6 +271,7 @@ export function signInWithNaver() {
   const handleMessage = async (e) => {
     if (e.origin !== window.location.origin || !e.data?.naverCustomToken) return;
     window.removeEventListener('message', handleMessage);
+    console.log('[Naver] received:', { email: e.data.email, phone: e.data.phone, displayName: e.data.displayName });
     try {
       const credential = await signInWithCustomToken(auth, e.data.naverCustomToken);
       if (e.data.displayName || e.data.photoURL) {
