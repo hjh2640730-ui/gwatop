@@ -15,7 +15,7 @@ function injectModal() {
       <div class="modal" style="max-width:420px">
         <div class="modal-icon">✏️</div>
         <h2 class="modal-title">닉네임 설정</h2>
-        <p class="modal-desc" style="margin-bottom:20px">커뮤니티에서 사용할 닉네임을 설정하세요.<br/><span style="font-size:13px;color:var(--text-muted)">한글·영문·숫자, 2~16자</span></p>
+        <p class="modal-desc" style="margin-bottom:20px">놀이터에서 사용할 닉네임을 설정하세요.<br/><span style="font-size:13px;color:var(--text-muted)">한글·영문·숫자, 2~16자</span></p>
         <input
           id="nickname-input"
           type="text"
