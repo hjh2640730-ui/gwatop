@@ -106,7 +106,7 @@ function setupUniversityModal() {
     optionsList.innerHTML = matches
       .map(u => `<li class="uni-opt-item">${escapeHtml(u)}</li>`)
       .join('');
-    optionsList.style.display = matches.length ? '' : 'none';
+    optionsList.style.display = matches.length ? 'block' : 'none';
   }
 
   searchInput.addEventListener('focus', () => renderOptions(searchInput.value));
