@@ -278,8 +278,13 @@ function handleSubmit() {
   // Show comment
   const commentBox = document.getElementById('comment-box');
   const commentText = document.getElementById('comment-text');
-  const correctComments = ['정확합니다! 🎯', '완벽해요! ✨', '맞습니다! 잘 하셨어요 👏', '훌륭해요! 🌟', '정답입니다! 💯'];
-  const wrongComments = ['아쉽네요. 다시 확인해보세요 📚', '틀렸습니다. 해설을 잘 읽어보세요 💡', '조금 더 공부가 필요해요 📖', '다음엔 맞출 수 있어요! 💪'];
+  const isFunMode = (localStorage.getItem('gwatop_comment_mode') || 'normal') === 'fun';
+  const correctComments = isFunMode
+    ? ['과탑 가즈아 🔥', '어 이거 알았어? 레전드네 ㄹㅇ', '이 문제 틀렸으면 나 집 가려고 했는데', '천재 아니야? 🧠', '역시 내 학생이야 ㅋㅋ', '교수님도 인정할듯 👀']
+    : ['정확합니다! 🎯', '완벽해요! ✨', '맞습니다! 잘 하셨어요 👏', '훌륭해요! 🌟', '정답입니다! 💯'];
+  const wrongComments = isFunMode
+    ? ['아 이걸 틀리네;;', '이건 진짜 기본 중에 기본인데...', '교수님이 보셨으면 큰일났다 😅', '야 공부 좀 해라', '이 문제 시험 나올 것 같은데 ㅠ', '다시 읽어봐 이거 진짜로']
+    : ['아쉽네요. 다시 확인해보세요 📚', '틀렸습니다. 해설을 잘 읽어보세요 💡', '조금 더 공부가 필요해요 📖', '다음엔 맞출 수 있어요! 💪'];
   const comments = isCorrect ? correctComments : wrongComments;
   commentText.textContent = comments[Math.floor(Math.random() * comments.length)];
   commentBox.className = `quiz-comment ${isCorrect ? 'correct' : 'wrong'}`;
