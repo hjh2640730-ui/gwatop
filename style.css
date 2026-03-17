@@ -316,7 +316,7 @@ body {
 /* ─── Modal ─── */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(6,6,15,0.82); backdrop-filter: blur(8px); z-index: 150; align-items: center; justify-content: center; padding: 20px; }
 .modal-overlay.visible { display: flex; }
-.modal { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 40px; max-width: 460px; width: 100%; box-shadow: var(--shadow-lg); animation: scaleIn 0.3s var(--transition-bounce); text-align: center; }
+.modal { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 40px; max-width: 460px; width: 100%; box-shadow: var(--shadow-lg); animation: scaleIn 0.3s var(--transition-bounce) backwards; text-align: center; }
 .modal-icon { font-size: 52px; margin-bottom: 20px; }
 .modal-title { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
 .modal-desc { font-size: 15px; color: var(--text-secondary); margin-bottom: 28px; line-height: 1.7; }
