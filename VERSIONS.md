@@ -1,5 +1,10 @@
 # GWATOP - Version History
 
+## v1.7.0 (2026-03-17) - 닉네임 미설정 계정 강제 설정
+- 모든 페이지(main, quiz, history, payment)에서 닉네임 없으면 모달 필수 표시
+- quiz.js에 checkAndShowNicknameModal 추가 (기존 누락)
+- quiz.js nav 사용자명을 userData?.nickname 우선 표시로 수정
+
 ## v1.6.0 (2026-03-17) - 랜딩 페이지 UX/UI 전면 개선
 - 히어로 CTA 버튼 제거, 설명 중심으로 재편
 - 4단계 스텝 카드 (번호 + 아이콘)로 작동 원리 시각화

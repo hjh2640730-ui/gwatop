@@ -5,6 +5,7 @@
 
 import { onUserChange } from './auth.js';
 import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore } from './db.js';
+import { checkAndShowNicknameModal } from './nickname.js';
 
 // ─── State ───
 let questions = [];
@@ -64,14 +65,15 @@ function setupNav() {
   document.getElementById('nav-login-btn')?.addEventListener('click', () => {
     window.location.href = '/';
   });
-  onUserChange((user) => {
+  onUserChange((user, userData) => {
     const lo = document.getElementById('nav-auth-logged-out');
     const li = document.getElementById('nav-auth-logged-in');
     if (user) {
       lo.style.display = 'none';
       li.style.display = 'flex';
       document.getElementById('nav-avatar').src = user.photoURL || '';
-      document.getElementById('nav-username').textContent = user.displayName || '';
+      document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
+      checkAndShowNicknameModal(user, userData);
     } else {
       lo.style.display = '';
       li.style.display = 'none';
