@@ -140,6 +140,13 @@ async function deletePost() {
   if (!currentUser || currentUser.uid !== postData.uid) return;
   if (!confirm('글을 삭제하시겠습니까?')) return;
   try {
+    // 좋아요로 받은 크레딧 회수 (최대 10개)
+    const likesEarned = Math.min(postData.likes || 0, 10);
+    if (likesEarned > 0) {
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        credits: increment(-likesEarned)
+      });
+    }
     await deleteDoc(doc(db, 'community_posts', postId));
     window.location.href = '/community.html';
   } catch (e) {
