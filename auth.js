@@ -240,6 +240,8 @@ export function signInWithKakao() {
         displayName: e.data.displayName,
         photoURL: e.data.photoURL
       });
+      // 레이스 컨디션 방지: onAuthStateChanged가 null email로 덮어쓸 수 있어 강제 업데이트
+      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.displayName, e.data.photoURL);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Kakao sign-in error:', err);
@@ -276,6 +278,8 @@ export function signInWithNaver() {
         displayName: e.data.displayName,
         photoURL: e.data.photoURL
       });
+      // 레이스 컨디션 방지: onAuthStateChanged가 null email로 덮어쓸 수 있어 강제 업데이트
+      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.displayName, e.data.photoURL);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Naver sign-in error:', err);
@@ -283,6 +287,22 @@ export function signInWithNaver() {
     }
   };
   window.addEventListener('message', handleMessage);
+}
+
+// ─── 소셜 로그인 프로필 강제 저장 (레이스 컨디션 방지) ───
+async function _forceSocialProfile(uid, email, displayName, photoURL) {
+  if (!db) return;
+  try {
+    const updates = {};
+    if (email) updates.email = email;
+    if (displayName) updates.displayName = displayName;
+    if (photoURL) updates.photoURL = photoURL;
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, 'users', uid), updates);
+    }
+  } catch (e) {
+    console.warn('_forceSocialProfile error:', e);
+  }
 }
 
 // ─── 소셜 로그인 후 nav 즉시 업데이트 ───
