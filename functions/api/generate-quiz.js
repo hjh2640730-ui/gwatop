@@ -67,9 +67,10 @@ export async function onRequestPost(context) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.8,
+          temperature: 0.7,
           topP: 0.95,
           maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 0 },
         },
         safetySettings: [
           { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },

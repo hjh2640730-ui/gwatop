@@ -138,11 +138,8 @@ function renderQuestion(idx) {
   }
 
   // Animate card
-  quizCard.classList.remove('shake', 'correct-flash');
-  void quizCard.offsetWidth; // reflow
-  quizCard.style.animation = 'none';
-  void quizCard.offsetWidth;
-  quizCard.style.animation = '';
+  quizCard.classList.remove('shake', 'correct-flash', 'card-enter');
+  requestAnimationFrame(() => quizCard.classList.add('card-enter'));
 }
 
 // ─── MCQ ───

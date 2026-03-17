@@ -379,7 +379,6 @@ body {
   backdrop-filter: blur(20px) saturate(1.5); -webkit-backdrop-filter: blur(20px) saturate(1.5);
   border: 1px solid var(--glass-border); border-radius: var(--radius-xl);
   padding: clamp(24px,5vw,48px); box-shadow: var(--shadow-glass);
-  animation: cardIn 0.4s var(--transition-bounce);
 }
 .quiz-card.shake { animation: shake 0.4s ease; }
 .quiz-card.correct-flash { border-color: rgba(16,185,129,0.4); animation: correctPulse 0.5s ease; }
@@ -496,9 +495,10 @@ body {
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
-@keyframes cardIn { from { opacity: 0; transform: translateY(20px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes cardIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.quiz-card.card-enter { animation: cardIn 0.25s ease both; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@keyframes shake { 0%,100%{transform:translateX(0)} 15%{transform:translateX(-8px)} 30%{transform:translateX(8px)} 45%{transform:translateX(-6px)} 60%{transform:translateX(6px)} 75%{transform:translateX(-3px)} 90%{transform:translateX(3px)} }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
 @keyframes correctPulse { 0%{box-shadow:var(--shadow-glass)} 50%{box-shadow:0 0 50px rgba(16,185,129,0.2)} 100%{box-shadow:var(--shadow-glass)} }
 @keyframes feedbackPop { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.3)} 40%{opacity:1;transform:translate(-50%,-50%) scale(1.2)} 60%{transform:translate(-50%,-50%) scale(0.95)} 80%{opacity:1;transform:translate(-50%,-50%) scale(1.05)} 100%{opacity:0;transform:translate(-50%,-50%) scale(1)} }
 @keyframes dotPulse { 0%,100%{transform:scale(1);opacity:0.5} 50%{transform:scale(1.4);opacity:1} }
