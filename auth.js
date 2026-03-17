@@ -26,9 +26,9 @@ import firebaseConfig from './firebase-config.js';
 
 // ─── 소셜 로그인 공개 키 ───
 // TODO: Kakao Developers (developers.kakao.com) → 앱 → 앱 키 → JavaScript 키
-const KAKAO_APP_KEY = '';
+const KAKAO_APP_KEY = '33326f45f3490e49195eb5bd74f03c04';
 // TODO: Naver Developers (developers.naver.com) → 앱 등록 → Client ID
-const NAVER_CLIENT_ID = '';
+const NAVER_CLIENT_ID = '7qK5JB94z8TvW5FFOnti';
 
 // ─── Firebase Init ───
 let app, auth, db;
