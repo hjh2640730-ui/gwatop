@@ -288,6 +288,7 @@ function openEditModal(uid) {
   document.getElementById('edit-university-input').value = user.university || '';
   document.getElementById('edit-nickname-input').value = user.nickname || '';
   document.getElementById('edit-credits-input').value = user.credits;
+  document.getElementById('edit-referral-input').value = user.referralCredits ?? 0;
   document.getElementById('edit-modal').classList.add('visible');
 }
 
@@ -299,6 +300,7 @@ function closeEditModal() {
 async function saveEdits() {
   if (!editingUid) return;
   const credits = parseInt(document.getElementById('edit-credits-input').value);
+  const referralCredits = parseInt(document.getElementById('edit-referral-input').value);
   const nickname = document.getElementById('edit-nickname-input').value.trim();
   const university = document.getElementById('edit-university-input').value.trim();
 
@@ -315,7 +317,7 @@ async function saveEdits() {
     const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: idToken, action: 'updateUser', uid: editingUid, credits, nickname, university }),
+      body: JSON.stringify({ token: idToken, action: 'updateUser', uid: editingUid, credits, referralCredits, nickname, university }),
     });
     const data = await res.json();
 
@@ -327,6 +329,7 @@ async function saveEdits() {
     const user = allUsers.find(u => u.uid === editingUid);
     if (user) {
       user.credits = credits;
+      user.referralCredits = referralCredits;
       user.nickname = nickname;
       user.university = university;
     }
