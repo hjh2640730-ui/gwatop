@@ -20,7 +20,12 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
-  increment
+  increment,
+  collection,
+  query,
+  where,
+  getDocs,
+  limit
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import firebaseConfig from './firebase-config.js';
 
@@ -80,13 +85,23 @@ export async function ensureUserDoc(user) {
     const ref = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
+      // 이메일 중복 확인: 같은 이메일로 이미 다른 계정이 있으면 무료 크레딧 미지급
+      let freeCredits = 10;
+      if (user.email) {
+        try {
+          const emailQ = query(collection(db, 'users'), where('email', '==', user.email), limit(1));
+          const emailSnap = await getDocs(emailQ);
+          if (!emailSnap.empty) freeCredits = 0;
+        } catch (_) {}
+      }
+
       await setDoc(ref, {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        credits: 10,          // 신규 가입 무료 문제 10개
-        referralCredits: 0,   // 추천으로 얻은 크레딧 합계
+        credits: freeCredits,
+        referralCredits: 0,
         totalQuizzes: 0,
         createdAt: serverTimestamp()
       });
