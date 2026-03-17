@@ -41,7 +41,6 @@ function setupNav() {
     } else {
       lo.style.display = '';
       li.style.display = 'none';
-      document.getElementById('login-modal').classList.add('visible');
     }
   });
 }

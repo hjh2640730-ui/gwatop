@@ -41,6 +41,7 @@ export async function signInWithGoogleAdmin() {
 export async function logOutAdmin() {
   if (!adminAuth) return;
   try { await signOut(adminAuth); } catch (e) { console.error(e); }
+  window.location.reload();
 }
 
 export function onAdminUserChange(callback) {

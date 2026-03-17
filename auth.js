@@ -74,6 +74,7 @@ export async function signInWithGoogle() {
 export async function logOut() {
   if (!isConfigured) return;
   try { await signOut(auth); } catch (e) { console.error(e); }
+  window.location.reload();
 }
 
 export async function handleRedirectResult() { return null; }
