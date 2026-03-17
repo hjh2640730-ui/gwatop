@@ -6,7 +6,7 @@ import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChang
 import { checkAndShowNicknameModal } from './nickname.js';
 import { db } from './auth.js';
 import {
-  collection, doc, getDoc, getDocs, addDoc, updateDoc,
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, limit, increment,
   arrayUnion, arrayRemove, serverTimestamp, runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -102,6 +102,7 @@ function renderPost() {
       </div>` : ''}
     <div class="post-detail-footer" id="post-detail-footer">
       <div id="post-like-wrap"></div>
+      ${currentUser?.uid === postData.uid ? `<button id="post-delete-btn" style="margin-left:auto;font-size:13px;color:var(--text-muted);background:none;border:none;cursor:pointer;padding:4px 8px;font-family:var(--font);transition:color var(--transition);" onmouseover="this.style.color='#f87171'" onmouseout="this.style.color='var(--text-muted)'">삭제</button>` : ''}
     </div>
   `;
 
@@ -114,7 +115,22 @@ function renderPost() {
     });
   }
 
+  document.getElementById('post-delete-btn')?.addEventListener('click', deletePost);
+
   renderLikeButton();
+}
+
+// ─── Delete Post ───
+async function deletePost() {
+  if (!currentUser || currentUser.uid !== postData.uid) return;
+  if (!confirm('글을 삭제하시겠습니까?')) return;
+  try {
+    await deleteDoc(doc(db, 'community_posts', postId));
+    window.location.href = '/community.html';
+  } catch (e) {
+    console.error('deletePost:', e);
+    showToast('글 삭제 실패', 'error');
+  }
 }
 
 // ─── Render Like Button ───
