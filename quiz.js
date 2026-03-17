@@ -199,9 +199,9 @@ function renderShort() {
   shortOptions.style.display = '';
   shortInput.value = '';
   shortInput.disabled = false;
-  shortInput.addEventListener('input', () => {
+  shortInput.oninput = () => {
     submitBtn.disabled = shortInput.value.trim().length === 0;
-  });
+  };
   submitBtn.disabled = true;
 }
 
@@ -224,6 +224,8 @@ function setupControls() {
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // textarea 포커스 상태에서는 Enter 단축키 무시
+    if (e.target === shortInput) return;
     if (e.key === 'Enter' && !answered && !submitBtn.disabled) handleSubmit();
     else if (e.key === 'Enter' && answered) handleNext();
     if (e.key === 'Escape' && !answered) quitModal.classList.toggle('visible');
