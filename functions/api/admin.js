@@ -77,6 +77,17 @@ export async function onRequestPost(context) {
     }
   }
 
+  if (action === 'deleteUser') {
+    if (!uid) return json({ error: 'uid 누락' }, 400);
+    try {
+      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      await deleteUserDoc(uid, accessToken);
+      return json({ success: true });
+    } catch (e) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
   return json({ error: '알 수 없는 액션' }, 400);
 }
 
@@ -102,6 +113,16 @@ async function getUsers(accessToken) {
       createdAt: f.createdAt?.timestampValue || null,
     };
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// ─── Firestore: 유저 삭제 ───
+async function deleteUserDoc(uid, accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+  });
+  if (!res.ok && res.status !== 404) throw new Error('유저 삭제 실패');
 }
 
 // ─── Firestore: 크레딧 업데이트 ───

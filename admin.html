@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/style.css" />
   <style>
     .admin-page { padding: calc(var(--nav-height) + 40px) clamp(16px,4vw,32px) 80px; min-height: 100vh; }
-    .admin-header { margin-bottom: 32px; }
+    .admin-header { margin-bottom: 32px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .admin-title { font-size: clamp(24px,4vw,36px); font-weight: 900; letter-spacing: -1px; margin-bottom: 6px; }
     .admin-subtitle { font-size: 14px; color: var(--text-muted); }
 
@@ -31,13 +31,13 @@
 
     /* Table */
     .table-wrap { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); overflow: hidden; }
-    .table-header { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr 80px; gap: 0; padding: 14px 20px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--glass-border); }
+    .table-header { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr 80px 80px; gap: 0; padding: 14px 20px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--glass-border); }
     .th { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
     .table-body { }
     .table-row {
-      display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr 80px;
+      display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1.5fr 80px 80px;
       gap: 0; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.04);
-      align-items: center; transition: background var(--transition); cursor: pointer;
+      align-items: center; transition: background var(--transition);
     }
     .table-row:last-child { border-bottom: none; }
     .table-row:hover { background: var(--glass-bg-hover); }
@@ -46,6 +46,8 @@
     .td-credits { font-weight: 700; color: #a78bfa; font-size: 14px; }
     .td-date { font-size: 12px; color: var(--text-muted); }
     .empty-row { padding: 60px 20px; text-align: center; color: var(--text-muted); font-size: 15px; }
+    .btn-delete { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #f87171; border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--transition); font-family: var(--font); }
+    .btn-delete:hover { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.5); }
 
     /* Edit Modal */
     .edit-modal-content { text-align: left; }
@@ -83,17 +85,32 @@
       </a>
       <div class="nav-right">
         <span style="font-size:13px;color:var(--text-muted);font-weight:600;">🔐 관리자</span>
+        <button class="btn btn-ghost btn-sm" id="admin-logout-btn" style="display:none">로그아웃</button>
         <a href="/" class="btn btn-ghost btn-sm">홈으로</a>
       </div>
     </div>
   </nav>
 
+  <!-- 로그인 화면 -->
+  <div id="login-state" style="display:none; padding-top:var(--nav-height); min-height:100vh; align-items:center; justify-content:center;">
+    <div style="text-align:center; padding:40px; max-width:360px; width:100%;">
+      <div style="font-size:64px; margin-bottom:20px">🔐</div>
+      <h1 style="font-size:24px; font-weight:800; margin-bottom:8px">관리자 로그인</h1>
+      <p style="color:var(--text-secondary); margin-bottom:32px; font-size:14px">관리자 계정으로만 접근 가능합니다.</p>
+      <button class="btn btn-google btn-full" id="admin-login-btn" style="justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+        Google로 로그인
+      </button>
+    </div>
+  </div>
+
   <!-- 접근 차단 화면 -->
-  <div id="access-denied" style="display:none; padding-top:var(--nav-height); min-height:100vh; display:none; align-items:center; justify-content:center;">
+  <div id="access-denied" style="display:none; padding-top:var(--nav-height); min-height:100vh; align-items:center; justify-content:center;">
     <div style="text-align:center; padding: 40px;">
-      <div style="font-size:64px; margin-bottom:20px">🔒</div>
+      <div style="font-size:64px; margin-bottom:20px">🚫</div>
       <h1 style="font-size:24px; font-weight:800; margin-bottom:8px">접근 권한 없음</h1>
-      <p style="color:var(--text-secondary)">관리자 계정으로 로그인해주세요.</p>
+      <p style="color:var(--text-secondary); margin-bottom:24px">관리자 계정으로만 접근 가능합니다.</p>
+      <button class="btn btn-glass" id="denied-logout-btn">다른 계정으로 로그인</button>
     </div>
   </div>
 
@@ -106,8 +123,10 @@
   <!-- 메인 어드민 -->
   <main class="admin-page container" id="admin-main" style="display:none">
     <div class="admin-header">
-      <h1 class="admin-title">🔐 관리자 대시보드</h1>
-      <p class="admin-subtitle">전체 유저 현황을 확인하고 크레딧을 조정합니다.</p>
+      <div>
+        <h1 class="admin-title">🔐 관리자 대시보드</h1>
+        <p class="admin-subtitle">전체 유저 현황을 확인하고 크레딧을 조정합니다.</p>
+      </div>
     </div>
 
     <!-- 통계 -->
@@ -142,6 +161,7 @@
         <div class="th">추천</div>
         <div class="th">가입일</div>
         <div class="th">수정</div>
+        <div class="th">삭제</div>
       </div>
       <div class="table-body" id="table-body">
         <div class="empty-row">데이터 로딩 중...</div>
@@ -161,6 +181,19 @@
       <div class="modal-actions" style="margin-top:20px;">
         <button class="btn btn-primary btn-lg" id="edit-save-btn" style="flex:1">저장</button>
         <button class="btn btn-ghost" id="edit-cancel-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 유저 삭제 확인 모달 -->
+  <div class="modal-overlay" id="delete-modal">
+    <div class="modal" style="max-width:400px; text-align:center;">
+      <div class="modal-icon">🗑️</div>
+      <h2 class="modal-title">유저 삭제</h2>
+      <p class="modal-desc" id="delete-desc">이 유저를 삭제하시겠습니까?<br/>이 작업은 되돌릴 수 없습니다.</p>
+      <div class="modal-actions" style="margin-top:24px;">
+        <button class="btn btn-lg" id="delete-confirm-btn" style="flex:1; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171;">삭제</button>
+        <button class="btn btn-ghost" id="delete-cancel-btn">취소</button>
       </div>
     </div>
   </div>
