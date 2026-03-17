@@ -49,6 +49,7 @@
 
         window.opener?.postMessage({
           kakaoCustomToken: data.customToken,
+          email: data.email,
           displayName: data.displayName,
           photoURL: data.photoURL
         }, window.location.origin);

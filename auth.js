@@ -79,17 +79,21 @@ export async function logOut() {
 export async function handleRedirectResult() { return null; }
 
 // ─── Ensure User Document (신규 가입 시 2 크레딧 무료 지급) ───
-export async function ensureUserDoc(user) {
+export async function ensureUserDoc(user, extra = {}) {
   if (!isConfigured || !db) return;
+  // extra: 카카오/네이버처럼 Firebase Auth에 이메일이 없을 때 직접 전달
+  const email = user.email || extra.email || '';
+  const displayName = user.displayName || extra.displayName || '';
+  const photoURL = user.photoURL || extra.photoURL || '';
   try {
     const ref = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
       // 이메일 중복 확인: 같은 이메일로 이미 다른 계정이 있으면 무료 크레딧 미지급
       let freeCredits = 10;
-      if (user.email) {
+      if (email) {
         try {
-          const emailQ = query(collection(db, 'users'), where('email', '==', user.email), limit(1));
+          const emailQ = query(collection(db, 'users'), where('email', '==', email), limit(1));
           const emailSnap = await getDocs(emailQ);
           if (!emailSnap.empty) freeCredits = 0;
         } catch (_) {}
@@ -97,9 +101,9 @@ export async function ensureUserDoc(user) {
 
       await setDoc(ref, {
         uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        photoURL: user.photoURL,
+        email,
+        displayName,
+        photoURL,
         credits: freeCredits,
         referralCredits: 0,
         totalQuizzes: 0,
@@ -118,9 +122,9 @@ export async function ensureUserDoc(user) {
       if (data.credits === undefined) updates.credits = 10;
       if (data.referralCredits === undefined) updates.referralCredits = 0;
       // 소셜 로그인 유저 프로필 업데이트 (이름/이메일/사진 누락 시 채우기)
-      if (user.displayName && !data.displayName) updates.displayName = user.displayName;
-      if (user.email && !data.email) updates.email = user.email;
-      if (user.photoURL && !data.photoURL) updates.photoURL = user.photoURL;
+      if (displayName && !data.displayName) updates.displayName = displayName;
+      if (email && !data.email) updates.email = email;
+      if (photoURL && !data.photoURL) updates.photoURL = photoURL;
       if (Object.keys(updates).length > 0) await updateDoc(ref, updates);
     }
   } catch (e) {
@@ -231,7 +235,11 @@ export function signInWithKakao() {
           photoURL: e.data.photoURL || ''
         });
       }
-      await ensureUserDoc(auth.currentUser);
+      await ensureUserDoc(auth.currentUser, {
+        email: e.data.email,
+        displayName: e.data.displayName,
+        photoURL: e.data.photoURL
+      });
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Kakao sign-in error:', err);
@@ -263,7 +271,11 @@ export function signInWithNaver() {
           photoURL: e.data.photoURL || ''
         });
       }
-      await ensureUserDoc(auth.currentUser);
+      await ensureUserDoc(auth.currentUser, {
+        email: e.data.email,
+        displayName: e.data.displayName,
+        photoURL: e.data.photoURL
+      });
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Naver sign-in error:', err);
