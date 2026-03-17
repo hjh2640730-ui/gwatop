@@ -83,6 +83,7 @@ function renderTable(users) {
   body.innerHTML = users.map(u => `
     <div class="table-row" data-uid="${u.uid}">
       <div class="td td-name" data-label="이름">${u.displayName || '(이름 없음)'}</div>
+      <div class="td" data-label="닉네임" style="color:#a78bfa;font-weight:600">${u.nickname || '-'}</div>
       <div class="td" data-label="이메일">${u.email || '-'}</div>
       <div class="td" data-label="전화번호">${formatPhone(u.phone)}</div>
       <div class="td td-credits" data-label="크레딧">${u.credits}</div>

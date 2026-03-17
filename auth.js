@@ -171,6 +171,22 @@ export async function getUserData(uid) {
   }
 }
 
+// ─── 닉네임 중복 확인 ───
+export async function checkNicknameAvailable(nickname) {
+  if (!isConfigured || !db) return true;
+  try {
+    const q = query(collection(db, 'users'), where('nickname', '==', nickname), limit(1));
+    const snap = await getDocs(q);
+    return snap.empty;
+  } catch { return true; }
+}
+
+// ─── 닉네임 저장 ───
+export async function setNickname(uid, nickname) {
+  if (!isConfigured || !db) return;
+  await updateDoc(doc(db, 'users', uid), { nickname });
+}
+
 // ─── Get Credits ───
 export async function getCredits(uid) {
   const data = await getUserData(uid);

@@ -5,6 +5,7 @@
 
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange, deductCredit, calcCredits } from './auth.js';
 import { saveDocument, savePendingQuiz } from './db.js';
+import { checkAndShowNicknameModal } from './nickname.js';
 
 // ─── PDF.js Setup ───
 const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
@@ -84,6 +85,7 @@ function setupNav() {
     currentUserData = userData;
     updateNavUI(user, userData);
     updateGenerateBtn();
+    checkAndShowNicknameModal(user, userData);
   });
 }
 
@@ -92,7 +94,7 @@ function updateNavUI(user, userData) {
     navLoggedOut.style.display = 'none';
     navLoggedIn.style.display = 'flex';
     navAvatar.src = user.photoURL || '';
-    navUsername.textContent = user.displayName || user.email || '사용자';
+    navUsername.textContent = userData?.nickname || user.displayName || user.email || '사용자';
     const credits = userData?.credits ?? 0;
     document.getElementById('nav-credits').textContent = credits;
   } else {

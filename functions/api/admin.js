@@ -108,6 +108,7 @@ async function getUsers(accessToken) {
       email: f.email?.stringValue || '',
       phone: f.phone?.stringValue || '',
       displayName: f.displayName?.stringValue || '',
+      nickname: f.nickname?.stringValue || '',
       credits: parseInt(f.credits?.integerValue || 0),
       totalQuizzes: parseInt(f.totalQuizzes?.integerValue || 0),
       referralCredits: parseInt(f.referralCredits?.integerValue || 0),

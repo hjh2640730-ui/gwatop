@@ -4,6 +4,7 @@
 // ============================================================
 
 import { signInWithGoogle, logOut, onUserChange } from './auth.js';
+import { checkAndShowNicknameModal } from './nickname.js';
 
 const TOSS_CLIENT_KEY = 'test_ck_DnyRpQWGrN2jDYK5Wa0LrKwv1M9E';
 
@@ -32,12 +33,13 @@ function setupNav() {
       lo.style.display = 'none';
       li.style.display = 'flex';
       document.getElementById('nav-avatar').src = user.photoURL || '';
-      document.getElementById('nav-username').textContent = user.displayName || '';
+      document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || '';
       const credits = userData?.credits ?? 0;
       document.getElementById('nav-credits').textContent = credits;
       document.getElementById('current-credits').textContent = credits;
       document.getElementById('credits-info-bar').style.display = 'flex';
       setupReferral(user, userData);
+      checkAndShowNicknameModal(user, userData);
     } else {
       lo.style.display = '';
       li.style.display = 'none';
