@@ -98,7 +98,7 @@
         <li><a href="/" class="active">홈</a></li>
         <li><a href="/create.html">퀴즈 만들기</a></li>
         <li><a href="/history.html">내 퀴즈</a></li>
-        <li><a href="/community.html" onclick="return confirm('공부 안 해?')">놀이터</a></li>
+        <li><a href="/community.html" onclick="showPlaygroundModal(event)">놀이터</a></li>
         <li><a href="/payment.html">크레딧 충전</a></li>
       </ul>
       <div class="nav-right">
@@ -292,7 +292,7 @@
         <a href="/">홈</a>
         <a href="/create.html">퀴즈 만들기</a>
         <a href="/history.html">내 퀴즈</a>
-        <a href="/community.html" onclick="return confirm('공부 안 해?')">놀이터</a>
+        <a href="/community.html" onclick="showPlaygroundModal(event)">놀이터</a>
         <a href="/payment.html">크레딧 충전</a>
         <a href="#pricing">요금제</a>
       </div>
@@ -303,7 +303,7 @@
   <nav class="mobile-bottom-nav">
     <a href="/" class="mbn-item active"><span class="mbn-icon">🏠</span>홈</a>
     <a href="/create.html" class="mbn-item"><span class="mbn-icon">⚡</span>퀴즈</a>
-    <a href="/community.html" class="mbn-item" onclick="return confirm('공부 안 해?')"><span class="mbn-icon">🏛️</span>놀이터</a>
+    <a href="/community.html" class="mbn-item" onclick="showPlaygroundModal(event)"><span class="mbn-icon">🏛️</span>놀이터</a>
     <a href="/payment.html" class="mbn-item"><span class="mbn-icon">💳</span>충전</a>
   </nav>
 
@@ -381,6 +381,29 @@
         li.style.display = 'none';
       }
     });
+  </script>
+
+  <!-- Playground Modal -->
+  <div class="modal-overlay" id="playground-modal">
+    <div class="modal" style="max-width:360px">
+      <div class="modal-icon">🎮</div>
+      <h2 class="modal-title">공부 안 하니?</h2>
+      <p class="modal-desc">지금 놀이터로 도망가려고요? 👀</p>
+      <div class="modal-actions" style="margin-top:28px;gap:10px;display:flex">
+        <button class="btn btn-glass btn-lg" id="pg-cancel-btn" style="flex:1">아니, 공부할게</button>
+        <button class="btn btn-primary btn-lg" id="pg-confirm-btn" style="flex:1">응, 놀러 갈게 🎉</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    function showPlaygroundModal(e) {
+      e.preventDefault();
+      const modal = document.getElementById('playground-modal');
+      modal.classList.add('visible');
+      document.getElementById('pg-cancel-btn').onclick = () => modal.classList.remove('visible');
+      document.getElementById('pg-confirm-btn').onclick = () => { window.location.href = '/community.html'; };
+      modal.onclick = (ev) => { if (ev.target === modal) modal.classList.remove('visible'); };
+    }
   </script>
 </body>
 </html>
