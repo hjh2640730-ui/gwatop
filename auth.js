@@ -242,6 +242,7 @@ export function signInWithKakao() {
       });
       // 레이스 컨디션 방지: onAuthStateChanged가 null email로 덮어쓸 수 있어 강제 업데이트
       await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.displayName, e.data.photoURL);
+      console.log('[Kakao] uid:', auth.currentUser.uid, 'email:', e.data.email, 'displayName:', e.data.displayName);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Kakao sign-in error:', err);
@@ -280,6 +281,7 @@ export function signInWithNaver() {
       });
       // 레이스 컨디션 방지: onAuthStateChanged가 null email로 덮어쓸 수 있어 강제 업데이트
       await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.displayName, e.data.photoURL);
+      console.log('[Naver] uid:', auth.currentUser.uid, 'email:', e.data.email, 'displayName:', e.data.displayName);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Naver sign-in error:', err);
