@@ -73,7 +73,7 @@ function selectPackage(card) {
   const payBtn = document.getElementById('pay-btn');
   const payBtnText = document.getElementById('pay-btn-text');
   payBtn.style.display = 'flex';
-  payBtnText.textContent = `${packageName} ₩${price.toLocaleString()} 결제하기`;
+  payBtnText.textContent = `${packageName} ${parseInt(credits).toLocaleString()}문제 ₩${price.toLocaleString()} 결제하기`;
 }
 
 // ─── Pay Button ───
@@ -93,7 +93,7 @@ document.getElementById('pay-btn')?.addEventListener('click', async () => {
       method: 'CARD',
       amount: { currency: 'KRW', value: price },
       orderId,
-      orderName: `GWATOP ${packageName} 크레딧 ${credits}회`,
+      orderName: `GWATOP ${packageName} ${parseInt(credits).toLocaleString()}문제`,
       successUrl: `${window.location.origin}/payment-success.html`,
       failUrl: `${window.location.origin}/payment-fail.html`,
       customerEmail: currentUser.email,

@@ -79,7 +79,7 @@ export async function ensureUserDoc(user) {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
-        credits: 2,           // 신규 가입 무료 크레딧
+        credits: 10,          // 신규 가입 무료 문제 10개
         referralCredits: 0,   // 추천으로 얻은 크레딧 합계
         totalQuizzes: 0,
         createdAt: serverTimestamp()
@@ -95,7 +95,7 @@ export async function ensureUserDoc(user) {
       // 기존 유저 credits 필드 마이그레이션
       const data = snap.data();
       const updates = {};
-      if (data.credits === undefined) updates.credits = 2;
+      if (data.credits === undefined) updates.credits = 10;
       if (data.referralCredits === undefined) updates.referralCredits = 0;
       if (Object.keys(updates).length > 0) await updateDoc(ref, updates);
     }
@@ -115,7 +115,7 @@ export async function addReferralCredit(referrerUid) {
     const referralCredits = data.referralCredits ?? 0;
     if (referralCredits >= 3) return; // 최대 3회 제한
     await updateDoc(ref, {
-      credits: increment(1),
+      credits: increment(5),
       referralCredits: increment(1)
     });
   } catch (e) {
@@ -142,11 +142,9 @@ export async function getCredits(uid) {
   return data?.credits ?? 0;
 }
 
-// ─── 문제 수 → 차감 크레딧 계산 ───
+// ─── 문제 수 → 차감 크레딧 계산 (1문제 = 1크레딧) ───
 export function calcCredits(count) {
-  if (count <= 10) return 1;
-  if (count <= 30) return 2;
-  return 3;
+  return count;
 }
 
 // ─── Deduct Credits (문제 수 기반 차감) ───

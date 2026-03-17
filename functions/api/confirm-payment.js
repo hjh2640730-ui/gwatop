@@ -14,9 +14,9 @@ const PROJECT_ID = 'gwatop-8edaf';
 
 // 결제 금액 → 크레딧 변환 (서버에서 결정 = 클라이언트 조작 불가)
 function creditsFromAmount(amount) {
-  if (amount === 1900) return 10;   // 스타터
-  if (amount === 3900) return 30;   // 스탠다드
-  if (amount === 9900) return 100;  // 프리미엄
+  if (amount === 1900) return 100;   // 스타터
+  if (amount === 3900) return 300;   // 스탠다드
+  if (amount === 9900) return 1000;  // 프리미엄
   return 0;
 }
 

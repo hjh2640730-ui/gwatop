@@ -178,7 +178,7 @@ function updateCreditCostLabel() {
   const count = parseInt(countSlider?.value || 15);
   const cost = calcCredits(count);
   const label = document.getElementById('credit-cost-label');
-  if (label) label.textContent = `⚡ ${cost} 크레딧 차감`;
+  if (label) label.textContent = `⚡ ${cost}문제 차감`;
 }
 
 function updateSliderStyle() {

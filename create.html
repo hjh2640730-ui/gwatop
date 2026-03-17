@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 퀴즈 만들기</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <span class="nav-logo-text">GWATOP</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">홈</a></li>
+        <li><a href="/create.html" class="active">퀴즈 만들기</a></li>
+        <li><a href="/history.html">내 퀴즈</a></li>
+        <li><a href="/payment.html">크레딧 충전</a></li>
+      </ul>
+      <div class="nav-right">
+        <div id="nav-auth-logged-out">
+          <button class="btn btn-primary" id="nav-login-btn">
+            <span>🔑</span> 구글 로그인
+          </button>
+        </div>
+        <div id="nav-auth-logged-in" class="nav-user" style="display:none">
+          <img class="nav-avatar" id="nav-avatar" src="" alt="avatar" />
+          <span class="nav-username" id="nav-username"></span>
+          <a href="/payment.html" class="nav-plan-badge free" id="nav-credits-badge" style="text-decoration:none;cursor:pointer">⚡ <span id="nav-credits">0</span>문제</a>
+          <button class="btn btn-ghost btn-sm" id="nav-logout-btn">로그아웃</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page">
+    <section class="hero container">
+      <h1 class="hero-title">
+        PDF 업로드하고<br />
+        <span class="gradient-text">AI 퀴즈 생성</span>
+      </h1>
+      <p class="hero-subtitle">
+        강의 자료, 교재, 논문을 업로드하면<br />
+        대학 시험 수준의 퀴즈를 즉시 만들어드립니다.
+      </p>
+
+      <div class="upload-card">
+        <div class="upload-zone" id="upload-zone">
+          <span class="upload-icon" id="upload-icon">📄</span>
+          <p class="upload-title">PDF 파일을 드래그하거나 클릭해서 업로드</p>
+          <p class="upload-sub">최대 50MB · PDF 형식만 지원</p>
+          <button class="btn btn-glass" id="upload-btn-click">
+            <span>📂</span> 파일 선택
+          </button>
+          <input type="file" class="upload-file-input" id="file-input" accept=".pdf" />
+        </div>
+
+        <div class="file-info" id="file-info">
+          <span class="file-info-icon">📄</span>
+          <div class="file-info-details">
+            <div class="file-info-name" id="file-name">파일명.pdf</div>
+            <div class="file-info-size" id="file-size">0 MB</div>
+          </div>
+          <button class="file-info-remove" id="file-remove-btn" title="파일 제거">✕</button>
+        </div>
+
+        <div class="quiz-settings" id="quiz-settings" style="display:none">
+          <div>
+            <div class="settings-label">문제 유형</div>
+            <div class="type-options">
+              <label class="type-option">
+                <input type="checkbox" name="quiz-type" value="mcq" checked />
+                <span class="type-option-label">
+                  <span class="type-icon">📝</span>
+                  객관식
+                </span>
+              </label>
+              <label class="type-option">
+                <input type="checkbox" name="quiz-type" value="short" />
+                <span class="type-option-label">
+                  <span class="type-icon">✏️</span>
+                  주관식
+                </span>
+              </label>
+              <label class="type-option">
+                <input type="checkbox" name="quiz-type" value="ox" />
+                <span class="type-option-label">
+                  <span class="type-icon">⭕</span>
+                  OX 퀴즈
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <div class="settings-label" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>문제 개수</span>
+              <span id="credit-cost-label" style="font-size:12px;color:#a78bfa;font-weight:700;">⚡ 15문제 차감</span>
+            </div>
+            <div class="count-slider-wrapper">
+              <input
+                type="range" class="count-slider" id="count-slider"
+                min="5" max="50" value="15" step="5"
+              />
+              <div class="count-display" id="count-display">15</div>
+            </div>
+          </div>
+
+          <button class="btn-generate" id="generate-btn" disabled>
+            <span>⚡</span> 퀴즈 생성하기
+          </button>
+
+          <div class="upgrade-banner" id="upgrade-banner" style="display:none">
+            <span class="upgrade-banner-icon">👑</span>
+            <div class="upgrade-banner-text">
+              <div class="upgrade-banner-title">문제가 부족합니다</div>
+              <div class="upgrade-banner-desc">크레딧을 충전하면 퀴즈를 계속 생성할 수 있습니다.</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="upgrade-btn">충전하기</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-title">🤖 AI가 퀴즈를 생성 중입니다...</div>
+    <div class="loading-subtitle">PDF 내용을 분석하고 문제를 만드는 중입니다. 잠시만 기다려주세요.</div>
+    <div class="loading-dots">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <div class="modal-icon">🔑</div>
+      <h2 class="modal-title">로그인이 필요합니다</h2>
+      <p class="modal-desc">퀴즈를 생성하려면 구글 계정으로 로그인해주세요.<br />신규 가입 시 10문제 무료!</p>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-lg" id="modal-login-btn">
+          <span>🔑</span> 구글로 로그인
+        </button>
+        <button class="btn btn-ghost" id="modal-close-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="upgrade-modal">
+    <div class="modal">
+      <div class="modal-icon">⚡</div>
+      <h2 class="modal-title">문제가 부족합니다</h2>
+      <p class="modal-desc">보유한 문제가 없습니다.<br />충전하면 퀴즈를 계속 생성할 수 있어요!</p>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-lg" id="modal-upgrade-btn">
+          <span>⚡</span> 충전하기
+        </button>
+        <button class="btn btn-ghost" id="modal-upgrade-close-btn">나중에</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
