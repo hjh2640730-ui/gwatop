@@ -333,6 +333,7 @@
 
   <script type="module">
     import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from '/auth.js';
+    import { checkAndShowNicknameModal } from '/nickname.js';
 
     document.getElementById('nav-login-btn')?.addEventListener('click', () => {
       document.getElementById('login-modal')?.classList.add('visible');
@@ -370,8 +371,9 @@
         lo.style.display = 'none';
         li.style.display = 'flex';
         document.getElementById('nav-avatar').src = user.photoURL || '';
-        document.getElementById('nav-username').textContent = user.displayName || '';
+        document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
         document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
+        checkAndShowNicknameModal(user, userData);
       } else {
         lo.style.display = '';
         li.style.display = 'none';
