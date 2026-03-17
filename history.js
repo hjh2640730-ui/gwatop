@@ -20,7 +20,6 @@ async function init() {
   setupTabs();
   setupDeleteModal();
   setupLoginModal();
-  await loadAll();
 }
 
 // ─── Nav ───
@@ -42,9 +41,15 @@ function setupNav() {
       const badge = document.getElementById('nav-plan-badge');
       badge.textContent = plan === 'premium' ? 'Premium' : 'Free';
       badge.className = `nav-plan-badge ${plan}`;
+      loadAll();
     } else {
       lo.style.display = '';
       li.style.display = 'none';
+      // 퀴즈 목록 비우기
+      const grid = document.getElementById('quizzes-grid');
+      const empty = document.getElementById('quizzes-empty');
+      if (grid) { grid.innerHTML = ''; grid.style.display = 'none'; }
+      if (empty) empty.style.display = '';
     }
   });
 }
