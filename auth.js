@@ -31,7 +31,7 @@ import firebaseConfig from './firebase-config.js';
 
 // ─── 소셜 로그인 공개 키 ───
 const KAKAO_REST_API_KEY = '6750d096b2c523c0a557ee153c62ddbd';
-const NAVER_CLIENT_ID = '7qK5JB94z8TvW5FFOnti';
+const NAVER_CLIENT_ID = '7qK5JB94z8TvW5FFOn';
 
 // ─── Firebase Init ───
 let app, auth, db;
@@ -214,19 +214,52 @@ export async function deductCredit(uid, amount = 1) {
   }
 }
 
+// ─── Nav Cache ───
+const NAV_CACHE_KEY = 'gwatop_nav_cache';
+
+function applyNavCache() {
+  try {
+    const raw = localStorage.getItem(NAV_CACHE_KEY);
+    if (!raw) return;
+    const cache = JSON.parse(raw);
+    const lo = document.getElementById('nav-auth-logged-out');
+    const li = document.getElementById('nav-auth-logged-in');
+    if (!lo || !li) return;
+    lo.style.display = 'none';
+    li.style.display = 'flex';
+    const avatar = document.getElementById('nav-avatar');
+    const username = document.getElementById('nav-username');
+    const credits = document.getElementById('nav-credits');
+    if (avatar) avatar.src = cache.photoURL || '';
+    if (username) username.textContent = cache.nickname || cache.displayName || '';
+    if (credits) credits.textContent = cache.credits ?? 0;
+  } catch (_) {}
+}
+
 // ─── Auth State Observer ───
 export function onUserChange(callback) {
   if (!isConfigured) {
     callback(null, null);
     return () => {};
   }
+
+  // 캐시된 로그인 상태를 즉시 적용해 flash 방지
+  applyNavCache();
+
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
     try {
       if (user) {
         await ensureUserDoc(user);
         const userData = await getUserData(user.uid);
+        localStorage.setItem(NAV_CACHE_KEY, JSON.stringify({
+          photoURL: user.photoURL || '',
+          displayName: user.displayName || '',
+          nickname: userData?.nickname || '',
+          credits: userData?.credits ?? 0
+        }));
         callback(user, userData);
       } else {
+        localStorage.removeItem(NAV_CACHE_KEY);
         callback(null, null);
       }
     } catch (e) {
