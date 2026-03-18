@@ -42,6 +42,7 @@ let hasMore = true;
 let currentSort = 'latest';
 let selectedImageFile = null;
 let postRenderCount = 0;
+let postsInitialized = false;
 
 // ─── Init ───
 async function init() {
@@ -76,7 +77,8 @@ function setupNav() {
     checkAndShowNicknameModal(user, userData);
     checkAndShowUniversityModal(user, userData);
     // Reload posts so liked state is correct after login/logout
-    loadPosts(true);
+    // init()에서 이미 loadPosts(true)를 호출하므로 첫 로드 완료 후에만 재로드
+    if (postsInitialized) loadPosts(true);
   });
 
   // 닉네임 설정 직후 대학 모달 체크
@@ -210,6 +212,7 @@ async function loadPosts(reset = false) {
 
     hasMore = snap.docs.length === 20;
     loadMoreBtn.style.display = hasMore ? '' : 'none';
+    postsInitialized = true;
   } catch (e) {
     if (reset) feed.innerHTML = '';
     console.error('loadPosts:', e);
