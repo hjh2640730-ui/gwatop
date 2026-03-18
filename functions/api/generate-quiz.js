@@ -6,6 +6,9 @@
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
+const PROJECT_ID = 'gwatop-8edaf';
+const RATE_LIMIT_SECONDS = 30;
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -44,6 +47,21 @@ export async function onRequestPost(context) {
     body = await request.json();
   } catch {
     return json({ error: '요청 본문을 파싱할 수 없습니다.' }, 400);
+  }
+
+  // ─── Rate Limiting (idToken 기반, 유저당 30초 제한) ───
+  const { idToken } = body;
+  if (idToken && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
+    try {
+      const tokenPayload = decodeJWT(idToken);
+      const uid = tokenPayload?.user_id || tokenPayload?.sub;
+      if (uid) {
+        const rateLimitResult = await checkAndUpdateRateLimit(uid, env);
+        if (!rateLimitResult.allowed) {
+          return json({ error: `요청이 너무 빠릅니다. ${rateLimitResult.waitSeconds}초 후 다시 시도해주세요.` }, 429);
+        }
+      }
+    } catch { /* rate limit 실패 시 통과 허용 */ }
   }
 
   const { text, types, type, count } = body;
@@ -133,6 +151,81 @@ export async function onRequestPost(context) {
     console.error('Unexpected error:', err);
     return json({ error: `서버 오류: ${err.message}` }, 500);
   }
+}
+
+// ─── Rate Limit Helpers ───
+function decodeJWT(token) {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decoded);
+  } catch { return null; }
+}
+
+async function getFirebaseAccessToken(clientEmail, privateKey) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: clientEmail, sub: clientEmail,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now, exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/datastore',
+  };
+  const encode = (obj) =>
+    btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const signingInput = `${encode(header)}.${encode(payload)}`;
+
+  const pem = privateKey
+    .replace(/-----BEGIN PRIVATE KEY-----/g, '')
+    .replace(/-----END PRIVATE KEY-----/g, '')
+    .replace(/\\n/g, '').replace(/\n/g, '').replace(/\r/g, '').replace(/\s/g, '');
+  const keyData = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', keyData.buffer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']
+  );
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput)
+  );
+  const sigEncoded = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const jwt = `${signingInput}.${sigEncoded}`;
+
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+  const tokenData = await tokenRes.json();
+  if (!tokenData.access_token) throw new Error('Firebase 액세스 토큰 발급 실패');
+  return tokenData.access_token;
+}
+
+async function checkAndUpdateRateLimit(uid, env) {
+  const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+  const docUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/quiz_rate_limits/${uid}`;
+  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
+
+  // 현재 rate limit 문서 조회
+  const getRes = await fetch(docUrl, { headers });
+  if (getRes.ok) {
+    const data = await getRes.json();
+    const lastSec = parseInt(data.fields?.lastRequestAt?.integerValue || 0);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const elapsed = nowSec - lastSec;
+    if (elapsed < RATE_LIMIT_SECONDS) {
+      return { allowed: false, waitSeconds: RATE_LIMIT_SECONDS - elapsed };
+    }
+  }
+
+  // 타임스탬프 업데이트
+  const nowSec = Math.floor(Date.now() / 1000);
+  await fetch(`${docUrl}?updateMask.fieldPaths=lastRequestAt`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ fields: { lastRequestAt: { integerValue: String(nowSec) } } }),
+  });
+  return { allowed: true };
 }
 
 // ─── Build Prompt (복수 타입 지원) ───

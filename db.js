@@ -134,12 +134,16 @@ export async function saveQuiz(uid, docId, docName, questions, type, score) {
     uid, docId, docName, questions, type, score,
     totalQuestions: questions.length, createdAt: Date.now()
   });
-  // Firestore 메타데이터 백업 (문제 데이터 제외 - 용량 절약)
+  // Firestore 백업: 메타데이터 + 문제 데이터 별도 저장
   if (firestoreDb && uid) {
     try {
       await setDoc(doc(firestoreDb, 'users', uid, 'quiz_history', String(localId)), {
         docName, type, score: score ?? null,
         totalQuestions: questions.length, createdAt: Date.now(), localId
+      });
+      // 문제 데이터 저장 (다른 기기에서 다시 풀기 지원)
+      await setDoc(doc(firestoreDb, 'users', uid, 'quiz_questions', String(localId)), {
+        questions, docName, type, createdAt: Date.now()
       });
     } catch { /* 백업 실패 시 무시 - IndexedDB가 primary */ }
   }
@@ -148,6 +152,17 @@ export async function saveQuiz(uid, docId, docName, questions, type, score) {
 
 export async function getQuiz(id) {
   return txGet(STORE_QUIZZES, id);
+}
+
+// Firestore에서 문제 데이터 조회 (_firestoreOnly 퀴즈 다시 풀기용)
+export async function getQuizQuestionsFromFirestore(uid, localId) {
+  if (!firestoreDb || !uid || !localId) return null;
+  try {
+    const { getDoc } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const snap = await getDoc(doc(firestoreDb, 'users', uid, 'quiz_questions', String(localId)));
+    if (!snap.exists()) return null;
+    return snap.data();
+  } catch { return null; }
 }
 
 export async function getAllQuizzes(uid) {
@@ -197,6 +212,7 @@ export async function deleteQuiz(id) {
   if (firestoreDb && quiz?.uid) {
     try {
       await deleteDoc(doc(firestoreDb, 'users', quiz.uid, 'quiz_history', String(id)));
+      await deleteDoc(doc(firestoreDb, 'users', quiz.uid, 'quiz_questions', String(id)));
     } catch { /* 무시 */ }
   }
 }

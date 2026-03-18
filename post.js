@@ -6,7 +6,7 @@ import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChang
 import { checkAndShowNicknameModal } from './nickname.js';
 import { db } from './auth.js';
 import {
-  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, setDoc,
   query, orderBy, limit, increment,
   arrayUnion, arrayRemove, serverTimestamp, runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -15,6 +15,7 @@ import {
 let currentUser = null;
 let currentUserData = null;
 let postData = null;
+let isPostLiked = false;
 const postId = new URLSearchParams(window.location.search).get('id');
 
 // ─── Init ───
@@ -33,7 +34,7 @@ function setupNav() {
   document.getElementById('nav-login-btn')?.addEventListener('click', openLoginModal);
   document.getElementById('nav-logout-btn')?.addEventListener('click', () => logOut());
 
-  onUserChange((user, userData) => {
+  onUserChange(async (user, userData) => {
     currentUser = user;
     currentUserData = userData;
     const lo = document.getElementById('nav-auth-logged-out');
@@ -47,15 +48,25 @@ function setupNav() {
     } else {
       lo.style.display = '';
       li.style.display = 'none';
+      isPostLiked = false;
     }
     checkAndShowNicknameModal(user, userData);
-    // Re-render after auth state changes
     if (postData) {
+      await checkPostLiked();
       renderPostFooter();
       renderCommentForm();
       loadComments();
     }
   });
+}
+
+// ─── Check Post Liked (post_likes 컬렉션) ───
+async function checkPostLiked() {
+  if (!currentUser || !postId) { isPostLiked = false; return; }
+  try {
+    const snap = await getDoc(doc(db, 'post_likes', `${postId}_${currentUser.uid}`));
+    isPostLiked = snap.exists();
+  } catch { isPostLiked = false; }
 }
 
 // ─── Load Post ───
@@ -68,6 +79,7 @@ async function loadPost() {
       return;
     }
     postData = { id: snap.id, ...snap.data() };
+    await checkPostLiked();
     renderPost();
     loadComments();
   } catch (e) {
@@ -160,7 +172,7 @@ async function deletePost() {
 function renderLikeButton() {
   const wrap = document.getElementById('post-like-wrap');
   if (!wrap || !postData) return;
-  const isLiked = currentUser && Array.isArray(postData.likedBy) && postData.likedBy.includes(currentUser.uid);
+  const isLiked = isPostLiked;
   const isMine = currentUser?.uid === postData.uid;
   const likeCount = postData.likes || 0;
 
@@ -205,25 +217,23 @@ async function handleLike() {
   btn.style.transform = 'scale(1.3)';
   setTimeout(() => btn.style.transform = '', 200);
 
-  // Update postData optimistically
-  if (wasLiked) {
-    postData.likes = Math.max(0, (postData.likes || 0) - 1);
-    postData.likedBy = (postData.likedBy || []).filter(u => u !== currentUser.uid);
-  } else {
-    postData.likes = (postData.likes || 0) + 1;
-    postData.likedBy = [...(postData.likedBy || []), currentUser.uid];
-  }
+  // Optimistic state update
+  isPostLiked = !wasLiked;
+  postData.likes = wasLiked ? Math.max(0, (postData.likes || 0) - 1) : (postData.likes || 0) + 1;
 
   try {
     const postRef = doc(db, 'community_posts', postId);
+    const likeDocRef = doc(db, 'post_likes', `${postId}_${currentUser.uid}`);
     const giveCredit = authorUid && authorUid !== currentUser.uid;
     if (wasLiked) {
-      await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
+      await deleteDoc(likeDocRef);
+      await updateDoc(postRef, { likes: increment(-1) });
       if (giveCredit && beforeCount <= 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1), referralCredits: increment(-1) });
       }
     } else {
-      await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
+      await setDoc(likeDocRef, { postId, uid: currentUser.uid, createdAt: serverTimestamp() });
+      await updateDoc(postRef, { likes: increment(1) });
       if (giveCredit && beforeCount < 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(1), referralCredits: increment(1) });
       }
@@ -233,14 +243,8 @@ async function handleLike() {
     btn.classList.toggle('liked');
     countEl.textContent = beforeCount;
     heart.textContent = wasLiked ? '❤️' : '🤍';
-    if (wasLiked) {
-      postData.likes = (postData.likes || 0) + 1;
-      if (!postData.likedBy) postData.likedBy = [];
-      postData.likedBy.push(currentUser.uid);
-    } else {
-      postData.likes = Math.max(0, (postData.likes || 0) - 1);
-      postData.likedBy = (postData.likedBy || []).filter(u => u !== currentUser.uid);
-    }
+    isPostLiked = wasLiked;
+    postData.likes = wasLiked ? (postData.likes || 0) + 1 : Math.max(0, (postData.likes || 0) - 1);
     console.error('like error:', e);
   }
 }

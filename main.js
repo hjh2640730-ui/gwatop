@@ -282,13 +282,15 @@ async function generateQuiz() {
 
     // 2) Call API
     showToast('🤖 AI가 문제를 생성 중입니다...', 'warning');
+    const idToken = await currentUser.getIdToken();
     const response = await fetch('/api/generate-quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: extractedText.slice(0, 60000),
         types,
-        count
+        count,
+        idToken
       })
     });
 

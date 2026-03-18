@@ -8,7 +8,8 @@ import { checkAndShowNicknameModal } from './nickname.js';
 import {
   getAllQuizzes, getAllDocuments,
   deleteQuiz, deleteDocument,
-  savePendingQuiz, getDocument
+  savePendingQuiz, getDocument,
+  getQuizQuestionsFromFirestore
 } from './db.js';
 
 // ─── State ───
@@ -101,7 +102,7 @@ async function loadQuizzes(uid) {
 
   // Attach events
   grid.querySelectorAll('[data-replay]').forEach(btn => {
-    btn.addEventListener('click', () => replayQuiz(parseInt(btn.dataset.replay)));
+    btn.addEventListener('click', () => replayQuiz(parseInt(btn.dataset.replay), btn.dataset.firestoreOnly === 'true'));
   });
   grid.querySelectorAll('[data-delete-quiz]').forEach(btn => {
     btn.addEventListener('click', () => confirmDelete('quiz', parseInt(btn.dataset.deleteQuiz), `"${btn.dataset.name}" 퀴즈 결과를 삭제합니다.`));
@@ -126,10 +127,7 @@ function renderQuizCard(q) {
       </div>
       ${score != null ? `<div class="history-card-score" style="color:${scoreColor}">${score}점</div>` : '<div style="font-size:13px;color:var(--text-muted)">미완료</div>'}
       <div class="history-card-actions">
-        ${q._firestoreOnly
-          ? `<button class="btn btn-glass btn-sm" style="flex:1;opacity:0.45" disabled title="브라우저 데이터 없음 - 다른 기기에서 생성됨">▶ 다시 풀기 불가</button>`
-          : `<button class="btn btn-primary btn-sm" style="flex:1" data-replay="${q.id}">▶ 다시 풀기</button>`
-        }
+        <button class="btn btn-primary btn-sm" style="flex:1" data-replay="${q.id}" ${q._firestoreOnly ? 'data-firestore-only="true"' : ''}>▶ 다시 풀기</button>
         <button class="btn btn-danger btn-sm" data-delete-quiz="${q.id}" data-name="${escapeAttr(q.docName || '문서')}">
           🗑
         </button>
@@ -197,7 +195,19 @@ function renderDocCard(d) {
 }
 
 // ─── Replay Quiz ───
-async function replayQuiz(quizId) {
+async function replayQuiz(quizId, firestoreOnly = false) {
+  if (firestoreOnly) {
+    // 다른 기기에서 생성된 퀴즈: Firestore에서 문제 데이터 로드
+    showToast('퀴즈 데이터를 불러오는 중...', 'warning');
+    const data = await getQuizQuestionsFromFirestore(currentUid, quizId);
+    if (!data || !data.questions?.length) {
+      showToast('퀴즈 데이터를 불러올 수 없습니다.', 'error'); return;
+    }
+    savePendingQuiz({ docName: data.docName, questions: data.questions, type: data.type });
+    window.location.href = '/quiz.html';
+    return;
+  }
+
   const { getQuiz } = await import('./db.js');
   const quiz = await getQuiz(quizId);
   if (!quiz || !quiz.questions?.length) {

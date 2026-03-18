@@ -6,9 +6,9 @@ import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChang
 import { checkAndShowNicknameModal } from './nickname.js';
 import { db, app } from './auth.js';
 import {
-  collection, doc, addDoc, getDocs, updateDoc,
+  collection, doc, addDoc, getDocs, updateDoc, setDoc, deleteDoc,
   query, orderBy, where, limit, startAfter, increment,
-  arrayUnion, arrayRemove, serverTimestamp, Timestamp
+  serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
@@ -40,6 +40,7 @@ let currentSort = 'latest';
 let selectedImageFile = null;
 let postRenderCount = 0;
 let authInitialized = false;
+let likedPostIds = new Set(); // post_likes 컬렉션에서 로드
 let pageStartCursors = [null]; // [0]=null(pg1 start), [n]=lastDoc of page n → start of page n+1
 let currentPagePosts = [];
 let hasNextPage = false;
@@ -66,7 +67,7 @@ function setupNav() {
   document.getElementById('nav-login-btn')?.addEventListener('click', openLoginModal);
   document.getElementById('nav-logout-btn')?.addEventListener('click', () => logOut());
 
-  onUserChange((user, userData) => {
+  onUserChange(async (user, userData) => {
     currentUser = user;
     currentUserData = userData;
     const lo = document.getElementById('nav-auth-logged-out');
@@ -77,9 +78,11 @@ function setupNav() {
       document.getElementById('nav-avatar').src = user.photoURL || '';
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || '';
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
+      await loadUserLikes();
     } else {
       lo.style.display = '';
       li.style.display = 'none';
+      likedPostIds = new Set();
     }
     checkAndShowNicknameModal(user, userData);
     checkAndShowUniversityModal(user, userData);
@@ -170,6 +173,18 @@ function setupFilters() {
     document.getElementById('sort-popular').className = 'sort-btn active';
     loadAllPosts();
   });
+}
+
+// ─── 유저가 좋아요한 게시글 ID 로드 ───
+async function loadUserLikes() {
+  if (!currentUser) { likedPostIds = new Set(); return; }
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'post_likes'),
+      where('uid', '==', currentUser.uid)
+    ));
+    likedPostIds = new Set(snap.docs.map(d => d.data().postId));
+  } catch { likedPostIds = new Set(); }
 }
 
 // ─── Load All Posts (정렬 변경/게시 후 상태 초기화) ───
@@ -421,7 +436,7 @@ function renderPostCard(post) {
   card.dataset.id = post.id;
   card.style.cursor = 'pointer';
 
-  const isLiked = currentUser && Array.isArray(post.likedBy) && post.likedBy.includes(currentUser.uid);
+  const isLiked = currentUser && likedPostIds.has(post.id);
   const isMine = currentUser?.uid === post.uid;
   const displayName = post.isAnonymous ? '익명' : (post.nickname || '알 수 없음');
   const avatarColor = post.isAnonymous ? '#374151' : getAvatarColor(post.uid || displayName);
@@ -507,13 +522,18 @@ async function handleLike(postId, authorUid) {
   try {
     const postRef = doc(db, 'community_posts', postId);
     const giveCredit = authorUid && authorUid !== currentUser.uid;
+    const likeDocRef = doc(db, 'post_likes', `${postId}_${currentUser.uid}`);
     if (wasLiked) {
-      await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
+      await deleteDoc(likeDocRef);
+      await updateDoc(postRef, { likes: increment(-1) });
+      likedPostIds.delete(postId);
       if (giveCredit && beforeCount <= 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1), referralCredits: increment(-1) });
       }
     } else {
-      await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
+      await setDoc(likeDocRef, { postId, uid: currentUser.uid, createdAt: serverTimestamp() });
+      await updateDoc(postRef, { likes: increment(1) });
+      likedPostIds.add(postId);
       if (giveCredit && beforeCount < 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(1), referralCredits: increment(1) });
       }

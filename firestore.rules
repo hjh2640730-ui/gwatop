@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── 유저 데이터 ──
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      // 본인: 모든 필드 수정. 타인: credits/referralCredits만 수정 (좋아요 보상)
+      allow update: if request.auth != null && (
+        request.auth.uid == uid ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['credits', 'referralCredits'])
+      );
+      allow delete: if false;
+
+      match /quiz_history/{quizId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+      match /quiz_questions/{quizId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // ── 커뮤니티 게시글 ──
+    match /community_posts/{postId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      // 작성자: 모든 필드. 타인: likes/commentCount/anonymousMap/anonymousCounter만
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.uid ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likes', 'commentCount', 'anonymousMap', 'anonymousCounter'])
+      );
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.uid;
+
+      // 댓글
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if request.auth != null
+          && request.resource.data.uid == request.auth.uid;
+        // 본인: soft delete(deleted 필드). 타인: likes/likedBy만 (댓글 좋아요)
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.uid ||
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['likes', 'likedBy'])
+        );
+        allow delete: if false;
+      }
+    }
+
+    // ── 게시글 좋아요 (배열 대체) ──
+    match /post_likes/{likeId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ── 나머지 모든 접근 거부 ──
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
