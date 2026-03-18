@@ -192,6 +192,7 @@ async function loadAllPosts() {
   pageStartCursors = [null];
   hasNextPage = false;
   currentPagePosts = [];
+  currentPage = 1;
   const searchVal = document.getElementById('community-search')?.value.trim() || '';
   if (isSearchMode && searchVal) {
     searchAllPosts = [];

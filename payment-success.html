@@ -63,9 +63,25 @@
 
     async function confirmPayment() {
       const params = new URLSearchParams(window.location.search);
-      const paymentKey = params.get('paymentKey');
-      const orderId = params.get('orderId');
-      const amount = params.get('amount');
+      let paymentKey = params.get('paymentKey');
+      let orderId = params.get('orderId');
+      let amount = params.get('amount');
+
+      // URL 파라미터가 있으면 sessionStorage에 백업
+      if (paymentKey && orderId && amount) {
+        sessionStorage.setItem('pending_payment', JSON.stringify({ paymentKey, orderId, amount }));
+      } else {
+        // URL에 없으면 sessionStorage에서 복구 (로그인 리다이렉트 후)
+        const saved = sessionStorage.getItem('pending_payment');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            paymentKey = parsed.paymentKey;
+            orderId = parsed.orderId;
+            amount = parsed.amount;
+          } catch { /* 파싱 실패 시 무시 */ }
+        }
+      }
 
       if (!paymentKey || !orderId || !amount) {
         showError('결제 정보가 올바르지 않습니다.');
@@ -95,6 +111,7 @@
           }
 
           // 성공
+          sessionStorage.removeItem('pending_payment');
           const newCredits = await getCredits(user.uid);
           document.getElementById('credited-amount').textContent = `+${data.credits}`;
           document.getElementById('total-credits').textContent = newCredits;

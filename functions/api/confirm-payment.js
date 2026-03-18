@@ -75,11 +75,18 @@ export async function onRequestPost(context) {
     }
 
     const accessToken = await getFirebaseAccessToken(clientEmail, privateKey);
+
+    // ─── 결제 중복 처리 방지 (orderId 기록) ───
+    const alreadyProcessed = await checkAndRecordPayment(orderId, uid, credits, accessToken);
+    if (alreadyProcessed) {
+      return json({ error: '이미 처리된 결제입니다.' }, 409);
+    }
+
     await addCreditsToFirestore(uid, credits, accessToken);
 
   } catch (e) {
     console.error('Firestore update error:', e);
-    return json({ error: `크레딧 추가 실패: ${e.message}` }, 500);
+    return json({ error: '크레딧 추가 중 오류가 발생했습니다.' }, 500);
   }
 
   return json({ success: true, credits, orderId });
@@ -142,6 +149,31 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
     throw new Error('Access token 발급 실패: ' + JSON.stringify(tokenData));
   }
   return tokenData.access_token;
+}
+
+// ─── 결제 중복 확인 및 기록 (orderId 기반) ───
+async function checkAndRecordPayment(orderId, uid, credits, accessToken) {
+  const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/payments/${orderId}`;
+
+  // 이미 처리된 결제인지 확인
+  const getRes = await fetch(baseUrl, {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  });
+  if (getRes.ok) return true; // 이미 존재 → 중복
+
+  // 결제 기록 저장
+  await fetch(baseUrl, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: {
+        uid: { stringValue: uid },
+        credits: { integerValue: String(credits) },
+        processedAt: { integerValue: String(Date.now()) }
+      }
+    }),
+  });
+  return false; // 새로운 결제
 }
 
 // ─── Firestore REST API: 크레딧 증가 ───

@@ -102,7 +102,14 @@ async function loadQuizzes(uid) {
 
   // Attach events
   grid.querySelectorAll('[data-replay]').forEach(btn => {
-    btn.addEventListener('click', () => replayQuiz(parseInt(btn.dataset.replay), btn.dataset.firestoreOnly === 'true'));
+    btn.addEventListener('click', async () => {
+      try {
+        await replayQuiz(parseInt(btn.dataset.replay), btn.dataset.firestoreOnly === 'true');
+      } catch (e) {
+        console.error('replayQuiz error:', e);
+        showToast('퀴즈를 불러오는데 실패했습니다.', 'error');
+      }
+    });
   });
   grid.querySelectorAll('[data-delete-quiz]').forEach(btn => {
     btn.addEventListener('click', () => confirmDelete('quiz', parseInt(btn.dataset.deleteQuiz), `"${btn.dataset.name}" 퀴즈 결과를 삭제합니다.`));

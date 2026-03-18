@@ -25,7 +25,8 @@ import {
   query,
   where,
   getDocs,
-  limit
+  limit,
+  runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import firebaseConfig from './firebase-config.js';
 
@@ -203,9 +204,15 @@ export async function deductCredit(uid, amount = 1) {
   if (!isConfigured || !db) return true;
   try {
     const ref = doc(db, 'users', uid);
-    await updateDoc(ref, {
-      credits: increment(-amount),
-      totalQuizzes: increment(1)
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists()) throw new Error('사용자 문서 없음');
+      const current = snap.data().credits ?? 0;
+      if (current < amount) throw new Error('크레딧이 부족합니다.');
+      transaction.update(ref, {
+        credits: increment(-amount),
+        totalQuizzes: increment(1)
+      });
     });
     return true;
   } catch (e) {

@@ -114,7 +114,8 @@ export async function onRequestPost(context) {
       if (geminiRes.status === 429) {
         return json({ error: '서버가 혼잡합니다. 1~2분 후 다시 시도해주세요.' }, 429);
       }
-      return json({ error: `Gemini API 오류 (${geminiRes.status}): ${errText.slice(0, 300)}` }, 502);
+      console.error('Gemini API error detail:', geminiRes.status, errText.slice(0, 300));
+      return json({ error: '퀴즈 생성에 실패했습니다. 잠시 후 다시 시도해주세요.' }, 502);
     }
 
     const geminiData = await geminiRes.json();
@@ -131,9 +132,13 @@ export async function onRequestPost(context) {
       const match = rawText.match(/\{[\s\S]*\}/);
       if (match) {
         try { quiz = JSON.parse(match[0]); }
-        catch { return json({ error: `JSON 파싱 실패. 원문: ${rawText.slice(0, 500)}` }, 502); }
+        catch {
+          console.error('JSON 파싱 실패. 원문:', rawText.slice(0, 500));
+          return json({ error: '퀴즈 데이터 형식 오류입니다. 다시 시도해주세요.' }, 502);
+        }
       } else {
-        return json({ error: `JSON 없음. 원문: ${rawText.slice(0, 500)}` }, 502);
+        console.error('JSON 없음. 원문:', rawText.slice(0, 500));
+        return json({ error: '퀴즈 생성 결과를 읽지 못했습니다. 다시 시도해주세요.' }, 502);
       }
     }
 
@@ -155,7 +160,11 @@ function decodeJWT(token) {
   try {
     const payload = token.split('.')[1];
     const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(decoded);
+    const parsed = JSON.parse(decoded);
+    // 만료된 토큰 거부
+    const now = Math.floor(Date.now() / 1000);
+    if (parsed.exp && parsed.exp < now) return null;
+    return parsed;
   } catch { return null; }
 }
 
