@@ -43,6 +43,7 @@ let currentSort = 'latest';
 let selectedImageFile = null;
 let postRenderCount = 0;
 let postsInitialized = false;
+let authInitialized = false;
 
 // ─── Init ───
 async function init() {
@@ -76,9 +77,9 @@ function setupNav() {
     }
     checkAndShowNicknameModal(user, userData);
     checkAndShowUniversityModal(user, userData);
-    // Reload posts so liked state is correct after login/logout
-    // init()에서 이미 loadPosts(true)를 호출하므로 첫 로드 완료 후에만 재로드
-    if (postsInitialized) loadPosts(true);
+    // 최초 auth 확인 시엔 init()의 loadPosts(true)로 충분 → 로그인/로그아웃 시에만 재로드
+    if (authInitialized) loadPosts(true);
+    authInitialized = true;
   });
 
   // 닉네임 설정 직후 대학 모달 체크
@@ -234,8 +235,6 @@ function renderAdSlot() {
     <div style="font-size:13px;color:#a78bfa;pointer-events:none;user-select:none;">광고 영역</div>
   `;
   feed.appendChild(slot);
-  const rect = slot.getBoundingClientRect();
-  console.log('[AD] slot rect:', rect.width, rect.height, rect.top);
 }
 
 // ─── Render Post Card ───
