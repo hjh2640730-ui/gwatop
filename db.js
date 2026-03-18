@@ -1,7 +1,12 @@
 // ============================================================
-// GWATOP - IndexedDB Module v1.0.0
-// 문서와 퀴즈 데이터를 브라우저에 로컬 저장
+// GWATOP - IndexedDB Module v2.0.0
+// 브라우저 로컬 저장 + Firestore 메타데이터 백업
 // ============================================================
+
+import { db as firestoreDb } from './auth.js';
+import {
+  collection, doc, setDoc, getDocs, deleteDoc, updateDoc, query, orderBy
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const DB_NAME = 'gwatop_db';
 const DB_VERSION = 2;
@@ -125,16 +130,20 @@ export async function deleteDocument(id) {
 
 // ─── Quizzes ───
 export async function saveQuiz(uid, docId, docName, questions, type, score) {
-  return txAdd(STORE_QUIZZES, {
-    uid,
-    docId,
-    docName,
-    questions,
-    type,
-    score,
-    totalQuestions: questions.length,
-    createdAt: Date.now()
+  const localId = await txAdd(STORE_QUIZZES, {
+    uid, docId, docName, questions, type, score,
+    totalQuestions: questions.length, createdAt: Date.now()
   });
+  // Firestore 메타데이터 백업 (문제 데이터 제외 - 용량 절약)
+  if (firestoreDb && uid) {
+    try {
+      await setDoc(doc(firestoreDb, 'users', uid, 'quiz_history', String(localId)), {
+        docName, type, score: score ?? null,
+        totalQuestions: questions.length, createdAt: Date.now(), localId
+      });
+    } catch { /* 백업 실패 시 무시 - IndexedDB가 primary */ }
+  }
+  return localId;
 }
 
 export async function getQuiz(id) {
@@ -144,7 +153,19 @@ export async function getQuiz(id) {
 export async function getAllQuizzes(uid) {
   if (!uid) return [];
   const quizzes = await txGetAll(STORE_QUIZZES, 'uid', uid);
-  return quizzes.sort((a, b) => b.createdAt - a.createdAt);
+  if (quizzes.length > 0) return quizzes.sort((a, b) => b.createdAt - a.createdAt);
+
+  // IndexedDB 비어있으면 Firestore 백업에서 복원 (메타데이터만)
+  if (firestoreDb) {
+    try {
+      const q = query(collection(firestoreDb, 'users', uid, 'quiz_history'), orderBy('createdAt', 'desc'));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        return snap.docs.map(d => ({ ...d.data(), id: d.data().localId, _firestoreOnly: true }));
+      }
+    } catch { /* 무시 */ }
+  }
+  return [];
 }
 
 export async function getQuizzesForDoc(docId) {
@@ -158,11 +179,26 @@ export async function updateQuizScore(id, score, wrongAnswers) {
   quiz.score = score;
   quiz.wrongAnswers = wrongAnswers;
   quiz.completedAt = Date.now();
-  return txPut(STORE_QUIZZES, quiz);
+  await txPut(STORE_QUIZZES, quiz);
+  // Firestore 동기화
+  if (firestoreDb && quiz.uid) {
+    try {
+      await updateDoc(doc(firestoreDb, 'users', quiz.uid, 'quiz_history', String(id)), {
+        score, completedAt: Date.now()
+      });
+    } catch { /* 무시 */ }
+  }
 }
 
 export async function deleteQuiz(id) {
-  return txDelete(STORE_QUIZZES, id);
+  const quiz = await txGet(STORE_QUIZZES, id);
+  await txDelete(STORE_QUIZZES, id);
+  // Firestore 동기화
+  if (firestoreDb && quiz?.uid) {
+    try {
+      await deleteDoc(doc(firestoreDb, 'users', quiz.uid, 'quiz_history', String(id)));
+    } catch { /* 무시 */ }
+  }
 }
 
 // ─── Pending Quiz (sessionStorage bridge) ───

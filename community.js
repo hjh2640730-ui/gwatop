@@ -7,7 +7,7 @@ import { checkAndShowNicknameModal } from './nickname.js';
 import { db, app } from './auth.js';
 import {
   collection, doc, addDoc, getDocs, updateDoc,
-  query, orderBy, where, limit, increment,
+  query, orderBy, where, limit, startAfter, increment,
   arrayUnion, arrayRemove, serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
@@ -40,9 +40,14 @@ let currentSort = 'latest';
 let selectedImageFile = null;
 let postRenderCount = 0;
 let authInitialized = false;
-let allPosts = [];
+let pageStartCursors = [null]; // [0]=null(pg1 start), [n]=lastDoc of page n → start of page n+1
+let currentPagePosts = [];
+let hasNextPage = false;
+let isSearchMode = false;
+let searchAllPosts = [];
 let filteredPosts = [];
 let currentPage = 1;
+let searchLoading = false;
 const POSTS_PER_PAGE = 10;
 
 // ─── Init ───
@@ -167,11 +172,27 @@ function setupFilters() {
   });
 }
 
-// ─── Load All Posts ───
+// ─── Load All Posts (정렬 변경/게시 후 상태 초기화) ───
 async function loadAllPosts() {
+  pageStartCursors = [null];
+  hasNextPage = false;
+  currentPagePosts = [];
+  const searchVal = document.getElementById('community-search')?.value.trim() || '';
+  if (isSearchMode && searchVal) {
+    searchAllPosts = [];
+    await loadPostsForSearch(searchVal);
+  } else {
+    isSearchMode = false;
+    searchAllPosts = [];
+    filteredPosts = [];
+    await loadPage(1);
+  }
+}
+
+// ─── Cursor-based Firestore Pagination ───
+async function loadPage(pageNum) {
   const feed = document.getElementById('posts-feed');
   const emptyEl = document.getElementById('posts-empty');
-
   feed.innerHTML = `
     <div class="post-skeleton"></div>
     <div class="post-skeleton"></div>
@@ -182,36 +203,113 @@ async function loadAllPosts() {
   try {
     const postsRef = collection(db, 'community_posts');
     const sortField = currentSort === 'popular' ? 'likes' : 'createdAt';
-    const q = query(postsRef, orderBy(sortField, 'desc'), limit(200));
+    const cursor = pageStartCursors[pageNum - 1];
+    const q = cursor
+      ? query(postsRef, orderBy(sortField, 'desc'), startAfter(cursor), limit(POSTS_PER_PAGE + 1))
+      : query(postsRef, orderBy(sortField, 'desc'), limit(POSTS_PER_PAGE + 1));
+
     const snap = await getDocs(q);
-    allPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    applySearch();
+    const docs = snap.docs;
+    hasNextPage = docs.length > POSTS_PER_PAGE;
+    const pageDocs = docs.slice(0, POSTS_PER_PAGE);
+
+    if (hasNextPage && pageDocs.length > 0 && !pageStartCursors[pageNum]) {
+      pageStartCursors[pageNum] = pageDocs[pageDocs.length - 1];
+    }
+
+    currentPage = pageNum;
+    currentPagePosts = pageDocs.map(d => ({ id: d.id, ...d.data() }));
+    renderCurrentPage();
   } catch (e) {
     feed.innerHTML = '';
-    console.error('loadAllPosts:', e);
+    console.error('loadPage:', e);
     showToast('게시글을 불러오지 못했습니다.', 'error');
   }
 }
 
-// ─── Apply Search Filter & Render ───
-function applySearch() {
-  const q = document.getElementById('community-search')?.value.trim().toLowerCase() || '';
-  filteredPosts = q
-    ? allPosts.filter(p =>
-        (p.title || '').toLowerCase().includes(q) ||
-        (p.content || '').toLowerCase().includes(q) ||
-        (p.nickname || '').toLowerCase().includes(q)
-      )
-    : [...allPosts];
-  renderPage(1);
+// ─── Load Posts for Search (최대 100개) ───
+async function loadPostsForSearch(searchQuery) {
+  if (searchLoading) return;
+  searchLoading = true;
+  const feed = document.getElementById('posts-feed');
+  feed.innerHTML = `
+    <div class="post-skeleton"></div>
+    <div class="post-skeleton"></div>
+    <div class="post-skeleton"></div>`;
+  document.getElementById('posts-empty').style.display = 'none';
+  document.getElementById('pagination-wrap').innerHTML = '';
+  try {
+    const postsRef = collection(db, 'community_posts');
+    const sortField = currentSort === 'popular' ? 'likes' : 'createdAt';
+    const q = query(postsRef, orderBy(sortField, 'desc'), limit(100));
+    const snap = await getDocs(q);
+    searchAllPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    isSearchMode = true;
+    applySearchFilter(searchQuery);
+  } catch (e) {
+    feed.innerHTML = '';
+    showToast('검색 중 오류가 발생했습니다.', 'error');
+  } finally {
+    searchLoading = false;
+  }
 }
 
-// ─── Render Page ───
-function renderPage(page) {
+// ─── Apply Search Filter ───
+function applySearchFilter(searchQuery) {
+  const q = searchQuery.toLowerCase();
+  filteredPosts = searchAllPosts.filter(p =>
+    (p.title || '').toLowerCase().includes(q) ||
+    (p.content || '').toLowerCase().includes(q) ||
+    (p.nickname || '').toLowerCase().includes(q)
+  );
+  renderSearchPage(1);
+}
+
+// ─── Apply Search (입력 이벤트에서 호출) ───
+function applySearch() {
+  const q = document.getElementById('community-search')?.value.trim().toLowerCase() || '';
+  if (!q) {
+    if (isSearchMode) {
+      isSearchMode = false;
+      searchAllPosts = [];
+      filteredPosts = [];
+      loadPage(1);
+    }
+    return;
+  }
+  if (!isSearchMode || searchAllPosts.length === 0) {
+    loadPostsForSearch(q);
+  } else {
+    applySearchFilter(q);
+  }
+}
+
+// ─── Render Current Page (일반 모드) ───
+function renderCurrentPage() {
+  const feed = document.getElementById('posts-feed');
+  const emptyEl = document.getElementById('posts-empty');
+  feed.innerHTML = '';
+  postRenderCount = 0;
+
+  if (currentPagePosts.length === 0) {
+    emptyEl.style.display = '';
+    document.getElementById('pagination-wrap').innerHTML = '';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  currentPagePosts.forEach(post => {
+    renderPostCard(post);
+    postRenderCount++;
+    if (postRenderCount % 6 === 0) renderAdSlot();
+  });
+  renderCursorPagination();
+}
+
+// ─── Render Search Results Page ───
+function renderSearchPage(page) {
   currentPage = page;
   const feed = document.getElementById('posts-feed');
   const emptyEl = document.getElementById('posts-empty');
-
   feed.innerHTML = '';
   postRenderCount = 0;
 
@@ -220,26 +318,50 @@ function renderPage(page) {
     document.getElementById('pagination-wrap').innerHTML = '';
     return;
   }
-
   emptyEl.style.display = 'none';
   const start = (page - 1) * POSTS_PER_PAGE;
-  const pagePosts = filteredPosts.slice(start, start + POSTS_PER_PAGE);
-
-  pagePosts.forEach(post => {
+  filteredPosts.slice(start, start + POSTS_PER_PAGE).forEach(post => {
     renderPostCard(post);
     postRenderCount++;
     if (postRenderCount % 6 === 0) renderAdSlot();
   });
-
-  renderPagination();
+  renderSearchPagination();
 }
 
-// ─── Render Pagination ───
-function renderPagination() {
+// ─── Cursor Pagination (일반 모드) ───
+function renderCursorPagination() {
+  const wrap = document.getElementById('pagination-wrap');
+  if (!wrap) return;
+  const knownPages = pageStartCursors.length; // 1..knownPages 접근 가능
+  if (knownPages <= 1 && !hasNextPage) { wrap.innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" ${currentPage === 1 ? 'disabled' : ''} data-action="prev">‹</button>`;
+  for (let i = 1; i <= knownPages; i++) {
+    html += `<button class="page-btn${i === currentPage ? ' active' : ''}" data-page="${i}">${i}</button>`;
+  }
+  if (hasNextPage) html += `<span class="page-ellipsis">···</span>`;
+  html += `<button class="page-btn" ${!hasNextPage ? 'disabled' : ''} data-action="next">›</button>`;
+
+  wrap.innerHTML = html;
+  wrap.querySelector('[data-action="prev"]')?.addEventListener('click', () => {
+    if (currentPage > 1) { window.scrollTo({ top: 0, behavior: 'smooth' }); loadPage(currentPage - 1); }
+  });
+  wrap.querySelector('[data-action="next"]')?.addEventListener('click', () => {
+    if (hasNextPage) { window.scrollTo({ top: 0, behavior: 'smooth' }); loadPage(currentPage + 1); }
+  });
+  wrap.querySelectorAll('[data-page]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = parseInt(btn.dataset.page);
+      if (p !== currentPage) { window.scrollTo({ top: 0, behavior: 'smooth' }); loadPage(p); }
+    });
+  });
+}
+
+// ─── Search Pagination ───
+function renderSearchPagination() {
   const wrap = document.getElementById('pagination-wrap');
   if (!wrap) return;
   const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
-
   if (totalPages <= 1) { wrap.innerHTML = ''; return; }
 
   const pages = [];
@@ -263,15 +385,19 @@ function renderPagination() {
   wrap.innerHTML = html;
   wrap.querySelectorAll('.page-btn[data-page]:not([disabled])').forEach(btn => {
     btn.addEventListener('click', () => {
-      renderPage(parseInt(btn.dataset.page));
+      renderSearchPage(parseInt(btn.dataset.page));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   });
 }
 
-// ─── Setup Search ───
+// ─── Setup Search (300ms 디바운스) ───
 function setupSearch() {
-  document.getElementById('community-search')?.addEventListener('input', applySearch);
+  let debounceTimer;
+  document.getElementById('community-search')?.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(applySearch, 300);
+  });
 }
 
 // ─── Render Ad Slot ───

@@ -126,9 +126,10 @@ function renderQuizCard(q) {
       </div>
       ${score != null ? `<div class="history-card-score" style="color:${scoreColor}">${score}점</div>` : '<div style="font-size:13px;color:var(--text-muted)">미완료</div>'}
       <div class="history-card-actions">
-        <button class="btn btn-primary btn-sm" style="flex:1" data-replay="${q.id}">
-          ▶ 다시 풀기
-        </button>
+        ${q._firestoreOnly
+          ? `<button class="btn btn-glass btn-sm" style="flex:1;opacity:0.45" disabled title="브라우저 데이터 없음 - 다른 기기에서 생성됨">▶ 다시 풀기 불가</button>`
+          : `<button class="btn btn-primary btn-sm" style="flex:1" data-replay="${q.id}">▶ 다시 풀기</button>`
+        }
         <button class="btn btn-danger btn-sm" data-delete-quiz="${q.id}" data-name="${escapeAttr(q.docName || '문서')}">
           🗑
         </button>
