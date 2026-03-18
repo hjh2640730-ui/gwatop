@@ -31,7 +31,7 @@ import firebaseConfig from './firebase-config.js';
 
 // ─── 소셜 로그인 공개 키 ───
 const KAKAO_REST_API_KEY = '6750d096b2c523c0a557ee153c62ddbd';
-const NAVER_CLIENT_ID = '7qK5JB94z8TvW5FFOn';
+const NAVER_CLIENT_ID = '7qK5JB94z8TvW5FFOnti';
 
 // ─── Firebase Init ───
 let app, auth, db;
