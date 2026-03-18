@@ -493,9 +493,17 @@ function renderReplyForm(container, parentId) {
   inputEl.focus();
 }
 
+const MAX_COMMENTS = 300;
+
 // ─── Submit Comment ───
 async function submitComment(content, isAnonymous, parentId) {
   if (!currentUser || !postData) return;
+
+  // 댓글 최대 300개 제한
+  if ((postData.commentCount || 0) >= MAX_COMMENTS) {
+    showToast(`댓글은 최대 ${MAX_COMMENTS}개까지 작성 가능합니다.`, 'error');
+    return;
+  }
 
   const university = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser.uid}`) || '';
   const isPostAuthor = currentUser.uid === postData.uid;

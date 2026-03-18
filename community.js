@@ -242,7 +242,7 @@ async function loadPage(pageNum) {
   }
 }
 
-// ─── Load Posts for Search (최대 100개) ───
+// ─── Load Posts for Search (Firestore prefix 쿼리 + 최근 50개 병행) ───
 async function loadPostsForSearch(searchQuery) {
   if (searchLoading) return;
   searchLoading = true;
@@ -255,10 +255,29 @@ async function loadPostsForSearch(searchQuery) {
   document.getElementById('pagination-wrap').innerHTML = '';
   try {
     const postsRef = collection(db, 'community_posts');
-    const sortField = currentSort === 'popular' ? 'likes' : 'createdAt';
-    const q = query(postsRef, orderBy(sortField, 'desc'), limit(100));
-    const snap = await getDocs(q);
-    searchAllPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const qLower = searchQuery.toLowerCase();
+
+    // 1) Firestore 제목 prefix 검색 (새 게시글 대상, 무제한 스케일)
+    const prefixEnd = qLower.slice(0, -1) + String.fromCharCode(qLower.charCodeAt(qLower.length - 1) + 1);
+    const titleQuery = query(
+      postsRef,
+      where('titleLower', '>=', qLower),
+      where('titleLower', '<', prefixEnd),
+      limit(50)
+    );
+
+    // 2) 최근 50개 클라이언트 필터 (제목/내용/닉네임 검색, 구 게시글 포함)
+    const recentQuery = query(postsRef, orderBy('createdAt', 'desc'), limit(50));
+
+    const [titleSnap, recentSnap] = await Promise.all([getDocs(titleQuery), getDocs(recentQuery)]);
+
+    const seen = new Set();
+    const merged = [];
+    for (const d of [...titleSnap.docs, ...recentSnap.docs]) {
+      if (!seen.has(d.id)) { seen.add(d.id); merged.push({ id: d.id, ...d.data() }); }
+    }
+
+    searchAllPosts = merged;
     isSearchMode = true;
     applySearchFilter(searchQuery);
   } catch (e) {
@@ -671,9 +690,9 @@ async function submitPost() {
       nickname: currentUserData?.nickname || currentUser.displayName || '',
       university,
       title: title || '',
+      titleLower: (title || '').toLowerCase(),
       content,
       likes: 0,
-      likedBy: [],
       commentCount: 0,
       anonymousCounter: 0,
       anonymousMap: {},
