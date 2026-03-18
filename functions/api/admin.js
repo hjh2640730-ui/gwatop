@@ -7,6 +7,7 @@
 
 const ADMIN_EMAIL = 'hjh2640730@gmail.com';
 const PROJECT_ID = 'gwatop-8edaf';
+const FIREBASE_WEB_API_KEY = 'AIzaSyAsxkIpwlBa0rD6FyzsrB0sdlovQoCPtcQ';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -19,12 +20,16 @@ export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
-// JWT payload 디코드 (서명 검증 없음 - 관리자 이메일 확인용)
-function decodeJWT(token) {
+// Firebase REST API로 토큰 실제 검증 (서명까지 확인)
+async function verifyFirebaseToken(idToken) {
   try {
-    const payload = token.split('.')[1];
-    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(decoded);
+    const res = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_WEB_API_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.users?.[0] || null;
   } catch { return null; }
 }
 
@@ -36,8 +41,8 @@ export async function onRequestGet(context) {
   const type = url.searchParams.get('type');
 
   if (!token) return json({ error: '인증 토큰이 없습니다.' }, 401);
-  const payload = decodeJWT(token);
-  if (!payload || payload.email !== ADMIN_EMAIL) {
+  const user = await verifyFirebaseToken(token);
+  if (!user || user.email !== ADMIN_EMAIL) {
     return json({ error: '관리자 권한이 없습니다.' }, 403);
   }
 
@@ -70,8 +75,8 @@ export async function onRequestPost(context) {
 
   const { token, action } = body;
   if (!token) return json({ error: '인증 토큰이 없습니다.' }, 401);
-  const payload = decodeJWT(token);
-  if (!payload || payload.email !== ADMIN_EMAIL) {
+  const user = await verifyFirebaseToken(token);
+  if (!user || user.email !== ADMIN_EMAIL) {
     return json({ error: '관리자 권한이 없습니다.' }, 403);
   }
 

@@ -95,27 +95,24 @@ export async function onRequestPost(context) {
       ],
     });
 
-    let geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: geminiBody,
-    });
-
-    // 429 시 3초 후 1회 자동 재시도
-    if (geminiRes.status === 429) {
-      await new Promise(r => setTimeout(r, 3000));
+    // 최대 3회 시도 (429 시 지수 백오프: 4s → 8s)
+    const delays = [4000, 8000];
+    let geminiRes;
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
       geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: geminiBody,
       });
+      if (geminiRes.status !== 429 || attempt === delays.length) break;
+      await new Promise(r => setTimeout(r, delays[attempt]));
     }
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error('Gemini API error:', geminiRes.status, errText);
       if (geminiRes.status === 429) {
-        return json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요. (1~2분 대기)' }, 429);
+        return json({ error: '서버가 혼잡합니다. 1~2분 후 다시 시도해주세요.' }, 429);
       }
       return json({ error: `Gemini API 오류 (${geminiRes.status}): ${errText.slice(0, 300)}` }, 502);
     }
