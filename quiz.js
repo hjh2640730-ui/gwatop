@@ -112,8 +112,6 @@ function renderQuestion(idx) {
   submitBtn.disabled = true;
   correctAnswerBox.classList.remove('visible');
   explanationBox.classList.remove('visible');
-  document.getElementById('comment-box').style.display = 'none';
-
   // Progress
   const pct = Math.round((idx / questions.length) * 100);
   progressFill.style.width = `${pct}%`;
@@ -276,21 +274,6 @@ function handleSubmit() {
 
   // Show result on options
   revealAnswer(q, isCorrect);
-
-  // Show comment
-  const commentBox = document.getElementById('comment-box');
-  const commentText = document.getElementById('comment-text');
-  const isFunMode = (localStorage.getItem('gwatop_comment_mode') || 'normal') === 'fun';
-  const correctComments = isFunMode
-    ? ['과탑 가즈아 🔥', '좀 치네?', '레전드~', '미쳤다~', '좋다~', '교수 모집 기간이 아닙니다.', '"장학금이 입금되었습니다"', '자네 대학원 올 생각 없나?']
-    : ['정확합니다! 🎯', '완벽해요! ✨', '맞습니다! 잘 하셨어요 👏', '훌륭해요! 🌟', '정답입니다! 💯'];
-  const wrongComments = isFunMode
-    ? ['아 제제이~', '이걸 틀리네;', '공부 좀 해라..', 'ㅋ', 'ㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋㅋ', '레전드네', '접으삼', '과바텀 ㄱㄱ', '실수지?', '실수도 실력임', '"장학금이 면제되었습니다"']
-    : ['아쉽네요. 다시 확인해보세요 📚', '틀렸습니다. 해설을 잘 읽어보세요 💡', '조금 더 공부가 필요해요 📖', '다음엔 맞출 수 있어요! 💪'];
-  const comments = isCorrect ? correctComments : wrongComments;
-  commentText.textContent = comments[Math.floor(Math.random() * comments.length)];
-  commentBox.className = `quiz-comment ${isCorrect ? 'correct' : 'wrong'}`;
-  commentBox.style.display = '';
 
   // Show explanation (항상 표시)
   explanationText.textContent = q.explanation || '해설이 제공되지 않았습니다.';

@@ -112,27 +112,6 @@
             </div>
           </div>
 
-          <!-- 멘트 스타일 -->
-          <div>
-            <div class="settings-label">멘트 스타일</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <label class="type-option" id="mode-normal-label">
-                <input type="radio" name="comment-mode" value="normal" checked />
-                <span class="type-option-label">
-                  <span class="type-icon">🎓</span>
-                  일반
-                </span>
-              </label>
-              <label class="type-option" id="mode-fun-label">
-                <input type="radio" name="comment-mode" value="fun" />
-                <span class="type-option-label">
-                  <span class="type-icon">🤪</span>
-                  병맛 모드
-                </span>
-              </label>
-            </div>
-          </div>
-
           <button class="btn-generate" id="generate-btn" disabled>
             <span>⚡</span> 퀴즈 생성하기
           </button>
@@ -206,16 +185,6 @@
   </div>
 
   <script type="module" src="/main.js"></script>
-  <script>
-    // 멘트 스타일 저장/복원
-    const saved = localStorage.getItem('gwatop_comment_mode') || 'normal';
-    document.querySelector(`input[name="comment-mode"][value="${saved}"]`).checked = true;
-    document.querySelectorAll('input[name="comment-mode"]').forEach(radio => {
-      radio.addEventListener('change', () => {
-        localStorage.setItem('gwatop_comment_mode', radio.value);
-      });
-    });
-  </script>
 
   <!-- Playground Modal -->
   <div class="modal-overlay" id="playground-modal">
