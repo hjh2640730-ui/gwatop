@@ -227,13 +227,15 @@ function renderAdSlot() {
   const feed = document.getElementById('posts-feed');
   const slot = document.createElement('div');
   slot.className = 'ad-slot';
-  slot.style.cssText = 'position:relative;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.35);border-radius:24px;margin-bottom:12px;min-height:90px;display:flex;align-items:center;justify-content:center;overflow:hidden;';
+  slot.style.cssText = 'position:relative;background:rgba(124,58,237,0.15);border:2px solid rgba(124,58,237,0.6);border-radius:24px;margin-bottom:12px;min-height:90px;display:flex;align-items:center;justify-content:center;overflow:hidden;';
   slot.innerHTML = `
-    <span style="position:absolute;top:6px;left:10px;font-size:10px;font-weight:700;color:#475569;letter-spacing:1px;">AD</span>
+    <span style="position:absolute;top:6px;left:10px;font-size:10px;font-weight:700;color:#a78bfa;letter-spacing:1px;">AD</span>
     <!-- TODO: AdSense 코드를 아래에 삽입하세요 -->
-    <div style="font-size:13px;color:#94a3b8;pointer-events:none;user-select:none;">광고 영역</div>
+    <div style="font-size:13px;color:#a78bfa;pointer-events:none;user-select:none;">광고 영역</div>
   `;
   feed.appendChild(slot);
+  const rect = slot.getBoundingClientRect();
+  console.log('[AD] slot rect:', rect.width, rect.height, rect.top);
 }
 
 // ─── Render Post Card ───
