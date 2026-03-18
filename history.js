@@ -162,7 +162,7 @@ async function loadDocuments(uid) {
       const doc = await getDocument(parseInt(btn.dataset.newQuiz));
       if (!doc) { showToast('문서를 불러올 수 없습니다.', 'error'); return; }
       sessionStorage.setItem('gwatop_preload_doc', JSON.stringify({ id: doc.id, name: doc.name, text: doc.text, fileSize: doc.fileSize || 0 }));
-      window.location.href = '/';
+      window.location.href = '/create.html';
     });
   });
 }
