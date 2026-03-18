@@ -205,7 +205,8 @@ async function loadPosts(reset = false) {
       snap.docs.forEach(d => {
         renderPostCard({ id: d.id, ...d.data() });
         postRenderCount++;
-        if (postRenderCount % 6 === 0) renderAdSlot();
+        console.log('[AD] postRenderCount:', postRenderCount);
+        if (postRenderCount % 3 === 0) renderAdSlot();
       });
       if (!snap.empty) lastVisible = snap.docs[snap.docs.length - 1];
     }
@@ -224,6 +225,7 @@ async function loadPosts(reset = false) {
 
 // ─── Render Ad Slot ───
 function renderAdSlot() {
+  console.log('[AD] renderAdSlot called');
   const feed = document.getElementById('posts-feed');
   const slot = document.createElement('div');
   slot.className = 'ad-slot';
@@ -233,6 +235,7 @@ function renderAdSlot() {
     <div class="ad-placeholder">광고 영역</div>
   `;
   feed.appendChild(slot);
+  console.log('[AD] slot appended, feed children:', feed.children.length);
 }
 
 // ─── Render Post Card ───
