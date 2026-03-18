@@ -205,8 +205,7 @@ async function loadPosts(reset = false) {
       snap.docs.forEach(d => {
         renderPostCard({ id: d.id, ...d.data() });
         postRenderCount++;
-        console.log('[AD] postRenderCount:', postRenderCount);
-        if (postRenderCount % 3 === 0) renderAdSlot();
+        if (postRenderCount % 6 === 0) renderAdSlot();
       });
       if (!snap.empty) lastVisible = snap.docs[snap.docs.length - 1];
     }
@@ -225,17 +224,16 @@ async function loadPosts(reset = false) {
 
 // ─── Render Ad Slot ───
 function renderAdSlot() {
-  console.log('[AD] renderAdSlot called');
   const feed = document.getElementById('posts-feed');
   const slot = document.createElement('div');
   slot.className = 'ad-slot';
+  slot.style.cssText = 'position:relative;background:rgba(255,255,255,0.04);border:1px dashed rgba(255,255,255,0.35);border-radius:24px;margin-bottom:12px;min-height:90px;display:flex;align-items:center;justify-content:center;overflow:hidden;';
   slot.innerHTML = `
-    <span class="ad-label">AD</span>
+    <span style="position:absolute;top:6px;left:10px;font-size:10px;font-weight:700;color:#475569;letter-spacing:1px;">AD</span>
     <!-- TODO: AdSense 코드를 아래에 삽입하세요 -->
-    <div class="ad-placeholder">광고 영역</div>
+    <div style="font-size:13px;color:#94a3b8;pointer-events:none;user-select:none;">광고 영역</div>
   `;
   feed.appendChild(slot);
-  console.log('[AD] slot appended, feed children:', feed.children.length);
 }
 
 // ─── Render Post Card ───
