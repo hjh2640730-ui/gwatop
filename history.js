@@ -156,6 +156,15 @@ async function loadDocuments(uid) {
   grid.querySelectorAll('[data-delete-doc]').forEach(btn => {
     btn.addEventListener('click', () => confirmDelete('doc', parseInt(btn.dataset.deleteDoc), `"${btn.dataset.name}" 문서와 관련된 모든 퀴즈를 삭제합니다.`));
   });
+
+  grid.querySelectorAll('[data-new-quiz]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const doc = await getDocument(parseInt(btn.dataset.newQuiz));
+      if (!doc) { showToast('문서를 불러올 수 없습니다.', 'error'); return; }
+      sessionStorage.setItem('gwatop_preload_doc', JSON.stringify({ id: doc.id, name: doc.name, text: doc.text, fileSize: doc.fileSize || 0 }));
+      window.location.href = '/';
+    });
+  });
 }
 
 function renderDocCard(d) {
@@ -175,9 +184,9 @@ function renderDocCard(d) {
         ${escapeHtml(previewText)}
       </p>
       <div class="history-card-actions">
-        <a href="/" class="btn btn-glass btn-sm" style="flex:1">
+        <button class="btn btn-glass btn-sm" style="flex:1" data-new-quiz="${d.id}">
           ✨ 새 퀴즈 만들기
-        </a>
+        </button>
         <button class="btn btn-danger btn-sm" data-delete-doc="${d.id}" data-name="${escapeAttr(d.name || '문서')}">
           🗑
         </button>

@@ -73,6 +73,26 @@ async function init() {
   setupPricing();
   updateSliderStyle();
   updateCreditCostLabel();
+  checkPreloadedDoc();
+}
+
+function checkPreloadedDoc() {
+  const raw = sessionStorage.getItem('gwatop_preload_doc');
+  if (!raw) return;
+  sessionStorage.removeItem('gwatop_preload_doc');
+  try {
+    const doc = JSON.parse(raw);
+    extractedText = doc.text;
+    selectedFile = { name: doc.name, size: doc.fileSize || 0, _preloadedDocId: doc.id };
+    fileName.textContent = doc.name;
+    fileSize.textContent = formatSize(doc.fileSize || 0);
+    fileInfo.classList.add('visible');
+    uploadZone.classList.add('has-file');
+    uploadIcon.textContent = '✅';
+    quizSettings.style.display = '';
+    generateBtn.disabled = false;
+    showToast(`"${doc.name}" 문서가 로드되었습니다.`, 'success');
+  } catch { /* 무시 */ }
 }
 
 // ─── Navigation Auth ───
@@ -250,9 +270,11 @@ async function generateQuiz() {
   generateBtn.disabled = true;
 
   try {
-    // 1) Extract text
-    showToast('📖 PDF 텍스트 추출 중...', 'warning');
-    extractedText = await extractTextFromPDF(selectedFile);
+    // 1) Extract text (저장된 문서에서 로드한 경우 스킵)
+    if (!extractedText) {
+      showToast('📖 PDF 텍스트 추출 중...', 'warning');
+      extractedText = await extractTextFromPDF(selectedFile);
+    }
 
     if (!extractedText || extractedText.length < 100) {
       throw new Error('PDF에서 텍스트를 추출할 수 없습니다. 이미지 기반 PDF일 수 있습니다.');
@@ -288,8 +310,8 @@ async function generateQuiz() {
       document.getElementById('nav-credits').textContent = currentUserData.credits;
     }
 
-    // 4) Save document
-    const docId = await saveDocument(currentUser.uid, selectedFile.name, extractedText, selectedFile.size);
+    // 4) Save document (저장된 문서에서 로드한 경우 기존 docId 재사용)
+    const docId = selectedFile._preloadedDocId || await saveDocument(currentUser.uid, selectedFile.name, extractedText, selectedFile.size);
 
     // 5) Pass to quiz page via sessionStorage
     savePendingQuiz({
