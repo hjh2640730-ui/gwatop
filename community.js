@@ -36,14 +36,14 @@ const UNIVERSITIES = [
 // ─── State ───
 let currentUser = null;
 let currentUserData = null;
-let lastVisible = null;
-let isLoading = false;
-let hasMore = true;
 let currentSort = 'latest';
 let selectedImageFile = null;
 let postRenderCount = 0;
-let postsInitialized = false;
 let authInitialized = false;
+let allPosts = [];
+let filteredPosts = [];
+let currentPage = 1;
+const POSTS_PER_PAGE = 10;
 
 // ─── Init ───
 async function init() {
@@ -52,7 +52,8 @@ async function init() {
   setupUniversityModal();
   setupWriteModal();
   setupLoginModal();
-  loadPosts(true);
+  setupSearch();
+  loadAllPosts();
 }
 
 // ─── Nav ───
@@ -77,8 +78,7 @@ function setupNav() {
     }
     checkAndShowNicknameModal(user, userData);
     checkAndShowUniversityModal(user, userData);
-    // 최초 auth 확인 시엔 init()의 loadPosts(true)로 충분 → 로그인/로그아웃 시에만 재로드
-    if (authInitialized) loadPosts(true);
+    if (authInitialized) loadAllPosts();
     authInitialized = true;
   });
 
@@ -157,70 +157,121 @@ function setupFilters() {
     currentSort = 'latest';
     document.getElementById('sort-latest').className = 'sort-btn active';
     document.getElementById('sort-popular').className = 'sort-btn';
-    loadPosts(true);
+    loadAllPosts();
   });
   document.getElementById('sort-popular').addEventListener('click', () => {
     currentSort = 'popular';
     document.getElementById('sort-latest').className = 'sort-btn';
     document.getElementById('sort-popular').className = 'sort-btn active';
-    loadPosts(true);
+    loadAllPosts();
   });
-  document.getElementById('load-more-btn').addEventListener('click', () => loadPosts(false));
 }
 
-// ─── Load Posts ───
-async function loadPosts(reset = false) {
-  if (isLoading) return;
-  if (!hasMore && !reset) return;
-
-  isLoading = true;
+// ─── Load All Posts ───
+async function loadAllPosts() {
   const feed = document.getElementById('posts-feed');
   const emptyEl = document.getElementById('posts-empty');
-  const loadMoreBtn = document.getElementById('load-more-btn');
 
-  if (reset) {
-    postRenderCount = 0;
-    lastVisible = null;
-    hasMore = true;
-    feed.innerHTML = `
-      <div class="post-skeleton"></div>
-      <div class="post-skeleton"></div>
-      <div class="post-skeleton"></div>`;
-    emptyEl.style.display = 'none';
-    loadMoreBtn.style.display = 'none';
-  }
+  feed.innerHTML = `
+    <div class="post-skeleton"></div>
+    <div class="post-skeleton"></div>
+    <div class="post-skeleton"></div>`;
+  emptyEl.style.display = 'none';
+  document.getElementById('pagination-wrap').innerHTML = '';
 
   try {
     const postsRef = collection(db, 'community_posts');
     const sortField = currentSort === 'popular' ? 'likes' : 'createdAt';
-    const q = lastVisible
-      ? query(postsRef, orderBy(sortField, 'desc'), startAfter(lastVisible), limit(20))
-      : query(postsRef, orderBy(sortField, 'desc'), limit(20));
-
+    const q = query(postsRef, orderBy(sortField, 'desc'), limit(200));
     const snap = await getDocs(q);
-    if (reset) feed.innerHTML = '';
-
-    if (snap.empty && reset) {
-      emptyEl.style.display = '';
-    } else {
-      snap.docs.forEach(d => {
-        renderPostCard({ id: d.id, ...d.data() });
-        postRenderCount++;
-        if (postRenderCount % 6 === 0) renderAdSlot();
-      });
-      if (!snap.empty) lastVisible = snap.docs[snap.docs.length - 1];
-    }
-
-    hasMore = snap.docs.length === 20;
-    loadMoreBtn.style.display = hasMore ? '' : 'none';
-    postsInitialized = true;
+    allPosts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    applySearch();
   } catch (e) {
-    if (reset) feed.innerHTML = '';
-    console.error('loadPosts:', e);
+    feed.innerHTML = '';
+    console.error('loadAllPosts:', e);
     showToast('게시글을 불러오지 못했습니다.', 'error');
-  } finally {
-    isLoading = false;
   }
+}
+
+// ─── Apply Search Filter & Render ───
+function applySearch() {
+  const q = document.getElementById('community-search')?.value.trim().toLowerCase() || '';
+  filteredPosts = q
+    ? allPosts.filter(p =>
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.content || '').toLowerCase().includes(q) ||
+        (p.nickname || '').toLowerCase().includes(q)
+      )
+    : [...allPosts];
+  renderPage(1);
+}
+
+// ─── Render Page ───
+function renderPage(page) {
+  currentPage = page;
+  const feed = document.getElementById('posts-feed');
+  const emptyEl = document.getElementById('posts-empty');
+
+  feed.innerHTML = '';
+  postRenderCount = 0;
+
+  if (filteredPosts.length === 0) {
+    emptyEl.style.display = '';
+    document.getElementById('pagination-wrap').innerHTML = '';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  const start = (page - 1) * POSTS_PER_PAGE;
+  const pagePosts = filteredPosts.slice(start, start + POSTS_PER_PAGE);
+
+  pagePosts.forEach(post => {
+    renderPostCard(post);
+    postRenderCount++;
+    if (postRenderCount % 6 === 0) renderAdSlot();
+  });
+
+  renderPagination();
+}
+
+// ─── Render Pagination ───
+function renderPagination() {
+  const wrap = document.getElementById('pagination-wrap');
+  if (!wrap) return;
+  const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+
+  if (totalPages <= 1) { wrap.innerHTML = ''; return; }
+
+  const pages = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (currentPage > 3) pages.push('…');
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) pages.push(i);
+    if (currentPage < totalPages - 2) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  let html = `<button class="page-btn" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>‹</button>`;
+  pages.forEach(p => {
+    if (p === '…') html += `<span class="page-ellipsis">···</span>`;
+    else html += `<button class="page-btn${p === currentPage ? ' active' : ''}" data-page="${p}">${p}</button>`;
+  });
+  html += `<button class="page-btn" data-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''}>›</button>`;
+
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.page-btn[data-page]:not([disabled])').forEach(btn => {
+    btn.addEventListener('click', () => {
+      renderPage(parseInt(btn.dataset.page));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+}
+
+// ─── Setup Search ───
+function setupSearch() {
+  document.getElementById('community-search')?.addEventListener('input', applySearch);
 }
 
 // ─── Render Ad Slot ───
@@ -434,6 +485,7 @@ async function submitPost() {
   const university = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser?.uid}`) || '';
   const btn = document.getElementById('write-modal-submit');
 
+  if (!title) { showToast('제목을 입력해주세요.', 'error'); return; }
   if (!content) { showToast('내용을 입력해주세요.', 'error'); return; }
   if (!university) { showToast('학교를 먼저 설정해주세요.', 'error'); return; }
   if (!currentUser || !currentUserData) { openLoginModal(); return; }
@@ -474,7 +526,7 @@ async function submitPost() {
     await addDoc(collection(db, 'community_posts'), postData);
     closeWriteModal();
     showToast('게시글이 등록됐습니다.', 'success');
-    loadPosts(true);
+    loadAllPosts();
   } catch (e) {
     showToast('게시글 등록 실패: ' + e.message, 'error');
   } finally {
