@@ -7,8 +7,8 @@ import { checkAndShowNicknameModal } from './nickname.js';
 import { db, app } from './auth.js';
 import {
   collection, doc, addDoc, getDocs, updateDoc,
-  query, orderBy, limit, startAfter, increment,
-  arrayUnion, arrayRemove, serverTimestamp
+  query, orderBy, where, limit, increment,
+  arrayUnion, arrayRemove, serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
@@ -326,7 +326,7 @@ function renderPostCard(post) {
       <button class="post-like-btn${isLiked ? ' liked' : ''}" data-id="${post.id}" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>
         <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
         <span class="like-count">${likeCount}</span>
-        ${likeCount >= 10 ? '<span class="like-maxed">MAX</span>' : ''}
+        ${likeCount >= 5 ? '<span class="like-maxed">MAX</span>' : ''}
       </button>
       <span class="post-comment-count-wrap">
         <span>💬</span>
@@ -369,7 +369,7 @@ async function handleLike(postId, authorUid) {
   countEl.textContent = newCount;
   heart.textContent = wasLiked ? '🤍' : '❤️';
   if (maxedEl) maxedEl.remove();
-  if (newCount >= 10) {
+  if (newCount >= 5) {
     const span = document.createElement('span');
     span.className = 'like-maxed';
     span.textContent = 'MAX';
@@ -383,12 +383,12 @@ async function handleLike(postId, authorUid) {
     const giveCredit = authorUid && authorUid !== currentUser.uid;
     if (wasLiked) {
       await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
-      if (giveCredit && beforeCount <= 10) {
+      if (giveCredit && beforeCount <= 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1), referralCredits: increment(-1) });
       }
     } else {
       await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
-      if (giveCredit && beforeCount < 10) {
+      if (giveCredit && beforeCount < 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(1), referralCredits: increment(1) });
       }
     }
@@ -489,6 +489,18 @@ async function submitPost() {
   if (!content) { showToast('내용을 입력해주세요.', 'error'); return; }
   if (!university) { showToast('학교를 먼저 설정해주세요.', 'error'); return; }
   if (!currentUser || !currentUserData) { openLoginModal(); return; }
+
+  // 하루 3개 제한
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todaySnap = await getDocs(query(
+    collection(db, 'community_posts'),
+    where('uid', '==', currentUser.uid),
+    where('createdAt', '>=', Timestamp.fromDate(todayStart))
+  ));
+  if (todaySnap.size >= 3) {
+    showToast('하루 최대 3개까지 글을 쓸 수 있습니다.', 'error');
+    return;
+  }
 
   btn.disabled = true;
 

@@ -277,8 +277,20 @@
     }
     .comment-actions-row {
       display: flex;
-      gap: 6px;
+      align-items: center;
+      gap: 8px;
     }
+    .comment-like-btn {
+      display: flex; align-items: center; gap: 3px;
+      background: none; border: none; cursor: pointer;
+      font-size: 12px; color: var(--text-muted);
+      padding: 2px 4px; border-radius: 6px;
+      transition: color var(--transition);
+      font-family: var(--font);
+    }
+    .comment-like-btn:hover { color: var(--text-secondary); }
+    .comment-like-btn.liked { color: #f87171; }
+    .comment-like-count { font-size: 11px; }
     .reply-toggle-btn {
       font-size: 12px;
       color: var(--text-muted);

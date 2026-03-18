@@ -141,7 +141,7 @@ async function deletePost() {
   if (!confirm('글을 삭제하시겠습니까?')) return;
   try {
     // 좋아요로 받은 크레딧 회수 (최대 10개)
-    const likesEarned = Math.min(postData.likes || 0, 10);
+    const likesEarned = Math.min(postData.likes || 0, 5);
     if (likesEarned > 0) {
       await updateDoc(doc(db, 'users', currentUser.uid), {
         credits: increment(-likesEarned),
@@ -168,7 +168,7 @@ function renderLikeButton() {
     <button class="post-like-btn${isLiked ? ' liked' : ''}" id="detail-like-btn" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>
       <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
       <span class="like-count">${likeCount}</span>
-      ${likeCount >= 10 ? '<span class="like-maxed">MAX</span>' : ''}
+      ${likeCount >= 5 ? '<span class="like-maxed">MAX</span>' : ''}
     </button>
   `;
 
@@ -196,7 +196,7 @@ async function handleLike() {
   countEl.textContent = newCount;
   heart.textContent = wasLiked ? '🤍' : '❤️';
   if (maxedEl) maxedEl.remove();
-  if (newCount >= 10) {
+  if (newCount >= 5) {
     const span = document.createElement('span');
     span.className = 'like-maxed';
     span.textContent = 'MAX';
@@ -219,12 +219,12 @@ async function handleLike() {
     const giveCredit = authorUid && authorUid !== currentUser.uid;
     if (wasLiked) {
       await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
-      if (giveCredit && beforeCount <= 10) {
+      if (giveCredit && beforeCount <= 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1), referralCredits: increment(-1) });
       }
     } else {
       await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
-      if (giveCredit && beforeCount < 10) {
+      if (giveCredit && beforeCount < 5) {
         await updateDoc(doc(db, 'users', authorUid), { credits: increment(1), referralCredits: increment(1) });
       }
     }
@@ -311,6 +311,7 @@ function getDisplayInfo(comment) {
 function buildCommentEl(comment, isReply) {
   const { name, isAuthor } = getDisplayInfo(comment);
   const isMine = currentUser && comment.uid === currentUser.uid;
+  const isCommentLiked = currentUser && Array.isArray(comment.likedBy) && comment.likedBy.includes(currentUser.uid);
   const avatarColor = isAuthor ? '#10b981' : (comment.isAnonymous ? '#374151' : getAvatarColor(comment.uid || name));
   const avatarChar = name[0] || '?';
 
@@ -341,6 +342,9 @@ function buildCommentEl(comment, isReply) {
         <div class="comment-text">${formatContent(comment.content || '')}</div>
         <div class="comment-actions-row">
           ${!isReply ? `<button class="reply-toggle-btn" data-id="${comment.id}">답글</button>` : ''}
+          <button class="comment-like-btn${isCommentLiked ? ' liked' : ''}" data-id="${comment.id}">
+            ${isCommentLiked ? '❤️' : '🤍'} <span class="comment-like-count">${comment.likes || 0}</span>
+          </button>
         </div>
         <div class="reply-form-wrap" id="reply-form-${comment.id}" style="display:none"></div>
       </div>
@@ -349,6 +353,9 @@ function buildCommentEl(comment, isReply) {
 
   // Delete
   wrap.querySelector('.comment-delete-btn')?.addEventListener('click', () => deleteComment(comment.id));
+
+  // Comment like
+  wrap.querySelector('.comment-like-btn')?.addEventListener('click', () => handleCommentLike(comment, wrap));
 
   // Reply toggle
   if (!isReply) {
@@ -557,6 +564,38 @@ async function deleteComment(commentId) {
   } catch (e) {
     console.error('deleteComment:', e);
     showToast('댓글 삭제 실패', 'error');
+  }
+}
+
+// ─── Comment Like ───
+async function handleCommentLike(comment, wrap) {
+  if (!currentUser) { openLoginModal(); return; }
+
+  const btn = wrap.querySelector('.comment-like-btn');
+  if (!btn) return;
+  const countEl = btn.querySelector('.comment-like-count');
+  const wasLiked = btn.classList.contains('liked');
+  const beforeCount = parseInt(countEl.textContent) || 0;
+
+  // Optimistic UI
+  btn.classList.toggle('liked');
+  countEl.textContent = wasLiked ? Math.max(0, beforeCount - 1) : beforeCount + 1;
+  btn.querySelector('span:first-child') ? null : null;
+  btn.childNodes[0].textContent = wasLiked ? '🤍' : '❤️';
+
+  try {
+    const commentRef = doc(db, 'community_posts', postId, 'comments', comment.id);
+    if (wasLiked) {
+      await updateDoc(commentRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
+    } else {
+      await updateDoc(commentRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
+    }
+  } catch (e) {
+    // Revert
+    btn.classList.toggle('liked');
+    countEl.textContent = beforeCount;
+    btn.childNodes[0].textContent = wasLiked ? '❤️' : '🤍';
+    console.error('comment like error:', e);
   }
 }
 

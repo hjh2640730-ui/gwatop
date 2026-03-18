@@ -216,7 +216,7 @@ async function deletePostAndRevokeCredits(postId, accessToken) {
     const postDoc = await getRes.json();
     const f = postDoc.fields || {};
     const authorUid = f.uid?.stringValue;
-    const likes = Math.min(parseInt(f.likes?.integerValue || 0), 10); // 최대 10 크레딧만 지급됐으므로
+    const likes = Math.min(parseInt(f.likes?.integerValue || 0), 5); // 최대 5 크레딧만 지급됐으므로
 
     // 작성자가 있고 좋아요가 1개 이상이면 크레딧 회수
     if (authorUid && likes > 0) {
