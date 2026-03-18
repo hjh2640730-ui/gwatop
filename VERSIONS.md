@@ -1,5 +1,10 @@
 # GWATOP - Version History
 
+## v2.0.1 (2026-03-18) - 글 삭제 시 referralCredits 동기화 수정
+- 좋아요 시 credits + referralCredits 동시 증감 (post.js, community.js)
+- 작성자 글 삭제 시 credits + referralCredits 함께 차감 (post.js)
+- 관리자 글 삭제 시 credits + referralCredits 함께 차감 (functions/api/admin.js)
+
 ## v2.0.0 (2026-03-17) - 커뮤니티 게시글 상세 페이지
 - post.html / post.js 신규 생성 (게시글 상세 뷰)
 - 게시글: 제목 + 내용 + 이미지 전체 표시

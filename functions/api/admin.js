@@ -227,11 +227,13 @@ async function deletePostAndRevokeCredits(postId, accessToken) {
         if (userRes.ok) {
           const userDoc = await userRes.json();
           const currentCredits = parseInt(userDoc.fields?.credits?.integerValue || 0);
+          const currentReferral = parseInt(userDoc.fields?.referralCredits?.integerValue || 0);
           const newCredits = Math.max(0, currentCredits - likes);
-          await fetch(`${userUrl}?updateMask.fieldPaths=credits`, {
+          const newReferral = Math.max(0, currentReferral - likes);
+          await fetch(`${userUrl}?updateMask.fieldPaths=credits&updateMask.fieldPaths=referralCredits`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fields: { credits: { integerValue: String(newCredits) } } })
+            body: JSON.stringify({ fields: { credits: { integerValue: String(newCredits) }, referralCredits: { integerValue: String(newReferral) } } })
           });
         }
       } catch (_) { /* 크레딧 회수 실패해도 게시글 삭제는 진행 */ }

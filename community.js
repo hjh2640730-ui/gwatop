@@ -310,12 +310,12 @@ async function handleLike(postId, authorUid) {
     if (wasLiked) {
       await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
       if (giveCredit && beforeCount <= 10) {
-        await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1) });
+        await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1), referralCredits: increment(-1) });
       }
     } else {
       await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
       if (giveCredit && beforeCount < 10) {
-        await updateDoc(doc(db, 'users', authorUid), { credits: increment(1) });
+        await updateDoc(doc(db, 'users', authorUid), { credits: increment(1), referralCredits: increment(1) });
       }
     }
   } catch (e) {

@@ -144,7 +144,8 @@ async function deletePost() {
     const likesEarned = Math.min(postData.likes || 0, 10);
     if (likesEarned > 0) {
       await updateDoc(doc(db, 'users', currentUser.uid), {
-        credits: increment(-likesEarned)
+        credits: increment(-likesEarned),
+        referralCredits: increment(-likesEarned)
       });
     }
     await deleteDoc(doc(db, 'community_posts', postId));
@@ -219,12 +220,12 @@ async function handleLike() {
     if (wasLiked) {
       await updateDoc(postRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
       if (giveCredit && beforeCount <= 10) {
-        await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1) });
+        await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1), referralCredits: increment(-1) });
       }
     } else {
       await updateDoc(postRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
       if (giveCredit && beforeCount < 10) {
-        await updateDoc(doc(db, 'users', authorUid), { credits: increment(1) });
+        await updateDoc(doc(db, 'users', authorUid), { credits: increment(1), referralCredits: increment(1) });
       }
     }
   } catch (e) {
