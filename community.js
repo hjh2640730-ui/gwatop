@@ -41,6 +41,7 @@ let isLoading = false;
 let hasMore = true;
 let currentSort = 'latest';
 let selectedImageFile = null;
+let postRenderCount = 0;
 
 // ─── Init ───
 async function init() {
@@ -175,6 +176,7 @@ async function loadPosts(reset = false) {
   const loadMoreBtn = document.getElementById('load-more-btn');
 
   if (reset) {
+    postRenderCount = 0;
     lastVisible = null;
     hasMore = true;
     feed.innerHTML = `
@@ -198,7 +200,11 @@ async function loadPosts(reset = false) {
     if (snap.empty && reset) {
       emptyEl.style.display = '';
     } else {
-      snap.docs.forEach(d => renderPostCard({ id: d.id, ...d.data() }));
+      snap.docs.forEach(d => {
+        renderPostCard({ id: d.id, ...d.data() });
+        postRenderCount++;
+        if (postRenderCount % 6 === 0) renderAdSlot();
+      });
       if (!snap.empty) lastVisible = snap.docs[snap.docs.length - 1];
     }
 
@@ -211,6 +217,19 @@ async function loadPosts(reset = false) {
   } finally {
     isLoading = false;
   }
+}
+
+// ─── Render Ad Slot ───
+function renderAdSlot() {
+  const feed = document.getElementById('posts-feed');
+  const slot = document.createElement('div');
+  slot.className = 'ad-slot';
+  slot.innerHTML = `
+    <span class="ad-label">AD</span>
+    <!-- TODO: AdSense 코드를 아래에 삽입하세요 -->
+    <div class="ad-placeholder">광고 영역</div>
+  `;
+  feed.appendChild(slot);
 }
 
 // ─── Render Post Card ───

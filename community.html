@@ -294,6 +294,35 @@
     @media (max-width: 768px) {
       #write-fab { bottom: 80px; right: 16px; padding: 12px 18px; font-size: 14px; }
     }
+
+    /* ── Ad Slot ── */
+    .ad-slot {
+      position: relative;
+      background: rgba(255,255,255,0.02);
+      border: 1px dashed rgba(255,255,255,0.08);
+      border-radius: var(--radius-lg);
+      margin-bottom: 12px;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .ad-label {
+      position: absolute;
+      top: 6px;
+      left: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 1px;
+    }
+    .ad-placeholder {
+      font-size: 13px;
+      color: rgba(255,255,255,0.12);
+      pointer-events: none;
+      user-select: none;
+    }
   </style>
 </head>
 <body>
