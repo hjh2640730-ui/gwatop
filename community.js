@@ -79,10 +79,12 @@ function setupNav() {
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || '';
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
       await loadUserLikes();
+      updateRenderedLikeStates();
     } else {
       lo.style.display = '';
       li.style.display = 'none';
       likedPostIds = new Set();
+      updateRenderedLikeStates();
     }
     checkAndShowNicknameModal(user, userData);
     checkAndShowUniversityModal(user, userData);
@@ -185,6 +187,19 @@ async function loadUserLikes() {
     ));
     likedPostIds = new Set(snap.docs.map(d => d.data().postId));
   } catch { likedPostIds = new Set(); }
+}
+
+// ─── 이미 렌더된 카드의 하트 상태 동기화 ───
+function updateRenderedLikeStates() {
+  document.querySelectorAll('.post-card[data-id]').forEach(card => {
+    const postId = card.dataset.id;
+    const btn = card.querySelector('.post-like-btn');
+    if (!btn || btn.hasAttribute('disabled')) return;
+    const isLiked = likedPostIds.has(postId);
+    btn.classList.toggle('liked', isLiked);
+    const heart = btn.querySelector('.like-heart');
+    if (heart) heart.textContent = isLiked ? '❤️' : '🤍';
+  });
 }
 
 // ─── Load All Posts (정렬 변경/게시 후 상태 초기화) ───
