@@ -11,6 +11,8 @@
 const PROJECT_ID = 'gwatop-8edaf';
 const FIREBASE_WEB_API_KEY = 'AIzaSyAsxkIpwlBa0rD6FyzsrB0sdlovQoCPtcQ';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+// commit writes의 document name은 URL 아닌 리소스 경로
+const DOC_BASE = `projects/${PROJECT_ID}/databases/(default)/documents`;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -159,19 +161,19 @@ export async function onRequestPost(context) {
     if (wasLiked) {
       // 좋아요 취소
       writes.push({
-        delete: `${FIRESTORE_BASE}/post_likes/${postId}_${uid}`,
+        delete: `${DOC_BASE}/post_likes/${postId}_${uid}`,
         currentDocument: { exists: true },
       });
       writes.push({
         transform: {
-          document: `${FIRESTORE_BASE}/community_posts/${postId}`,
+          document: `${DOC_BASE}/community_posts/${postId}`,
           fieldTransforms: [{ fieldPath: 'likes', increment: { integerValue: '-1' } }],
         },
       });
       if (currentLikes <= 5) {
         writes.push({
           transform: {
-            document: `${FIRESTORE_BASE}/users/${authorUid}`,
+            document: `${DOC_BASE}/users/${authorUid}`,
             fieldTransforms: [
               { fieldPath: 'credits', increment: { integerValue: '-1' } },
               { fieldPath: 'referralCredits', increment: { integerValue: '-1' } },
@@ -183,7 +185,7 @@ export async function onRequestPost(context) {
       // 좋아요 추가 (이미 존재하면 커밋 실패 → 중복 방지)
       writes.push({
         update: {
-          name: `${FIRESTORE_BASE}/post_likes/${postId}_${uid}`,
+          name: `${DOC_BASE}/post_likes/${postId}_${uid}`,
           fields: {
             postId: { stringValue: postId },
             uid: { stringValue: uid },
@@ -194,14 +196,14 @@ export async function onRequestPost(context) {
       });
       writes.push({
         transform: {
-          document: `${FIRESTORE_BASE}/community_posts/${postId}`,
+          document: `${DOC_BASE}/community_posts/${postId}`,
           fieldTransforms: [{ fieldPath: 'likes', increment: { integerValue: '1' } }],
         },
       });
       if (currentLikes < 5) {
         writes.push({
           transform: {
-            document: `${FIRESTORE_BASE}/users/${authorUid}`,
+            document: `${DOC_BASE}/users/${authorUid}`,
             fieldTransforms: [
               { fieldPath: 'credits', increment: { integerValue: '1' } },
               { fieldPath: 'referralCredits', increment: { integerValue: '1' } },
