@@ -18,6 +18,29 @@ const DOC_BASE = `projects/${PROJECT_ID}/databases/(default)/documents`;
 let _cachedToken = null;
 let _tokenExpiry = 0;
 
+// ─── Rate Limiting (유저당 분당 30회, Worker 인스턴스 내 베스트 에포트) ───
+const _rateLimitMap = new Map();
+const RATE_LIMIT = 30;
+const RATE_WINDOW = 60 * 1000;
+
+function isRateLimited(uid) {
+  const now = Date.now();
+  const entry = _rateLimitMap.get(uid);
+  if (!entry || now - entry.start > RATE_WINDOW) {
+    _rateLimitMap.set(uid, { count: 1, start: now });
+    // 만료된 항목 정리 (메모리 누수 방지, 1만 건 초과 시)
+    if (_rateLimitMap.size > 10000) {
+      for (const [k, v] of _rateLimitMap) {
+        if (now - v.start > RATE_WINDOW) _rateLimitMap.delete(k);
+      }
+    }
+    return false;
+  }
+  if (entry.count >= RATE_LIMIT) return true;
+  entry.count++;
+  return false;
+}
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -143,6 +166,10 @@ export async function onRequestPost(context) {
   }
   if (!user) return json({ error: '유효하지 않은 토큰' }, 401);
   const uid = user.localId;
+
+  if (isRateLimited(uid)) {
+    return json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' }, 429);
+  }
 
   try {
     // ─── 3. 문서 읽기 (병렬) ───

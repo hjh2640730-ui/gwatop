@@ -1,5 +1,11 @@
 # GWATOP - Version History
 
+## v2.2.0 (2026-03-19) - 50만 유저 대비 확장성 개선
+- loadUserLikes() 제거: 전체 좋아요 쿼리 → 현재 페이지 10건 직접 ID 조회로 교체 (Firestore 읽기 대폭 절감)
+- loadLikesForPosts(): 페이지 로드 시 렌더 전에 좋아요 상태 로드 (하트 깜박임 없음)
+- 검색 결과 페이지도 동일하게 likes 선로드 적용
+- like-post API: 유저당 분당 30회 Rate Limiting 추가 (메모리 누수 방지 포함)
+
 ## v2.1.0 (2026-03-19) - 좋아요 크레딧 보안 강화
 - 좋아요/크레딧 처리를 서버 사이드 Cloud Function으로 이전 (functions/api/like-post.js 신규)
 - Firestore 트랜잭션으로 race condition 방지

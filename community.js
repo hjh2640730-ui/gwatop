@@ -6,7 +6,7 @@ import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChang
 import { checkAndShowNicknameModal } from './nickname.js';
 import { db, app } from './auth.js';
 import {
-  collection, doc, addDoc, getDocs, updateDoc,
+  collection, doc, getDoc, addDoc, getDocs, updateDoc,
   query, orderBy, where, limit, startAfter,
   serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -78,7 +78,7 @@ function setupNav() {
       document.getElementById('nav-avatar').src = user.photoURL || '';
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || '';
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
-      await loadUserLikes();
+      await loadLikesForPosts(currentPagePosts.map(p => p.id));
       updateRenderedLikeStates();
     } else {
       lo.style.display = '';
@@ -177,16 +177,20 @@ function setupFilters() {
   });
 }
 
-// ─── 유저가 좋아요한 게시글 ID 로드 ───
-async function loadUserLikes() {
-  if (!currentUser) { likedPostIds = new Set(); return; }
+// ─── 현재 페이지 게시물 좋아요 상태만 조회 (직접 문서 ID 조회, 인덱스 불필요) ───
+async function loadLikesForPosts(postIds) {
+  if (!currentUser || !postIds.length) return;
   try {
-    const snap = await getDocs(query(
-      collection(db, 'post_likes'),
-      where('uid', '==', currentUser.uid)
-    ));
-    likedPostIds = new Set(snap.docs.map(d => d.data().postId));
-  } catch { likedPostIds = new Set(); }
+    const snaps = await Promise.all(
+      postIds.map(id => getDoc(doc(db, 'post_likes', `${id}_${currentUser.uid}`)))
+    );
+    snaps.forEach((snap, i) => {
+      if (snap.exists()) likedPostIds.add(postIds[i]);
+      else likedPostIds.delete(postIds[i]);
+    });
+  } catch (e) {
+    console.error('loadLikesForPosts:', e);
+  }
 }
 
 // ─── 이미 렌더된 카드의 하트 상태 동기화 ───
@@ -250,6 +254,7 @@ async function loadPage(pageNum) {
 
     currentPage = pageNum;
     currentPagePosts = pageDocs.map(d => ({ id: d.id, ...d.data() }));
+    await loadLikesForPosts(currentPagePosts.map(p => p.id));
     renderCurrentPage();
   } catch (e) {
     feed.innerHTML = '';
@@ -356,7 +361,7 @@ function renderCurrentPage() {
 }
 
 // ─── Render Search Results Page ───
-function renderSearchPage(page) {
+async function renderSearchPage(page) {
   currentPage = page;
   const feed = document.getElementById('posts-feed');
   const emptyEl = document.getElementById('posts-empty');
@@ -370,7 +375,9 @@ function renderSearchPage(page) {
   }
   emptyEl.style.display = 'none';
   const start = (page - 1) * POSTS_PER_PAGE;
-  filteredPosts.slice(start, start + POSTS_PER_PAGE).forEach(post => {
+  const pagePosts = filteredPosts.slice(start, start + POSTS_PER_PAGE);
+  await loadLikesForPosts(pagePosts.map(p => p.id));
+  pagePosts.forEach(post => {
     renderPostCard(post);
     postRenderCount++;
     if (postRenderCount % 5 === 0) renderAdSlot();
