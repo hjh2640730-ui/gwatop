@@ -40,6 +40,7 @@ const UNIVERSITIES = [
 
 // ─── State ───
 let currentUser = null;
+window.__getAdminToken = async () => currentUser ? await currentUser.getIdToken() : null;
 let currentUserData = null;
 let currentSort = 'latest';
 let selectedImageFile = null;
