@@ -64,28 +64,44 @@ export async function onRequestPost(context) {
     } catch { /* rate limit 실패 시 통과 허용 */ }
   }
 
-  const { text, types, type, count } = body;
+  const { text, images, types, type, count } = body;
 
   // 단일 type 또는 복수 types 모두 지원
   const selectedTypes = types || (type ? [type] : ['mcq']);
   const validTypes = selectedTypes.filter(t => ['mcq', 'short', 'ox'].includes(t));
   if (validTypes.length === 0) return json({ error: '유효하지 않은 문제 유형입니다.' }, 400);
 
-  if (!text) return json({ error: 'text 파라미터가 필요합니다.' }, 400);
+  const hasText = text && text.length >= 50;
+  const hasImages = Array.isArray(images) && images.length > 0;
+  if (!hasText && !hasImages) return json({ error: 'text 또는 images 파라미터가 필요합니다.' }, 400);
   if (!count || count < 1 || count > 50) return json({ error: '문제 개수는 1~50 사이여야 합니다.' }, 400);
 
-  const truncatedText = text.slice(0, 55000);
-  const prompt = buildPrompt(truncatedText, validTypes, Math.min(parseInt(count), 50));
+  // 이미지 수 제한 (보안 + 비용 제어)
+  const safeImages = hasImages ? images.slice(0, 20) : [];
+  const isVisionMode = safeImages.length > 0;
+
+  const truncatedText = hasText ? text.slice(0, 55000) : '';
+  const prompt = buildPrompt(truncatedText, validTypes, Math.min(parseInt(count), 50), isVisionMode);
 
   try {
+    // Vision 모드: 이미지를 parts 앞에 삽입
+    const parts = [];
+    if (isVisionMode) {
+      safeImages.forEach(img => {
+        parts.push({ inlineData: { mimeType: 'image/jpeg', data: img } });
+      });
+    }
+    parts.push({ text: prompt });
+
     const geminiBody = JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ parts }],
       generationConfig: {
         responseMimeType: 'application/json',
         temperature: 0.7,
         topP: 0.95,
         maxOutputTokens: 8192,
-        thinkingConfig: { thinkingBudget: 0 },
+        // Vision 모드: 수식/도표 해석을 위해 약간의 thinking 허용
+        thinkingConfig: { thinkingBudget: isVisionMode ? 1024 : 0 },
       },
       safetySettings: [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -234,8 +250,8 @@ async function checkAndUpdateRateLimit(uid, env) {
   return { allowed: true };
 }
 
-// ─── Build Prompt (복수 타입 지원) ───
-function buildPrompt(text, types, count) {
+// ─── Build Prompt (복수 타입 지원, Vision 모드 포함) ───
+function buildPrompt(text, types, count, isVisionMode = false) {
   // 각 타입별 문제 수 분배
   const distribution = distributeCount(count, types);
 
@@ -263,13 +279,18 @@ OX 퀴즈 ${n}개:
   const typeInstructions = types.map(t => typeDescriptions[t](distribution[t])).join('\n');
   const totalDesc = types.map(t => `${typeLabels[t]} ${distribution[t]}개`).join(', ');
 
+  const visionNote = isVisionMode
+    ? `위에 첨부된 PDF 페이지 이미지들을 분석하여 수식, 도표, 그래프, 계산 과정을 포함한 문제를 출제하세요.${text ? '\n아래 추출된 텍스트도 함께 참고하세요.' : ''}\n`
+    : '';
+
+  const textSection = text
+    ? `[학습 자료]\n${text}\n\n`
+    : '';
+
   return `당신은 대학교 시험을 전문으로 출제하는 교수입니다.
-아래 텍스트를 바탕으로 대학생 수준의 시험 문제 총 ${count}개를 생성해주세요.
+${isVisionMode ? '첨부된 PDF 이미지와 텍스트 자료' : '아래 텍스트'}를 바탕으로 대학생 수준의 시험 문제 총 ${count}개를 생성해주세요.
 
-[학습 자료]
-${text}
-
-[생성할 문제]
+${visionNote}${textSection}[생성할 문제]
 ${totalDesc}
 
 [각 유형별 형식]
@@ -278,9 +299,10 @@ ${typeInstructions}
 [작성 규칙]
 1. 반드시 한국어로 작성하세요.
 2. 교재의 핵심 개념과 중요 원리를 다루는 문제를 만드세요.
-3. 문제는 서로 중복되지 않아야 합니다.
-4. explanation은 왜 정답인지 명확히 설명해야 합니다.
-5. 반드시 아래 JSON 형식으로만 응답하세요. 추가 텍스트 없이 순수 JSON만 반환하세요.
+3. 수식, 계산, 도표가 있다면 해당 내용을 문제에 반영하세요.
+4. 문제는 서로 중복되지 않아야 합니다.
+5. explanation은 왜 정답인지 명확히 설명해야 합니다.
+6. 반드시 아래 JSON 형식으로만 응답하세요. 추가 텍스트 없이 순수 JSON만 반환하세요.
 
 [응답 형식]
 {"questions": [ ...문제 배열... ]}

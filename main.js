@@ -34,6 +34,7 @@ let currentUser = null;
 let currentUserData = null;
 let selectedFile = null;
 let extractedText = '';
+let extractedImages = []; // Vision: base64 JPEG 이미지 배열
 
 // ─── DOM Elements ───
 const uploadZone = document.getElementById('upload-zone');
@@ -179,6 +180,7 @@ async function handleFile(file) {
 function clearFile() {
   selectedFile = null;
   extractedText = '';
+  extractedImages = [];
   fileInput.value = '';
   fileInfo.classList.remove('visible');
   uploadZone.classList.remove('has-file');
@@ -241,13 +243,17 @@ async function handleGenerate() {
   await generateQuiz();
 }
 
-// ─── Core: Extract Text from PDF ───
-async function extractTextFromPDF(file) {
+// ─── Core: Load PDF Document (공유) ───
+async function loadPDFDocument(file) {
   const lib = await loadPdfJs();
   const arrayBuffer = await file.arrayBuffer();
-  const pdf = await lib.getDocument({ data: arrayBuffer }).promise;
+  return lib.getDocument({ data: arrayBuffer }).promise;
+}
+
+// ─── Core: Extract Text from PDF ───
+async function extractTextFromPDF(pdf) {
   let text = '';
-  const maxPages = Math.min(pdf.numPages, 80); // cap at 80 pages
+  const maxPages = Math.min(pdf.numPages, 80);
   for (let i = 1; i <= maxPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
@@ -260,6 +266,36 @@ async function extractTextFromPDF(file) {
   return text.trim();
 }
 
+// ─── Core: Render PDF Pages as JPEG Images (Vision용) ───
+async function renderPagesAsImages(pdf, maxPages = 15) {
+  const images = [];
+  const pageCount = Math.min(pdf.numPages, maxPages);
+  for (let i = 1; i <= pageCount; i++) {
+    try {
+      const page = await pdf.getPage(i);
+      const baseViewport = page.getViewport({ scale: 1 });
+      // 최대 너비 1400px로 정규화 (모바일 메모리 보호)
+      const scale = Math.min(1.5, 1400 / baseViewport.width);
+      const viewport = page.getViewport({ scale });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // base64만 추출 (data:image/jpeg;base64, 제거)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      images.push(dataUrl.split(',')[1]);
+
+      // 메모리 해제
+      canvas.width = 0;
+      canvas.height = 0;
+    } catch { /* 개별 페이지 실패 시 건너뜀 */ }
+  }
+  return images;
+}
+
 // ─── Core: Generate Quiz via API ───
 async function generateQuiz() {
   const checked = [...document.querySelectorAll('input[name="quiz-type"]:checked')].map(el => el.value);
@@ -268,26 +304,41 @@ async function generateQuiz() {
 
   showLoading(true);
   generateBtn.disabled = true;
+  setLoadingStep(1, '📖 PDF 텍스트 읽는 중...', 'PDF에서 글자와 내용을 추출합니다');
 
   try {
-    // 1) Extract text (저장된 문서에서 로드한 경우 스킵)
-    if (!extractedText) {
-      showToast('📖 PDF 텍스트 추출 중...', 'warning');
-      extractedText = await extractTextFromPDF(selectedFile);
+    // 1) Extract text + images (저장된 문서에서 로드한 경우 스킵)
+    const isPreloaded = !!selectedFile._preloadedDocId;
+
+    if (!isPreloaded && (!extractedText || extractedImages.length === 0)) {
+      setLoadingStep(1, '📖 PDF 텍스트 읽는 중...', 'PDF에서 글자와 내용을 추출합니다');
+      const pdf = await loadPDFDocument(selectedFile);
+
+      if (!extractedText) {
+        extractedText = await extractTextFromPDF(pdf);
+      }
+      if (extractedImages.length === 0) {
+        setLoadingStep(2, '🖼️ 페이지 이미지 변환 중...', '수식·도표·그래프를 AI가 볼 수 있는 형태로 변환합니다 (최대 30페이지)');
+        extractedImages = await renderPagesAsImages(pdf, 30);
+      }
     }
 
-    if (!extractedText || extractedText.length < 100) {
-      throw new Error('PDF에서 텍스트를 추출할 수 없습니다. 이미지 기반 PDF일 수 있습니다.');
+    const hasText = extractedText && extractedText.length >= 100;
+    const hasImages = extractedImages.length > 0;
+    if (!hasText && !hasImages) {
+      throw new Error('PDF 내용을 읽을 수 없습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.');
     }
 
     // 2) Call API
-    showToast('🤖 AI가 문제를 생성 중입니다...', 'warning');
+    if (isPreloaded) setLoadingStep(2, '🤖 AI가 문제를 출제 중...', 'Gemini AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
+    else setLoadingStep(3, '🤖 AI가 문제를 출제 중...', 'Gemini AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
     const idToken = await currentUser.getIdToken();
     const response = await fetch('/api/generate-quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: extractedText.slice(0, 60000),
+        text: hasText ? extractedText.slice(0, 60000) : '',
+        images: hasImages ? extractedImages : undefined,
         types,
         count,
         idToken
@@ -390,6 +441,15 @@ function showToast(msg, type = 'success') {
 // ─── Loading ───
 function showLoading(show) {
   loadingOverlay?.classList.toggle('visible', show);
+}
+
+function setLoadingStep(step, title, desc) {
+  const badge = document.getElementById('loading-step-badge');
+  const titleEl = document.getElementById('loading-title');
+  const descEl = document.getElementById('loading-desc');
+  if (badge) badge.textContent = `${step} / 3`;
+  if (titleEl) titleEl.textContent = title;
+  if (descEl) descEl.textContent = desc;
 }
 
 // ─── Utils ───
