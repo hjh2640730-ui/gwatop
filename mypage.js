@@ -8,9 +8,9 @@ import {
 } from '/auth.js';
 import {
   getFirestore, collection, query, where, orderBy, limit,
-  getDocs, getCountFromServer, deleteDoc, doc
+  getDocs, getCountFromServer
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import { getAuth, deleteUser } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { app } from '/auth.js';
 
 const db = getFirestore(app);
@@ -191,18 +191,24 @@ function setupNicknameEdit() {
 function setupDeleteAccount() {
   document.getElementById('mp-delete-btn').addEventListener('click', async () => {
     if (!confirm('정말 탈퇴하시겠습니까?\n모든 데이터가 삭제되며 복구할 수 없습니다.')) return;
-    if (!confirm('마지막 확인입니다. 탈퇴 후 크레딧과 퀴즈 기록이 모두 사라집니다.\n계속하시겠습니까?')) return;
+    if (!confirm('마지막 확인입니다. 탈퇴 후 크레딧, 퀴즈 기록, 게시글, 댓글이 모두 삭제됩니다.\n계속하시겠습니까?')) return;
+    const btn = document.getElementById('mp-delete-btn');
+    btn.disabled = true;
+    btn.textContent = '삭제 중...';
     try {
-      await deleteDoc(doc(db, 'users', currentUser.uid));
-      await deleteUser(auth.currentUser);
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '탈퇴 실패');
       showToast('탈퇴가 완료됐습니다.', 'success');
       setTimeout(() => window.location.href = '/', 1500);
     } catch (e) {
-      if (e.code === 'auth/requires-recent-login') {
-        showToast('보안을 위해 재로그인 후 탈퇴해주세요.', 'error');
-      } else {
-        showToast('탈퇴 처리 중 오류가 발생했습니다.', 'error');
-      }
+      showToast(e.message || '탈퇴 처리 중 오류가 발생했습니다.', 'error');
+      btn.disabled = false;
+      btn.textContent = '탈퇴';
     }
   });
 }
