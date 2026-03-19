@@ -14,6 +14,10 @@ const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_I
 // commit writes의 document name은 URL 아닌 리소스 경로
 const DOC_BASE = `projects/${PROJECT_ID}/databases/(default)/documents`;
 
+// ─── 서비스 계정 토큰 캐시 (Worker 인스턴스 내 재사용으로 딜레이 단축) ───
+let _cachedToken = null;
+let _tokenExpiry = 0;
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -38,9 +42,11 @@ async function verifyFirebaseToken(idToken) {
   } catch { return null; }
 }
 
-// ─── Service Account → Access Token ───
+// ─── Service Account → Access Token (캐시 적용) ───
 async function getFirebaseAccessToken(clientEmail, privateKey) {
   const now = Math.floor(Date.now() / 1000);
+  if (_cachedToken && _tokenExpiry - now > 300) return _cachedToken;
+
   const header = { alg: 'RS256', typ: 'JWT' };
   const payload = {
     iss: clientEmail, sub: clientEmail,
@@ -72,7 +78,9 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
   });
   const tokenData = await tokenRes.json();
   if (!tokenData.access_token) throw new Error('Access token 발급 실패');
-  return tokenData.access_token;
+  _cachedToken = tokenData.access_token;
+  _tokenExpiry = now + 3600;
+  return _cachedToken;
 }
 
 // ─── 문서 단건 읽기 ───
@@ -105,16 +113,15 @@ async function commitWrites(writes, accessToken) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  // ─── 1. 인증 ───
+  // ─── 1. 인증 + 요청 파싱 ───
   const authHeader = request.headers.get('Authorization') || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   if (!idToken) return json({ error: '인증 토큰 없음' }, 401);
 
-  const user = await verifyFirebaseToken(idToken);
-  if (!user) return json({ error: '유효하지 않은 토큰' }, 401);
-  const uid = user.localId;
+  if (!env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {
+    return json({ error: 'Firebase 서비스 계정 환경 변수가 없습니다.' }, 500);
+  }
 
-  // ─── 2. 요청 파싱 ───
   let body;
   try { body = await request.json(); }
   catch { return json({ error: '요청 파싱 실패' }, 400); }
@@ -124,20 +131,21 @@ export async function onRequestPost(context) {
     return json({ error: 'postId 형식 오류' }, 400);
   }
 
-  // ─── 3. 서비스 계정 ───
-  if (!env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {
-    return json({ error: 'Firebase 서비스 계정 환경 변수가 없습니다.' }, 500);
-  }
-
-  let accessToken;
+  // ─── 2. ID Token 검증 + 서비스 계정 토큰 발급 (병렬) ───
+  let user, accessToken;
   try {
-    accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+    [user, accessToken] = await Promise.all([
+      verifyFirebaseToken(idToken),
+      getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY),
+    ]);
   } catch (e) {
     return json({ error: '서버 인증 실패' }, 500);
   }
+  if (!user) return json({ error: '유효하지 않은 토큰' }, 401);
+  const uid = user.localId;
 
   try {
-    // ─── 4. 문서 읽기 (병렬) ───
+    // ─── 3. 문서 읽기 (병렬) ───
     const [postDoc, likeDoc] = await Promise.all([
       getDocument(`community_posts/${postId}`, accessToken),
       getDocument(`post_likes/${postId}_${uid}`, accessToken),
