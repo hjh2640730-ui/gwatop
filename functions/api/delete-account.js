@@ -118,6 +118,20 @@ async function deleteDocument(name, accessToken) {
   });
 }
 
+// Firebase Storage 파일 삭제
+const STORAGE_BUCKET = 'gwatop-8edaf.firebasestorage.app';
+async function deleteStorageFile(imageUrl, accessToken) {
+  try {
+    const match = imageUrl.match(/\/o\/([^?]+)/);
+    if (!match) return;
+    const encodedPath = match[1]; // already URL-encoded
+    await fetch(
+      `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/${encodedPath}`,
+      { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+  } catch { /* 이미 없으면 무시 */ }
+}
+
 // Firebase Auth 유저 삭제 (Admin)
 async function deleteAuthUser(uid, accessToken) {
   const res = await fetch(
@@ -155,13 +169,16 @@ export async function onRequestPost(context) {
     // 1. 내 게시글 조회
     const myPosts = await queryDocs('community_posts', uid, accessToken);
 
-    // 2. 각 게시글의 댓글 삭제 + 게시글 삭제
+    // 2. 각 게시글의 댓글 + 이미지 삭제 + 게시글 삭제
     for (const post of myPosts) {
-      const postPath = post.name.split('/documents/')[1]; // e.g. community_posts/xxx
+      const postPath = post.name.split('/documents/')[1];
       const comments = await getSubDocs(postPath, 'comments', accessToken);
       for (const comment of comments) {
         await deleteDocument(comment.name, accessToken);
       }
+      // 첨부 이미지 삭제
+      const imageUrl = post.fields?.imageUrl?.stringValue;
+      if (imageUrl) await deleteStorageFile(imageUrl, accessToken);
       await deleteDocument(post.name, accessToken);
     }
 

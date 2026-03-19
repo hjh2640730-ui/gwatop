@@ -4,12 +4,17 @@
 
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
 import { checkAndShowNicknameModal } from './nickname.js';
-import { db } from './auth.js';
+import { db, app } from './auth.js';
 import {
   collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, limit, increment,
   arrayUnion, arrayRemove, serverTimestamp, runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  getStorage, ref as storageRef, deleteObject
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+
+const storage = getStorage(app);
 
 // ─── State ───
 let currentUser = null;
@@ -159,6 +164,13 @@ async function deletePost() {
         credits: increment(-likesEarned),
         referralCredits: increment(-likesEarned)
       });
+    }
+    // 첨부 이미지 삭제 (백그라운드, 실패해도 무시)
+    if (postData.imageUrl) {
+      try {
+        const imgRef = storageRef(storage, postData.imageUrl);
+        await deleteObject(imgRef);
+      } catch { /* 이미 없거나 권한 없으면 무시 */ }
     }
     await deleteDoc(doc(db, 'community_posts', postId));
     // Algolia 인덱스 제거 (백그라운드)

@@ -8,7 +8,7 @@ import {
 } from '/auth.js';
 import {
   getFirestore, collection, query, where, orderBy, limit,
-  getDocs, getCountFromServer
+  getDocs, getCountFromServer, writeBatch, doc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { app } from '/auth.js';
@@ -176,6 +176,17 @@ function setupNicknameEdit() {
       return;
     }
     await setNickname(currentUser.uid, newNick);
+    // 비익명 게시글 닉네임 일괄 업데이트
+    try {
+      const postsSnap = await getDocs(
+        query(collection(db, 'community_posts'), where('uid', '==', currentUser.uid), where('isAnonymous', '==', false))
+      );
+      if (!postsSnap.empty) {
+        const batch = writeBatch(db);
+        postsSnap.docs.forEach(d => batch.update(d.ref, { nickname: newNick }));
+        await batch.commit();
+      }
+    } catch { /* 게시글 업데이트 실패해도 닉네임 변경은 성공 */ }
     currentUserData = { ...currentUserData, nickname: newNick };
     display.textContent = newNick;
     document.getElementById('mp-name').textContent = newNick;
