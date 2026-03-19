@@ -1,10 +1,10 @@
 // ============================================================
-// GWATOP - Like Post API v1.0.0
-// 좋아요/크레딧 처리를 서버 사이드 트랜잭션으로 처리
+// GWATOP - Like Post API v1.1.0
+// 좋아요/크레딧 처리를 서버 사이드로 처리
 // - DOM 조작을 통한 beforeCount 우회 방지
-// - Race Condition 방지 (Firestore 트랜잭션)
 // - 자기 글 좋아요 서버에서 이중 검증
 // - credits 직접 조작 방지 (서비스 계정만 수정)
+// - post_likes 중복 방지 (currentDocument precondition)
 // ENV: FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
 // ============================================================
 
@@ -73,40 +73,29 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
   return tokenData.access_token;
 }
 
-// ─── Firestore 트랜잭션 시작 ───
-async function beginTransaction(accessToken) {
-  const res = await fetch(`${FIRESTORE_BASE}:beginTransaction`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ options: { readWrite: {} } }),
+// ─── 문서 단건 읽기 ───
+async function getDocument(path, accessToken) {
+  const res = await fetch(`${FIRESTORE_BASE}/${path}`, {
+    headers: { 'Authorization': `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error('트랜잭션 시작 실패');
-  const data = await res.json();
-  return data.transaction;
-}
-
-// ─── 트랜잭션 안에서 복수 문서 읽기 ───
-async function batchGet(paths, transaction, accessToken) {
-  const documents = paths.map(p => `${FIRESTORE_BASE}/${p}`);
-  const res = await fetch(`${FIRESTORE_BASE}:batchGet`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ documents, transaction }),
-  });
-  if (!res.ok) throw new Error('문서 읽기 실패');
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`문서 읽기 실패 (${res.status}): ${err}`);
+  }
   return res.json();
 }
 
-// ─── 트랜잭션 커밋 ───
-async function commitTransaction(transaction, writes, accessToken) {
+// ─── Firestore 커밋 ───
+async function commitWrites(writes, accessToken) {
   const res = await fetch(`${FIRESTORE_BASE}:commit`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transaction, writes }),
+    body: JSON.stringify({ writes }),
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`커밋 실패: ${err}`);
+    throw new Error(`커밋 실패 (${res.status}): ${err}`);
   }
   return res.json();
 }
@@ -146,50 +135,39 @@ export async function onRequestPost(context) {
   }
 
   try {
-    // ─── 4. 트랜잭션 시작 + 문서 읽기 ───
-    const transaction = await beginTransaction(accessToken);
-    const results = await batchGet(
-      [`community_posts/${postId}`, `post_likes/${postId}_${uid}`],
-      transaction, accessToken
-    );
-
-    // ─── 5. 결과 파싱 ───
-    let postDoc = null;
-    let likeDocExists = false;
-    for (const r of results) {
-      if (r.found) {
-        const name = r.found.name;
-        if (name.includes(`/community_posts/${postId}`)) postDoc = r.found;
-        else if (name.includes(`/post_likes/${postId}_${uid}`)) likeDocExists = true;
-      }
-    }
+    // ─── 4. 문서 읽기 (병렬) ───
+    const [postDoc, likeDoc] = await Promise.all([
+      getDocument(`community_posts/${postId}`, accessToken),
+      getDocument(`post_likes/${postId}_${uid}`, accessToken),
+    ]);
 
     if (!postDoc) return json({ error: '게시물을 찾을 수 없습니다.' }, 404);
 
     const authorUid = postDoc.fields?.uid?.stringValue;
     if (!authorUid) return json({ error: '게시물 데이터 오류' }, 500);
 
-    // ─── 6. 자기 글 검증 (서버에서 이중 확인) ───
+    // ─── 5. 자기 글 검증 ───
     if (authorUid === uid) return json({ error: '자기 글에는 좋아요를 누를 수 없습니다.' }, 400);
 
     const currentLikes = parseInt(postDoc.fields?.likes?.integerValue || '0');
-    const wasLiked = likeDocExists;
+    const wasLiked = likeDoc !== null;
     const newLikes = wasLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1;
 
-    // ─── 7. 쓰기 작업 구성 ───
+    // ─── 6. 쓰기 작업 구성 ───
     const writes = [];
 
     if (wasLiked) {
       // 좋아요 취소
-      writes.push({ delete: `${FIRESTORE_BASE}/post_likes/${postId}_${uid}` });
       writes.push({
-        update: {
-          name: `${FIRESTORE_BASE}/community_posts/${postId}`,
-          fields: { likes: { integerValue: String(newLikes) } },
-        },
-        updateMask: { fieldPaths: ['likes'] },
+        delete: `${FIRESTORE_BASE}/post_likes/${postId}_${uid}`,
+        currentDocument: { exists: true },
       });
-      // 크레딧 회수 (5개 이하였을 때 줬으므로 currentLikes <= 5이면 회수)
+      writes.push({
+        transform: {
+          document: `${FIRESTORE_BASE}/community_posts/${postId}`,
+          fieldTransforms: [{ fieldPath: 'likes', increment: { integerValue: '-1' } }],
+        },
+      });
       if (currentLikes <= 5) {
         writes.push({
           transform: {
@@ -202,7 +180,7 @@ export async function onRequestPost(context) {
         });
       }
     } else {
-      // 좋아요 추가 (post_likes 중복 시 트랜잭션 자동 실패)
+      // 좋아요 추가 (이미 존재하면 커밋 실패 → 중복 방지)
       writes.push({
         update: {
           name: `${FIRESTORE_BASE}/post_likes/${postId}_${uid}`,
@@ -212,16 +190,14 @@ export async function onRequestPost(context) {
             createdAt: { timestampValue: new Date().toISOString() },
           },
         },
-        currentDocument: { exists: false }, // 이미 존재하면 커밋 실패 → 중복 방지
+        currentDocument: { exists: false },
       });
       writes.push({
-        update: {
-          name: `${FIRESTORE_BASE}/community_posts/${postId}`,
-          fields: { likes: { integerValue: String(newLikes) } },
+        transform: {
+          document: `${FIRESTORE_BASE}/community_posts/${postId}`,
+          fieldTransforms: [{ fieldPath: 'likes', increment: { integerValue: '1' } }],
         },
-        updateMask: { fieldPaths: ['likes'] },
       });
-      // 크레딧 지급 (최대 5개, 서버에서 Firestore 실제 값 기준으로 판단)
       if (currentLikes < 5) {
         writes.push({
           transform: {
@@ -235,8 +211,8 @@ export async function onRequestPost(context) {
       }
     }
 
-    // ─── 8. 원자적 커밋 ───
-    await commitTransaction(transaction, writes, accessToken);
+    // ─── 7. 커밋 ───
+    await commitWrites(writes, accessToken);
 
     return json({ liked: !wasLiked, likes: newLikes });
 
