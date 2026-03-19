@@ -6,8 +6,8 @@ import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChang
 import { checkAndShowNicknameModal } from './nickname.js';
 import { db, app } from './auth.js';
 import {
-  collection, doc, addDoc, getDocs, updateDoc, setDoc, deleteDoc,
-  query, orderBy, where, limit, startAfter, increment,
+  collection, doc, addDoc, getDocs, updateDoc,
+  query, orderBy, where, limit, startAfter,
   serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
@@ -510,7 +510,7 @@ function renderPostCard(post) {
   feed.appendChild(card);
 }
 
-// ─── Like (최대 10 크레딧) ───
+// ─── Like (서버 트랜잭션으로 처리) ───
 async function handleLike(postId, authorUid) {
   if (!currentUser) { openLoginModal(); return; }
 
@@ -519,17 +519,17 @@ async function handleLike(postId, authorUid) {
   const btn = card.querySelector('.post-like-btn');
   const heart = btn.querySelector('.like-heart');
   const countEl = btn.querySelector('.like-count');
-  const maxedEl = btn.querySelector('.like-maxed');
   const wasLiked = btn.classList.contains('liked');
   const beforeCount = parseInt(countEl.textContent) || 0;
 
-  // Optimistic
-  btn.classList.toggle('liked');
-  const delta = wasLiked ? -1 : 1;
-  const newCount = Math.max(0, beforeCount + delta);
+  // Optimistic UI
+  btn.disabled = true;
+  btn.classList.toggle('liked', !wasLiked);
+  const newCount = wasLiked ? Math.max(0, beforeCount - 1) : beforeCount + 1;
   countEl.textContent = newCount;
   heart.textContent = wasLiked ? '🤍' : '❤️';
-  if (maxedEl) maxedEl.remove();
+  const existingMax = btn.querySelector('.like-maxed');
+  if (existingMax) existingMax.remove();
   if (newCount >= 5) {
     const span = document.createElement('span');
     span.className = 'like-maxed';
@@ -540,30 +540,48 @@ async function handleLike(postId, authorUid) {
   setTimeout(() => btn.style.transform = '', 200);
 
   try {
-    const postRef = doc(db, 'community_posts', postId);
-    const giveCredit = authorUid && authorUid !== currentUser.uid;
-    const likeDocRef = doc(db, 'post_likes', `${postId}_${currentUser.uid}`);
-    if (wasLiked) {
-      await deleteDoc(likeDocRef);
-      await updateDoc(postRef, { likes: increment(-1) });
-      likedPostIds.delete(postId);
-      if (giveCredit && beforeCount <= 5) {
-        await updateDoc(doc(db, 'users', authorUid), { credits: increment(-1), referralCredits: increment(-1) });
-      }
-    } else {
-      await setDoc(likeDocRef, { postId, uid: currentUser.uid, createdAt: serverTimestamp() });
-      await updateDoc(postRef, { likes: increment(1) });
-      likedPostIds.add(postId);
-      if (giveCredit && beforeCount < 5) {
-        await updateDoc(doc(db, 'users', authorUid), { credits: increment(1), referralCredits: increment(1) });
-      }
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch('/api/like-post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify({ postId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || '좋아요 처리 실패');
+    }
+    const { liked, likes } = await res.json();
+
+    // 서버 응답으로 실제 상태 동기화
+    btn.classList.toggle('liked', liked);
+    heart.textContent = liked ? '❤️' : '🤍';
+    countEl.textContent = likes;
+    if (liked) likedPostIds.add(postId); else likedPostIds.delete(postId);
+    const maxEl = btn.querySelector('.like-maxed');
+    if (maxEl) maxEl.remove();
+    if (likes >= 5) {
+      const span = document.createElement('span');
+      span.className = 'like-maxed';
+      span.textContent = 'MAX';
+      btn.appendChild(span);
     }
   } catch (e) {
     // Revert
-    btn.classList.toggle('liked');
-    countEl.textContent = beforeCount;
+    btn.classList.toggle('liked', wasLiked);
     heart.textContent = wasLiked ? '❤️' : '🤍';
+    countEl.textContent = beforeCount;
+    const maxEl = btn.querySelector('.like-maxed');
+    if (maxEl) maxEl.remove();
+    if (beforeCount >= 5) {
+      const span = document.createElement('span');
+      span.className = 'like-maxed';
+      span.textContent = 'MAX';
+      btn.appendChild(span);
+    }
     console.error('like error:', e);
+    showToast(e.message || '좋아요 처리 중 오류가 발생했습니다.', 'error');
+  } finally {
+    btn.disabled = false;
   }
 }
 

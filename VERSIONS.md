@@ -1,5 +1,15 @@
 # GWATOP - Version History
 
+## v2.1.0 (2026-03-19) - 좋아요 크레딧 보안 강화
+- 좋아요/크레딧 처리를 서버 사이드 Cloud Function으로 이전 (functions/api/like-post.js 신규)
+- Firestore 트랜잭션으로 race condition 방지
+- DOM 조작을 통한 beforeCount 우회 공격 차단 (서버에서 실제 값 읽기)
+- Firestore Rules: users.credits 타인 직접 수정 완전 차단
+- Firestore Rules: community_posts.likes 클라이언트 직접 수정 차단
+- Firestore Rules: post_likes 클라이언트 create/delete 완전 차단 (CF만)
+- 자기 글 좋아요 서버에서 이중 검증
+- 좋아요 버튼 연타 방지 (disabled 처리)
+
 ## v2.0.1 (2026-03-18) - 글 삭제 시 referralCredits 동기화 수정
 - 좋아요 시 credits + referralCredits 동시 증감 (post.js, community.js)
 - 작성자 글 삭제 시 credits + referralCredits 함께 차감 (post.js)

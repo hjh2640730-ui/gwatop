@@ -6,12 +6,8 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null && request.auth.uid == uid;
-      // 본인: 모든 필드 수정. 타인: credits/referralCredits만 수정 (좋아요 보상)
-      allow update: if request.auth != null && (
-        request.auth.uid == uid ||
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['credits', 'referralCredits'])
-      );
+      // 본인만 수정 가능. credits/referralCredits는 서버(Cloud Function)에서만 변경
+      allow update: if request.auth != null && request.auth.uid == uid;
       allow delete: if false;
 
       match /quiz_history/{quizId} {
@@ -27,11 +23,11 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid;
-      // 작성자: 모든 필드. 타인: likes/commentCount/anonymousMap/anonymousCounter만
+      // 작성자: 모든 필드. 타인: commentCount/anonymousMap/anonymousCounter만 (likes는 CF만)
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.uid ||
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['likes', 'commentCount', 'anonymousMap', 'anonymousCounter'])
+          .hasOnly(['commentCount', 'anonymousMap', 'anonymousCounter'])
       );
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.uid;
@@ -51,14 +47,10 @@ service cloud.firestore {
       }
     }
 
-    // ── 게시글 좋아요 (배열 대체) ──
+    // ── 게시글 좋아요 (Cloud Function 서비스 계정만 쓰기) ──
     match /post_likes/{likeId} {
       allow read: if true;
-      allow create: if request.auth != null
-        && request.resource.data.uid == request.auth.uid;
-      allow delete: if request.auth != null
-        && resource.data.uid == request.auth.uid;
-      allow update: if false;
+      allow create, update, delete: if false;
     }
 
     // ── 나머지 모든 접근 거부 ──
