@@ -1,6 +1,11 @@
 // ============================================================
-// GWATOP - Community Page Logic v3.0.0
+// GWATOP - Community Page Logic v3.1.0
 // ============================================================
+
+// ─── Algolia 검색 설정 ───
+const ALGOLIA_APP_ID = 'THOWOPCXWC';
+const ALGOLIA_SEARCH_KEY = 'f926a04651ab3a962b0367c3dcdf5290';
+const ALGOLIA_INDEX = 'posts';
 
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
 import { checkAndShowNicknameModal } from './nickname.js';
@@ -263,7 +268,7 @@ async function loadPage(pageNum) {
   }
 }
 
-// ─── Load Posts for Search (Firestore prefix 쿼리 + 최근 50개 병행) ───
+// ─── Load Posts for Search (Algolia 전문 검색) ───
 async function loadPostsForSearch(searchQuery) {
   if (searchLoading) return;
   searchLoading = true;
@@ -275,32 +280,36 @@ async function loadPostsForSearch(searchQuery) {
   document.getElementById('posts-empty').style.display = 'none';
   document.getElementById('pagination-wrap').innerHTML = '';
   try {
-    const postsRef = collection(db, 'community_posts');
-    const qLower = searchQuery.toLowerCase();
-
-    // 1) Firestore 제목 prefix 검색 (새 게시글 대상, 무제한 스케일)
-    const prefixEnd = qLower.slice(0, -1) + String.fromCharCode(qLower.charCodeAt(qLower.length - 1) + 1);
-    const titleQuery = query(
-      postsRef,
-      where('titleLower', '>=', qLower),
-      where('titleLower', '<', prefixEnd),
-      limit(50)
+    const res = await fetch(
+      `https://${ALGOLIA_APP_ID}-dsn.algolia.net/1/indexes/${ALGOLIA_INDEX}/query`,
+      {
+        method: 'POST',
+        headers: {
+          'X-Algolia-Application-Id': ALGOLIA_APP_ID,
+          'X-Algolia-API-Key': ALGOLIA_SEARCH_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: searchQuery, hitsPerPage: 200 }),
+      }
     );
-
-    // 2) 최근 50개 클라이언트 필터 (제목/내용/닉네임 검색, 구 게시글 포함)
-    const recentQuery = query(postsRef, orderBy('createdAt', 'desc'), limit(50));
-
-    const [titleSnap, recentSnap] = await Promise.all([getDocs(titleQuery), getDocs(recentQuery)]);
-
-    const seen = new Set();
-    const merged = [];
-    for (const d of [...titleSnap.docs, ...recentSnap.docs]) {
-      if (!seen.has(d.id)) { seen.add(d.id); merged.push({ id: d.id, ...d.data() }); }
-    }
-
-    searchAllPosts = merged;
+    if (!res.ok) throw new Error('Algolia 검색 실패');
+    const data = await res.json();
+    searchAllPosts = (data.hits || []).map(hit => ({
+      id: hit.objectID,
+      title: hit.title,
+      content: hit.content,
+      nickname: hit.nickname,
+      university: hit.university,
+      uid: hit.uid,
+      isAnonymous: hit.isAnonymous,
+      createdAt: { seconds: Math.floor((hit.createdAt || Date.now()) / 1000) },
+      likes: hit.likes || 0,
+      commentCount: hit.commentCount || 0,
+      imageUrl: hit.imageUrl || '',
+    }));
+    filteredPosts = searchAllPosts;
     isSearchMode = true;
-    applySearchFilter(searchQuery);
+    renderSearchPage(1);
   } catch (e) {
     feed.innerHTML = '';
     showToast('검색 중 오류가 발생했습니다.', 'error');
@@ -741,7 +750,17 @@ async function submitPost() {
     };
     if (imageUrl) postData.imageUrl = imageUrl;
 
-    await addDoc(collection(db, 'community_posts'), postData);
+    const docRef = await addDoc(collection(db, 'community_posts'), postData);
+    // Algolia 인덱싱 (백그라운드, 실패해도 게시 성공)
+    fetch('/api/index-post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await currentUser.getIdToken()}` },
+      body: JSON.stringify({
+        action: 'add',
+        postId: docRef.id,
+        post: { ...postData, createdAt: Date.now() },
+      }),
+    }).catch(() => {});
     closeWriteModal();
     showToast('게시글이 등록됐습니다.', 'success');
     loadAllPosts();

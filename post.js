@@ -161,6 +161,12 @@ async function deletePost() {
       });
     }
     await deleteDoc(doc(db, 'community_posts', postId));
+    // Algolia 인덱스 제거 (백그라운드)
+    fetch('/api/index-post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await currentUser.getIdToken()}` },
+      body: JSON.stringify({ action: 'remove', postId }),
+    }).catch(() => {});
     window.location.href = '/community.html';
   } catch (e) {
     console.error('deletePost:', e);
