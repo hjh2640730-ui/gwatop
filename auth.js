@@ -75,6 +75,8 @@ export async function signInWithGoogle() {
 // ─── Sign Out ───
 export async function logOut() {
   if (!isConfigured) return;
+  // gwatop_ 접두사 localStorage 전부 정리
+  Object.keys(localStorage).filter(k => k.startsWith('gwatop_')).forEach(k => localStorage.removeItem(k));
   try { await signOut(auth); } catch (e) { console.error(e); }
   window.location.reload();
 }

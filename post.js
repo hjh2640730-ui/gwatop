@@ -113,7 +113,7 @@ function renderPost() {
     </div>
     ${postData.title ? `<h1 class="post-detail-title">${escapeHtml(postData.title)}</h1>` : ''}
     <div class="post-detail-content">${formatContent(postData.content || '')}</div>
-    ${postData.imageUrl ? `
+    ${postData.imageUrl?.startsWith('https://') ? `
       <div class="post-detail-image-wrap">
         <img class="post-detail-image" src="${escapeHtml(postData.imageUrl)}" alt="이미지" loading="lazy" />
       </div>` : ''}
@@ -294,7 +294,7 @@ async function loadComments() {
 
   try {
     const snap = await getDocs(
-      query(collection(db, 'community_posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(200))
+      query(collection(db, 'community_posts', postId, 'comments'), orderBy('createdAt', 'asc'), limit(300))
     );
 
     const allComments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -609,7 +609,9 @@ async function deleteComment(commentId) {
   if (!confirm('댓글을 삭제하시겠습니까?')) return;
   try {
     const commentRef = doc(db, 'community_posts', postId, 'comments', commentId);
-    await updateDoc(commentRef, { deleted: true, content: '' });
+    await updateDoc(commentRef, { deleted: true, content: '', likes: 0, likedBy: [] });
+    await updateDoc(doc(db, 'community_posts', postId), { commentCount: increment(-1) });
+    postData.commentCount = Math.max(0, (postData.commentCount || 1) - 1);
     await loadComments();
   } catch (e) {
     console.error('deleteComment:', e);
@@ -622,30 +624,38 @@ async function handleCommentLike(comment, wrap) {
   if (!currentUser) { openLoginModal(); return; }
 
   const btn = wrap.querySelector('.comment-like-btn');
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   const countEl = btn.querySelector('.comment-like-count');
   const wasLiked = btn.classList.contains('liked');
   const beforeCount = parseInt(countEl.textContent) || 0;
 
   // Optimistic UI
+  btn.disabled = true;
   btn.classList.toggle('liked');
   countEl.textContent = wasLiked ? Math.max(0, beforeCount - 1) : beforeCount + 1;
-  btn.querySelector('span:first-child') ? null : null;
   btn.childNodes[0].textContent = wasLiked ? '🤍' : '❤️';
 
   try {
-    const commentRef = doc(db, 'community_posts', postId, 'comments', comment.id);
-    if (wasLiked) {
-      await updateDoc(commentRef, { likes: increment(-1), likedBy: arrayRemove(currentUser.uid) });
-    } else {
-      await updateDoc(commentRef, { likes: increment(1), likedBy: arrayUnion(currentUser.uid) });
-    }
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch('/api/like-comment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify({ postId, commentId: comment.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    // 서버 응답으로 동기화
+    btn.classList.toggle('liked', data.liked);
+    countEl.textContent = data.likes;
+    btn.childNodes[0].textContent = data.liked ? '❤️' : '🤍';
   } catch (e) {
     // Revert
-    btn.classList.toggle('liked');
+    btn.classList.toggle('liked', wasLiked);
     countEl.textContent = beforeCount;
     btn.childNodes[0].textContent = wasLiked ? '❤️' : '🤍';
     console.error('comment like error:', e);
+  } finally {
+    btn.disabled = false;
   }
 }
 

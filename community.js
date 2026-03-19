@@ -173,12 +173,20 @@ function setupFilters() {
     currentSort = 'latest';
     document.getElementById('sort-latest').className = 'sort-btn active';
     document.getElementById('sort-popular').className = 'sort-btn';
+    if (isSearchMode) {
+      isSearchMode = false; searchAllPosts = []; filteredPosts = [];
+      document.getElementById('community-search').value = '';
+    }
     loadAllPosts();
   });
   document.getElementById('sort-popular').addEventListener('click', () => {
     currentSort = 'popular';
     document.getElementById('sort-latest').className = 'sort-btn';
     document.getElementById('sort-popular').className = 'sort-btn active';
+    if (isSearchMode) {
+      isSearchMode = false; searchAllPosts = []; filteredPosts = [];
+      document.getElementById('community-search').value = '';
+    }
     loadAllPosts();
   });
 }
@@ -290,7 +298,7 @@ async function loadPostsForSearch(searchQuery) {
           'X-Algolia-API-Key': ALGOLIA_SEARCH_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: searchQuery, hitsPerPage: 200 }),
+        body: JSON.stringify({ query: searchQuery, hitsPerPage: 50 }),
       }
     );
     if (!res.ok) throw new Error('Algolia 검색 실패');
@@ -513,7 +521,7 @@ function renderPostCard(post) {
     <div class="post-card-body">
       ${post.title ? `<div class="post-card-title">${escapeHtml(post.title)}</div>` : ''}
       <div class="post-card-preview">${escapeHtml(previewText)}</div>
-      ${post.imageUrl ? `<img class="post-card-thumb" src="${escapeHtml(post.imageUrl)}" alt="이미지" loading="lazy" />` : ''}
+      ${post.imageUrl?.startsWith('https://') ? `<img class="post-card-thumb" src="${escapeHtml(post.imageUrl)}" alt="이미지" loading="lazy" />` : ''}
     </div>
     <div class="post-footer">
       <button class="post-like-btn${isLiked ? ' liked' : ''}" data-id="${post.id}" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>

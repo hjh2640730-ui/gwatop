@@ -4,8 +4,47 @@
 // ENV: ALGOLIA_APP_ID, ALGOLIA_ADMIN_KEY
 // ============================================================
 
+const PROJECT_ID = 'gwatop-8edaf';
 const FIREBASE_WEB_API_KEY = 'AIzaSyAsxkIpwlBa0rD6FyzsrB0sdlovQoCPtcQ';
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const ALGOLIA_INDEX = 'posts';
+
+let _cachedToken = null;
+let _tokenExpiry = 0;
+
+async function getServiceAccountToken(clientEmail, privateKey) {
+  const now = Math.floor(Date.now() / 1000);
+  if (_cachedToken && _tokenExpiry - now > 300) return _cachedToken;
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = { iss: clientEmail, sub: clientEmail, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600, scope: 'https://www.googleapis.com/auth/datastore' };
+  const encode = (obj) => btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const signingInput = `${encode(header)}.${encode(payload)}`;
+  const pem = privateKey.replace(/-----BEGIN PRIVATE KEY-----/g, '').replace(/-----END PRIVATE KEY-----/g, '').replace(/\\n/g, '').replace(/\n/g, '').replace(/\r/g, '').replace(/\s/g, '');
+  const keyData = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('pkcs8', keyData.buffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput));
+  const sigEncoded = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const jwt = `${signingInput}.${sigEncoded}`;
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}` });
+  const tokenData = await tokenRes.json();
+  if (!tokenData.access_token) throw new Error('토큰 발급 실패');
+  _cachedToken = tokenData.access_token;
+  _tokenExpiry = now + 3600;
+  return _cachedToken;
+}
+
+async function deletePostLikes(postId, accessToken) {
+  try {
+    const res = await fetch(`${FIRESTORE_BASE}:runQuery`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'post_likes' }], where: { fieldFilter: { field: { fieldPath: 'postId' }, op: 'EQUAL', value: { stringValue: postId } } } } }),
+    });
+    if (!res.ok) return;
+    const docs = (await res.json()).filter(r => r.document);
+    await Promise.all(docs.map(r => fetch(`https://firestore.googleapis.com/v1/${r.document.name}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } })));
+  } catch { /* 실패해도 무시 */ }
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -60,9 +99,16 @@ export async function onRequestPost(context) {
 
   if (action === 'remove') {
     if (post?.uid && post.uid !== user.localId) return json({ error: '권한 없음' }, 403);
-    const res = await fetch(`${algoliaBase}/${postId}`, { method: 'DELETE', headers });
-    if (!res.ok && res.status !== 404) {
-      return json({ error: `Algolia 삭제 실패: ${res.status}` }, 500);
+    // Algolia 삭제 + post_likes 정리 (병렬)
+    const algoliaDelete = fetch(`${algoliaBase}/${postId}`, { method: 'DELETE', headers });
+    const postLikesCleanup = (env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY)
+      ? getServiceAccountToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY)
+          .then(token => deletePostLikes(postId, token))
+          .catch(() => {})
+      : Promise.resolve();
+    const [algoliaRes] = await Promise.all([algoliaDelete, postLikesCleanup]);
+    if (!algoliaRes.ok && algoliaRes.status !== 404) {
+      return json({ error: `Algolia 삭제 실패: ${algoliaRes.status}` }, 500);
     }
     return json({ success: true });
   }

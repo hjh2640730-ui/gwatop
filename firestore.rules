@@ -37,12 +37,11 @@ service cloud.firestore {
         allow read: if true;
         allow create: if request.auth != null
           && request.resource.data.uid == request.auth.uid;
-        // 본인: soft delete(deleted 필드). 타인: likes/likedBy만 (댓글 좋아요)
-        allow update: if request.auth != null && (
-          request.auth.uid == resource.data.uid ||
+        // 본인: soft delete(deleted 필드). likes/likedBy는 서버(CF)에서만 수정
+        allow update: if request.auth != null &&
+          request.auth.uid == resource.data.uid &&
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['likes', 'likedBy'])
-        );
+            .hasOnly(['deleted', 'content', 'likes', 'likedBy']);
         allow delete: if false;
       }
     }
