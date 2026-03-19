@@ -6,9 +6,8 @@ import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChang
 import { checkAndShowNicknameModal } from './nickname.js';
 import { db, app } from './auth.js';
 import {
-  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
-  query, orderBy, limit, increment,
-  arrayUnion, arrayRemove, serverTimestamp, runTransaction
+  collection, doc, getDoc, getDocs, updateDoc, deleteDoc,
+  query, orderBy, limit, increment
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   getStorage, ref as storageRef, deleteObject
@@ -531,75 +530,34 @@ function renderReplyForm(container, parentId) {
   inputEl.focus();
 }
 
-const MAX_COMMENTS = 300;
-
 // ─── Submit Comment ───
 async function submitComment(content, isAnonymous, parentId) {
   if (!currentUser || !postData) return;
 
-  // 댓글 최대 300개 제한
-  if ((postData.commentCount || 0) >= MAX_COMMENTS) {
-    showToast(`댓글은 최대 ${MAX_COMMENTS}개까지 작성 가능합니다.`, 'error');
-    return;
-  }
-
   const university = currentUserData?.university || localStorage.getItem(`gwatop_uni_${currentUser.uid}`) || '';
-  const isPostAuthor = currentUser.uid === postData.uid;
-  // Post author always shows as 작성자, never anonymous
-  const effectiveAnonymous = isPostAuthor ? false : isAnonymous;
-
-  let anonNumber = null;
-
-  if (effectiveAnonymous) {
-    // Get or assign anonymous number via transaction
-    try {
-      const postRef = doc(db, 'community_posts', postId);
-      await runTransaction(db, async (transaction) => {
-        const postSnap = await transaction.get(postRef);
-        if (!postSnap.exists()) throw new Error('Post not found');
-        const data = postSnap.data();
-        const anonMap = data.anonymousMap || {};
-        const counter = data.anonymousCounter || 0;
-
-        if (anonMap[currentUser.uid] !== undefined) {
-          anonNumber = anonMap[currentUser.uid];
-        } else {
-          anonNumber = counter + 1;
-          const newMap = { ...anonMap, [currentUser.uid]: anonNumber };
-          transaction.update(postRef, {
-            anonymousMap: newMap,
-            anonymousCounter: anonNumber
-          });
-        }
-      });
-    } catch (e) {
-      console.error('anonNumber transaction error:', e);
-      showToast('댓글 등록 실패. 다시 시도해주세요.', 'error');
-      return;
-    }
-  }
 
   try {
-    await addDoc(collection(db, 'community_posts', postId, 'comments'), {
-      uid: currentUser.uid,
-      isAnonymous: effectiveAnonymous,
-      anonNumber: anonNumber,
-      nickname: currentUserData?.nickname || currentUser.displayName || '',
-      university,
-      content,
-      parentId: parentId || null,
-      deleted: false,
-      createdAt: serverTimestamp()
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch('/api/comment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify({
+        action: 'add',
+        postId,
+        content,
+        isAnonymous,
+        parentId: parentId || null,
+        nickname: currentUserData?.nickname || currentUser.displayName || '',
+        university,
+      }),
     });
-
-    await updateDoc(doc(db, 'community_posts', postId), { commentCount: increment(1) });
-    // Update local postData commentCount
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
     postData.commentCount = (postData.commentCount || 0) + 1;
-
     await loadComments();
   } catch (e) {
     console.error('submitComment:', e);
-    showToast('댓글 등록 실패', 'error');
+    showToast(e.message || '댓글 등록 실패', 'error');
   }
 }
 
@@ -608,14 +566,19 @@ async function deleteComment(commentId) {
   if (!currentUser) return;
   if (!confirm('댓글을 삭제하시겠습니까?')) return;
   try {
-    const commentRef = doc(db, 'community_posts', postId, 'comments', commentId);
-    await updateDoc(commentRef, { deleted: true, content: '', likes: 0, likedBy: [] });
-    await updateDoc(doc(db, 'community_posts', postId), { commentCount: increment(-1) });
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch('/api/comment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify({ action: 'delete', postId, commentId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
     postData.commentCount = Math.max(0, (postData.commentCount || 1) - 1);
     await loadComments();
   } catch (e) {
     console.error('deleteComment:', e);
-    showToast('댓글 삭제 실패', 'error');
+    showToast(e.message || '댓글 삭제 실패', 'error');
   }
 }
 

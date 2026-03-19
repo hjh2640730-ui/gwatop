@@ -23,12 +23,11 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.auth != null
         && request.resource.data.uid == request.auth.uid;
-      // 작성자: 모든 필드. 타인: commentCount/anonymousMap/anonymousCounter만 (likes는 CF만)
-      allow update: if request.auth != null && (
-        request.auth.uid == resource.data.uid ||
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['commentCount', 'anonymousMap', 'anonymousCounter'])
-      );
+      // 작성자만 수정. commentCount/anonymousMap/anonymousCounter/likes는 CF(서비스 계정)에서만
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.uid
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['commentCount', 'anonymousMap', 'anonymousCounter', 'likes']);
       allow delete: if request.auth != null
         && request.auth.uid == resource.data.uid;
 
