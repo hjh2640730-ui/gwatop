@@ -335,7 +335,7 @@ function renderCurrentPage() {
   currentPagePosts.forEach(post => {
     renderPostCard(post);
     postRenderCount++;
-    if (postRenderCount % 6 === 0) renderAdSlot();
+    if (postRenderCount % 5 === 0) renderAdSlot();
   });
   renderCursorPagination();
 }
@@ -358,7 +358,7 @@ function renderSearchPage(page) {
   filteredPosts.slice(start, start + POSTS_PER_PAGE).forEach(post => {
     renderPostCard(post);
     postRenderCount++;
-    if (postRenderCount % 6 === 0) renderAdSlot();
+    if (postRenderCount % 5 === 0) renderAdSlot();
   });
   renderSearchPagination();
 }
