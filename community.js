@@ -16,7 +16,7 @@ import {
   serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
-  getStorage, ref as storageRef, uploadBytes, getDownloadURL
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 // ─── Universities ───
@@ -43,6 +43,7 @@ let currentUser = null;
 let currentUserData = null;
 let currentSort = 'latest';
 let selectedImageFile = null;
+let pendingImageUrl = null; // 업로드됐지만 게시글에 아직 저장 안 된 이미지 URL
 let postRenderCount = 0;
 let authInitialized = false;
 let likedPostIds = new Set(); // post_likes 컬렉션에서 로드
@@ -690,6 +691,14 @@ function openWriteModal() {
 }
 
 function closeWriteModal() {
+  // 업로드됐지만 게시글에 저장 안 된 이미지 삭제
+  if (pendingImageUrl) {
+    deleteObject(storageRef(storage, pendingImageUrl)).catch(() => {});
+    pendingImageUrl = null;
+  }
+  selectedImageFile = null;
+  document.getElementById('post-image-input').value = '';
+  document.getElementById('image-preview-wrap').style.display = 'none';
   document.getElementById('write-modal').classList.remove('visible');
 }
 
@@ -724,6 +733,7 @@ async function submitPost() {
     btn.textContent = '이미지 업로드 중...';
     try {
       imageUrl = await uploadImage(selectedImageFile);
+      pendingImageUrl = imageUrl; // 게시글 저장 전까지 추적
     } catch (e) {
       showToast('이미지 업로드 실패. 다시 시도해주세요.', 'error');
       btn.disabled = false;
@@ -751,6 +761,7 @@ async function submitPost() {
     if (imageUrl) postData.imageUrl = imageUrl;
 
     const docRef = await addDoc(collection(db, 'community_posts'), postData);
+    pendingImageUrl = null; // 게시글에 정상 저장됨 → 추적 해제
     // Algolia 인덱싱 (백그라운드, 실패해도 게시 성공)
     fetch('/api/index-post', {
       method: 'POST',
