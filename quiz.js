@@ -306,7 +306,7 @@ function handleSubmit() {
   revealAnswer(q, isCorrect);
 
   // Show explanation (항상 표시)
-  explanationText.textContent = q.explanation || '해설이 제공되지 않았습니다.';
+  explanationText.innerHTML = formatExplanation(q.explanation || '해설이 제공되지 않았습니다.');
   explanationBox.classList.add('visible');
 
   // For short answer and OX, show correct answer if wrong
@@ -469,7 +469,7 @@ async function showResults() {
         <div class="wrong-answer-q">${marked.parse(w.question)}</div>
         <div class="wrong-answer-yours">❌ 내 답: ${formatAnswer(w.yourAnswer)}</div>
         <div class="wrong-answer-correct">✅ 정답: ${formatAnswer(w.correctAnswer)}</div>
-        ${w.explanation ? `<div class="wrong-answer-expl">📖 ${marked.parse(w.explanation)}</div>` : ''}
+        ${w.explanation ? `<div class="wrong-answer-expl">📖 ${formatExplanation(w.explanation)}</div>` : ''}
       </div>
     `).join('');
   }
@@ -489,6 +489,13 @@ async function showResults() {
 
 function getBadgeText(type) {
   return { mcq: '객관식', short: '주관식', ox: 'OX' }[type] || '문제';
+}
+
+function formatExplanation(text) {
+  if (!text) return '';
+  // 선지 번호(①②③④) 앞에 줄바꿈 강제 삽입 (AI가 붙여쓴 경우 대비)
+  const spaced = text.replace(/([^\n])(①|②|③|④)/g, '$1\n\n$2');
+  return marked.parse(spaced);
 }
 
 function formatAnswer(ans) {
@@ -526,7 +533,7 @@ function downloadPDF() {
       <div class="question">${marked.parse(w.question)}</div>
       <div class="yours">&#10060; 내 답: ${formatAnswer(w.yourAnswer)}</div>
       <div class="correct">&#9989; 정답: ${formatAnswer(w.correctAnswer)}</div>
-      ${w.explanation ? `<div class="expl">&#128214; ${marked.parse(w.explanation)}</div>` : ''}
+      ${w.explanation ? `<div class="expl">&#128214; ${formatExplanation(w.explanation)}</div>` : ''}
     </div>
   `).join('');
 
