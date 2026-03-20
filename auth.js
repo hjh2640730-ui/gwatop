@@ -312,7 +312,7 @@ export function signInWithKakao() {
         photoURL: e.data.photoURL,
         provider: 'kakao'
       });
-      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL);
+      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL, 'kakao');
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Kakao sign-in error:', err);
@@ -352,7 +352,7 @@ export function signInWithNaver() {
         photoURL: e.data.photoURL,
         provider: 'naver'
       });
-      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL);
+      await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL, 'naver');
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Naver sign-in error:', err);
@@ -363,7 +363,7 @@ export function signInWithNaver() {
 }
 
 // ─── 소셜 로그인 프로필 강제 저장 (레이스 컨디션 방지) ───
-async function _forceSocialProfile(uid, email, phone, displayName, photoURL) {
+async function _forceSocialProfile(uid, email, phone, displayName, photoURL, provider) {
   if (!db) return;
   try {
     const updates = {};
@@ -371,6 +371,7 @@ async function _forceSocialProfile(uid, email, phone, displayName, photoURL) {
     if (phone) updates.phone = phone;
     if (displayName) updates.displayName = displayName;
     if (photoURL) updates.photoURL = photoURL;
+    if (provider) updates.provider = provider;
     if (Object.keys(updates).length > 0) {
       await setDoc(doc(db, 'users', uid), updates, { merge: true });
     }
