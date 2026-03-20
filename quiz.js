@@ -523,10 +523,10 @@ function downloadPDF() {
   const cardsHtml = wrongAnswers.map((w, i) => `
     <div class="card">
       <div class="num">오답 ${i + 1} &middot; ${getBadgeText(questions[w.idx - 1]?.type)}</div>
-      <div class="question">${w.question}</div>
+      <div class="question">${marked.parse(w.question)}</div>
       <div class="yours">&#10060; 내 답: ${formatAnswer(w.yourAnswer)}</div>
       <div class="correct">&#9989; 정답: ${formatAnswer(w.correctAnswer)}</div>
-      ${w.explanation ? `<div class="expl">&#128214; ${w.explanation}</div>` : ''}
+      ${w.explanation ? `<div class="expl">&#128214; ${marked.parse(w.explanation)}</div>` : ''}
     </div>
   `).join('');
 
