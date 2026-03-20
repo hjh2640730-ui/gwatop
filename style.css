@@ -490,23 +490,29 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
+  margin-bottom: 16px;
 }
 .scrap-sq-card {
   aspect-ratio: 1;
   background: var(--glass-bg);
-  border: 1px solid rgba(245,158,11,0.15);
+  border: 2px solid transparent;
   border-radius: var(--radius-lg);
   padding: 14px;
   cursor: pointer;
   transition: all var(--transition);
   display: flex; flex-direction: column; gap: 8px;
   overflow: hidden; position: relative;
+  outline: 1px solid rgba(245,158,11,0.15);
 }
 .scrap-sq-card:hover {
-  border-color: rgba(245,158,11,0.5);
+  outline-color: rgba(245,158,11,0.4);
   background: var(--glass-bg-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(245,158,11,0.08);
+}
+.scrap-sq-card.selected {
+  border-color: #f59e0b;
+  background: rgba(245,158,11,0.07);
+  outline: none;
 }
 .scrap-sq-badge {
   font-size: 10px; font-weight: 700; padding: 2px 8px;
@@ -524,43 +530,42 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   flex-shrink: 0;
 }
-.scrap-sq-remove {
+/* 선택됐을 때 체크마크 */
+.scrap-sq-check-mark {
   position: absolute; top: 8px; right: 8px;
-  background: rgba(0,0,0,0.4); border: none; color: var(--text-muted);
-  border-radius: var(--radius-full); width: 20px; height: 20px;
-  font-size: 11px; cursor: pointer; display: none;
-  align-items: center; justify-content: center; transition: color var(--transition);
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #f59e0b; color: white;
+  font-size: 12px; font-weight: 900;
+  display: none; align-items: center; justify-content: center;
 }
-.scrap-sq-card:hover .scrap-sq-remove { display: flex; }
-.scrap-sq-remove:hover { color: var(--error); }
+.scrap-sq-card.selected .scrap-sq-check-mark { display: flex; }
+/* 상세보기 버튼 (호버 시 표시) */
+.scrap-sq-view {
+  position: absolute; top: 8px; right: 8px;
+  background: rgba(0,0,0,0.45); border: none; color: white;
+  border-radius: var(--radius-full); width: 24px; height: 24px;
+  font-size: 12px; cursor: pointer;
+  display: none; align-items: center; justify-content: center;
+  transition: background var(--transition);
+}
+.scrap-sq-card:not(.selected):hover .scrap-sq-view { display: flex; }
+.scrap-sq-view:hover { background: rgba(124,58,237,0.6); }
 
-/* 체크박스 */
-.scrap-sq-check {
-  position: absolute; top: 8px; left: 8px;
-  width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; z-index: 2; transition: all var(--transition); flex-shrink: 0;
-  font-size: 11px; color: transparent;
-}
-.scrap-sq-card:hover .scrap-sq-check { border-color: rgba(245,158,11,0.6); }
-.scrap-sq-card.selected .scrap-sq-check {
-  background: #f59e0b; border-color: #f59e0b; color: white;
-}
-.scrap-sq-card.selected {
-  border-color: rgba(245,158,11,0.7);
-  background: rgba(245,158,11,0.08);
-  box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
-}
-
-/* 선택 액션 바 */
-.scrap-sel-bar {
+/* 하단 액션 바 */
+.scrap-action-bar {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 10px 14px; background: rgba(245,158,11,0.08);
-  border: 1px solid rgba(245,158,11,0.25); border-radius: var(--radius-md);
-  margin-bottom: 14px;
+  padding: 14px 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  margin-top: 8px;
 }
-.scrap-sel-count { font-size: 13px; font-weight: 700; color: #f59e0b; }
+.scrap-action-bar.has-selection {
+  background: rgba(245,158,11,0.06);
+  border-color: rgba(245,158,11,0.25);
+}
+.scrap-action-info { font-size: 13px; font-weight: 700; color: var(--text-secondary); flex: 1; }
+.scrap-action-bar.has-selection .scrap-action-info { color: #f59e0b; }
 
 /* Scrap Detail Modal */
 .scrap-view-modal-inner {
