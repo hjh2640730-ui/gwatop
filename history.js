@@ -270,42 +270,30 @@ function renderScrapList() {
 
   const typeLabels = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX' };
 
-  list.innerHTML = filtered.map(s => {
+  list.innerHTML = `<div class="scrap-sq-grid">${filtered.map(s => {
     const stem = stripMarkdown(s.question);
     return `
-      <div class="scrap-item" data-scrap-id="${s.id}">
-        <div class="scrap-item-header">
-          <div class="scrap-item-left">
-            <div class="scrap-item-badges">
-              <span class="scrap-badge">${typeLabels[s.type] || '📝'}</span>
-              ${s.docName ? `<span class="scrap-badge" title="${escapeAttr(s.docName)}">📄 ${escapeHtml(truncate(s.docName, 18))}</span>` : ''}
-            </div>
-            <div class="scrap-item-q">${escapeHtml(stem)}</div>
-          </div>
-          <div class="scrap-item-right">
-            <button class="scrap-remove-btn" title="스크랩 해제" data-id="${s.id}">✕</button>
-            <span class="scrap-expand-icon">▾</span>
-          </div>
-        </div>
-        <div class="scrap-item-detail" style="display:none">
-          ${s.type === 'mcq' && s.options?.length ? `
-            <div class="scrap-detail-options">
-              ${s.options.map((opt, oi) => {
-                const marker = opt.match(/^[①②③④⑤]/) ? opt[0] : String.fromCharCode(9312 + oi);
-                const text = opt.replace(/^[①②③④⑤]\s*/, '').trim();
-                return `<div class="scrap-option-row">${escapeHtml(marker)} ${escapeHtml(text)}</div>`;
-              }).join('')}
-            </div>
-          ` : ''}
-          <div class="scrap-detail-answer">✅ 정답: ${escapeHtml(s.answer)}</div>
-          ${s.explanation ? `<div class="scrap-detail-expl">${formatExplanation(s.explanation)}</div>` : ''}
-        </div>
+      <div class="scrap-sq-card" data-scrap-id="${s.id}">
+        <button class="scrap-sq-remove" title="스크랩 해제" data-id="${s.id}">✕</button>
+        <span class="scrap-sq-badge">${typeLabels[s.type] || '📝'}</span>
+        <div class="scrap-sq-q">${escapeHtml(stem)}</div>
+        ${s.docName ? `<div class="scrap-sq-footer">📄 ${escapeHtml(truncate(s.docName, 20))}</div>` : ''}
       </div>
     `;
-  }).join('');
+  }).join('')}</div>`;
 
-  // 삭제
-  list.querySelectorAll('.scrap-remove-btn').forEach(btn => {
+  // 카드 클릭 → 상세 모달
+  list.querySelectorAll('.scrap-sq-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.scrap-sq-remove')) return;
+      const id = Number(card.dataset.scrapId);
+      const s = scrapData.find(x => x.id === id);
+      if (s) openScrapViewModal(s);
+    });
+  });
+
+  // X 버튼 → 스크랩 해제
+  list.querySelectorAll('.scrap-sq-remove').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = Number(btn.dataset.id);
@@ -316,25 +304,81 @@ function renderScrapList() {
       showToast('스크랩이 해제됐습니다.', 'success');
     });
   });
+}
 
-  // 클릭으로 확장
-  list.querySelectorAll('.scrap-item-header').forEach(header => {
-    header.addEventListener('click', (e) => {
-      if (e.target.closest('.scrap-remove-btn')) return;
-      const item = header.closest('.scrap-item');
-      const detail = item.querySelector('.scrap-item-detail');
-      const icon = item.querySelector('.scrap-expand-icon');
-      const isOpen = detail.style.display !== 'none';
-      detail.style.display = isOpen ? 'none' : '';
-      if (icon) icon.textContent = isOpen ? '▾' : '▴';
-      item.classList.toggle('expanded', !isOpen);
-    });
-  });
+let _scrapViewId = null;
+
+function openScrapViewModal(s) {
+  _scrapViewId = s.id;
+  const typeLabels = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX' };
+
+  // 뱃지
+  const badges = document.getElementById('scrap-modal-badges');
+  if (badges) {
+    badges.innerHTML = `
+      <span class="history-meta-chip">${typeLabels[s.type] || '📝'}</span>
+      ${s.docName ? `<span class="history-meta-chip">📄 ${escapeHtml(truncate(s.docName, 24))}</span>` : ''}
+    `;
+  }
+
+  // 문제
+  const qEl = document.getElementById('scrap-modal-q');
+  if (qEl) qEl.innerHTML = marked.parse(s.question);
+
+  // 선지
+  const optsEl = document.getElementById('scrap-modal-options');
+  if (optsEl) {
+    if (s.type === 'mcq' && s.options?.length) {
+      optsEl.style.display = '';
+      optsEl.innerHTML = s.options.map((opt, oi) => {
+        const marker = opt.match(/^[①②③④⑤]/) ? opt[0] : String.fromCharCode(9312 + oi);
+        const text = opt.replace(/^[①②③④⑤]\s*/, '').trim();
+        return `<div class="scrap-modal-option">${escapeHtml(marker)} ${escapeHtml(text)}</div>`;
+      }).join('');
+    } else {
+      optsEl.style.display = 'none';
+      optsEl.innerHTML = '';
+    }
+  }
+
+  // 정답
+  const ansEl = document.getElementById('scrap-modal-answer');
+  if (ansEl) ansEl.textContent = `✅ 정답: ${s.answer}`;
+
+  // 해설
+  const explEl = document.getElementById('scrap-modal-expl');
+  if (explEl) {
+    if (s.explanation) {
+      explEl.style.display = '';
+      explEl.innerHTML = `<div style="font-size:11px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">📖 해설</div>` + formatExplanation(s.explanation);
+    } else {
+      explEl.style.display = 'none';
+    }
+  }
+
+  document.getElementById('scrap-view-modal')?.classList.add('visible');
 }
 
 function setupScrapModals() {
+  const viewModal = document.getElementById('scrap-view-modal');
   const retryModal = document.getElementById('scrap-retry-modal');
   const clearModal = document.getElementById('scrap-clear-modal');
+
+  // 상세 모달
+  document.getElementById('scrap-modal-close-btn')?.addEventListener('click', () => {
+    viewModal?.classList.remove('visible');
+  });
+  viewModal?.addEventListener('click', (e) => { if (e.target === viewModal) viewModal.classList.remove('visible'); });
+  document.getElementById('scrap-modal-remove-btn')?.addEventListener('click', async () => {
+    if (!_scrapViewId) return;
+    await unscrapQuestion(_scrapViewId);
+    scrapData = scrapData.filter(s => s.id !== _scrapViewId);
+    _scrapViewId = null;
+    viewModal?.classList.remove('visible');
+    renderScrapFilter();
+    renderScrapList();
+    showToast('스크랩이 해제됐습니다.', 'success');
+  });
 
   document.getElementById('scrap-retry-btn')?.addEventListener('click', () => {
     const filtered = getScrapFiltered();
