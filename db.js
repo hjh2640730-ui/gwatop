@@ -5,7 +5,7 @@
 
 import { db as firestoreDb } from './auth.js';
 import {
-  collection, doc, setDoc, getDocs, deleteDoc, updateDoc, query, orderBy
+  collection, doc, setDoc, getDocs, deleteDoc, updateDoc, query, orderBy, addDoc, getDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const DB_NAME = 'gwatop_db';
@@ -230,6 +230,29 @@ export function loadPendingQuiz() {
 
 export function clearPendingQuiz() {
   sessionStorage.removeItem('gwatop_pending_quiz');
+}
+
+// ─── Shared Quizzes ───
+export async function saveSharedQuiz(uid, docName, questions, type) {
+  if (!firestoreDb) throw new Error('Firestore 연결 실패');
+  const ref = await addDoc(collection(firestoreDb, 'shared_quizzes'), {
+    uid: uid || null,
+    docName,
+    questions,
+    type,
+    totalQuestions: questions.length,
+    createdAt: Date.now()
+  });
+  return ref.id;
+}
+
+export async function getSharedQuiz(shareId) {
+  if (!firestoreDb) return null;
+  try {
+    const snap = await getDoc(doc(firestoreDb, 'shared_quizzes', shareId));
+    if (!snap.exists()) return null;
+    return snap.data();
+  } catch { return null; }
 }
 
 // ─── Guest Quota (localStorage) ───

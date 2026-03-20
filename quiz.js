@@ -4,7 +4,7 @@
 // ============================================================
 
 import { onUserChange } from './auth.js';
-import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore } from './db.js';
+import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore, saveSharedQuiz, getSharedQuiz } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 import { marked } from 'https://esm.sh/marked@11';
 
@@ -17,6 +17,8 @@ let currentAnswer = null;
 let answered = false;
 let quizMeta = null;
 let savedQuizId = null;
+let currentUser = null;
+let isSharedQuiz = false;
 
 // ─── DOM ───
 const quizTopbar = document.getElementById('quiz-topbar');
@@ -44,6 +46,25 @@ const quitModal = document.getElementById('quit-modal');
 // ─── Init ───
 async function init() {
   setupNav();
+
+  // 공유 링크로 접근한 경우
+  const shareId = new URLSearchParams(location.search).get('share');
+  if (shareId) {
+    isSharedQuiz = true;
+    const shared = await getSharedQuiz(shareId);
+    if (!shared || !shared.questions?.length) {
+      showArea('no-quiz');
+      return;
+    }
+    quizMeta = shared;
+    questions = shared.questions;
+    showArea('quiz');
+    quizTopbar.style.display = '';
+    renderQuestion(0);
+    setupControls();
+    return;
+  }
+
   const data = loadPendingQuiz();
   if (!data || !data.questions || data.questions.length === 0) {
     showArea('no-quiz');
@@ -67,6 +88,7 @@ function setupNav() {
     window.location.href = '/';
   });
   onUserChange((user, userData) => {
+    currentUser = user;
     const lo = document.getElementById('nav-auth-logged-out');
     const li = document.getElementById('nav-auth-logged-in');
     if (user) {
@@ -220,6 +242,12 @@ function setupControls() {
   quitModal?.addEventListener('click', (e) => {
     if (e.target === quitModal) quitModal.classList.remove('visible');
   });
+
+  // 공유 버튼
+  document.getElementById('share-quiz-btn')?.addEventListener('click', shareQuiz);
+
+  // PDF 다운로드 버튼
+  document.getElementById('download-pdf-btn')?.addEventListener('click', downloadPDF);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -446,6 +474,14 @@ async function showResults() {
     `).join('');
   }
 
+  // 공유 버튼 (공유된 퀴즈가 아닐 때만)
+  const shareBtn = document.getElementById('share-quiz-btn');
+  if (shareBtn) shareBtn.style.display = isSharedQuiz ? 'none' : '';
+
+  // PDF 버튼 (오답이 있을 때만)
+  const pdfBtn = document.getElementById('download-pdf-btn');
+  if (pdfBtn) pdfBtn.style.display = wrongAnswers.length > 0 ? '' : 'none';
+
   // Progress bar to 100%
   progressFill.style.width = '100%';
   quizCounter.textContent = `${total} / ${total}`;
@@ -458,6 +494,80 @@ function getBadgeText(type) {
 function formatAnswer(ans) {
   if (!ans) return '(없음)';
   return ans.length > 80 ? ans.slice(0, 80) + '...' : ans;
+}
+
+// ─── 퀴즈 공유 ───
+async function shareQuiz() {
+  const btn = document.getElementById('share-quiz-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '링크 생성 중...'; }
+  try {
+    const uid = currentUser?.uid || null;
+    const docName = quizMeta?.docName || '공유된 퀴즈';
+    const type = quizMeta?.type || 'mcq';
+    const shareId = await saveSharedQuiz(uid, docName, questions, type);
+    const shareUrl = `${location.origin}/quiz.html?share=${shareId}`;
+    await navigator.clipboard.writeText(shareUrl);
+    showToast('공유 링크가 복사됐습니다!', 'success');
+  } catch (e) {
+    showToast('공유 링크 생성 실패: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔗 공유 링크 복사'; }
+  }
+}
+
+// ─── 오답 노트 PDF 다운로드 ───
+function downloadPDF() {
+  const date = new Date().toLocaleDateString('ko-KR');
+  const docName = quizMeta?.docName || 'GWATOP 퀴즈';
+
+  const cardsHtml = wrongAnswers.map((w, i) => `
+    <div class="card">
+      <div class="num">오답 ${i + 1} &middot; ${getBadgeText(questions[w.idx - 1]?.type)}</div>
+      <div class="question">${w.question}</div>
+      <div class="yours">&#10060; 내 답: ${formatAnswer(w.yourAnswer)}</div>
+      <div class="correct">&#9989; 정답: ${formatAnswer(w.correctAnswer)}</div>
+      ${w.explanation ? `<div class="expl">&#128214; ${w.explanation}</div>` : ''}
+    </div>
+  `).join('');
+
+  const win = window.open('', '_blank');
+  if (!win) { showToast('팝업이 차단됐습니다. 팝업을 허용해주세요.', 'error'); return; }
+  win.document.write(`<!DOCTYPE html><html lang="ko"><head>
+    <meta charset="UTF-8">
+    <title>오답 노트 - ${docName}</title>
+    <style>
+      body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 24px; color: #1e293b; font-size: 15px; }
+      h1 { font-size: 26px; font-weight: 900; margin: 0 0 4px; }
+      .meta { color: #64748b; font-size: 13px; margin-bottom: 32px; }
+      .card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; page-break-inside: avoid; }
+      .num { font-size: 11px; font-weight: 700; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+      .question { font-size: 15px; font-weight: 600; line-height: 1.7; margin-bottom: 14px; white-space: pre-wrap; }
+      .yours { color: #ef4444; font-size: 14px; margin-bottom: 6px; }
+      .correct { color: #10b981; font-size: 14px; margin-bottom: 6px; }
+      .expl { background: #f8fafc; border-left: 3px solid #7c3aed; padding: 10px 14px; font-size: 13px; color: #475569; margin-top: 12px; border-radius: 0 6px 6px 0; line-height: 1.7; }
+      table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+      th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
+      th { background: #f1f5f9; font-weight: 700; }
+      @media print { body { padding: 20px; } }
+    </style>
+  </head><body>
+    <h1>&#128213; 오답 노트</h1>
+    <div class="meta">${date} &middot; ${docName} &middot; ${wrongAnswers.length}개 오답</div>
+    ${cardsHtml}
+    <script>window.onload = function(){ window.print(); }<\/script>
+  </body></html>`);
+  win.document.close();
+}
+
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
 }
 
 init();
