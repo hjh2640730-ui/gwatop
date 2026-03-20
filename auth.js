@@ -118,6 +118,7 @@ export async function ensureUserDoc(user, extra = {}) {
         credits: freeCredits,
         referralCredits: 0,
         totalQuizzes: 0,
+        provider: extra.provider || 'google',
         createdAt: serverTimestamp()
       });
 
@@ -136,6 +137,7 @@ export async function ensureUserDoc(user, extra = {}) {
       if (email && !data.email) updates.email = email;
       if (photoURL && !data.photoURL) updates.photoURL = photoURL;
       if (phone && !data.phone) updates.phone = phone;
+      if (!data.provider && extra.provider) updates.provider = extra.provider;
       if (Object.keys(updates).length > 0) await updateDoc(ref, updates);
     }
   } catch (e) {
@@ -259,7 +261,7 @@ export function onUserChange(callback) {
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
     try {
       if (user) {
-        await ensureUserDoc(user);
+        await ensureUserDoc(user, { provider: 'google' });
         const userData = await getUserData(user.uid);
         localStorage.setItem(NAV_CACHE_KEY, JSON.stringify({
           photoURL: user.photoURL || '',
@@ -305,7 +307,8 @@ export function signInWithKakao() {
         email: e.data.email,
         phone: e.data.phone,
         displayName: e.data.displayName,
-        photoURL: e.data.photoURL
+        photoURL: e.data.photoURL,
+        provider: 'kakao'
       });
       await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
@@ -344,7 +347,8 @@ export function signInWithNaver() {
         email: e.data.email,
         phone: e.data.phone,
         displayName: e.data.displayName,
-        photoURL: e.data.photoURL
+        photoURL: e.data.photoURL,
+        provider: 'naver'
       });
       await _forceSocialProfile(auth.currentUser.uid, e.data.email, e.data.phone, e.data.displayName, e.data.photoURL);
       _updateNavAvatar(e.data.photoURL, e.data.displayName);

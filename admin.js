@@ -154,6 +154,7 @@ function renderTable(users) {
       <div class="td td-credits" data-label="크레딧">${u.credits}</div>
       <div class="td" data-label="퀴즈 수">${u.totalQuizzes}</div>
       <div class="td" data-label="추천">${u.referralCredits}</div>
+      <div class="td" data-label="로그인">${formatProvider(u.provider)}</div>
       <div class="td td-date" data-label="가입일">${formatDate(u.createdAt)}</div>
       <div class="td"><button class="btn btn-glass btn-sm edit-btn" data-uid="${u.uid}">수정</button></div>
       <div class="td"><button class="btn-delete delete-btn" data-uid="${u.uid}">삭제</button></div>
@@ -443,6 +444,12 @@ async function confirmPostDelete() {
 }
 
 // ─── Utils ───
+function formatProvider(provider) {
+  if (provider === 'kakao') return '<span style="background:rgba(254,229,0,0.15);color:#f5c400;border:1px solid rgba(254,229,0,0.3);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;">카카오</span>';
+  if (provider === 'naver') return '<span style="background:rgba(3,199,90,0.15);color:#03c75a;border:1px solid rgba(3,199,90,0.3);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;">네이버</span>';
+  return '<span style="background:rgba(66,133,244,0.15);color:#4285f4;border:1px solid rgba(66,133,244,0.3);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:700;">구글</span>';
+}
+
 function formatPhone(phone) {
   if (!phone) return '-';
   return phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, '$1-$2-$3');
