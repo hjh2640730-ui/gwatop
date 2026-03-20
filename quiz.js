@@ -4,7 +4,7 @@
 // ============================================================
 
 import { onUserChange } from './auth.js';
-import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore, saveSharedQuiz, getSharedQuiz } from './db.js';
+import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 import { marked } from 'https://esm.sh/marked@11';
 
@@ -18,7 +18,7 @@ let answered = false;
 let quizMeta = null;
 let savedQuizId = null;
 let currentUser = null;
-let isSharedQuiz = false;
+
 
 // ─── DOM ───
 const quizTopbar = document.getElementById('quiz-topbar');
@@ -46,24 +46,6 @@ const quitModal = document.getElementById('quit-modal');
 // ─── Init ───
 async function init() {
   setupNav();
-
-  // 공유 링크로 접근한 경우
-  const shareId = new URLSearchParams(location.search).get('share');
-  if (shareId) {
-    isSharedQuiz = true;
-    const shared = await getSharedQuiz(shareId);
-    if (!shared || !shared.questions?.length) {
-      showArea('no-quiz');
-      return;
-    }
-    quizMeta = shared;
-    questions = shared.questions;
-    showArea('quiz');
-    quizTopbar.style.display = '';
-    renderQuestion(0);
-    setupControls();
-    return;
-  }
 
   const data = loadPendingQuiz();
   if (!data || !data.questions || data.questions.length === 0) {
@@ -242,9 +224,6 @@ function setupControls() {
   quitModal?.addEventListener('click', (e) => {
     if (e.target === quitModal) quitModal.classList.remove('visible');
   });
-
-  // 공유 버튼
-  document.getElementById('share-quiz-btn')?.addEventListener('click', shareQuiz);
 
   // PDF 다운로드 버튼
   document.getElementById('download-pdf-btn')?.addEventListener('click', downloadPDF);
@@ -474,10 +453,6 @@ async function showResults() {
     `).join('');
   }
 
-  // 공유 버튼 (공유된 퀴즈가 아닐 때만)
-  const shareBtn = document.getElementById('share-quiz-btn');
-  if (shareBtn) shareBtn.style.display = isSharedQuiz ? 'none' : '';
-
   // PDF 버튼 (오답이 있을 때만)
   const pdfBtn = document.getElementById('download-pdf-btn');
   if (pdfBtn) pdfBtn.style.display = wrongAnswers.length > 0 ? '' : 'none';
@@ -503,24 +478,6 @@ function formatAnswer(ans) {
   return ans.length > 80 ? ans.slice(0, 80) + '...' : ans;
 }
 
-// ─── 퀴즈 공유 ───
-async function shareQuiz() {
-  const btn = document.getElementById('share-quiz-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '링크 생성 중...'; }
-  try {
-    const uid = currentUser?.uid || null;
-    const docName = quizMeta?.docName || '공유된 퀴즈';
-    const type = quizMeta?.type || 'mcq';
-    const shareId = await saveSharedQuiz(uid, docName, questions, type);
-    const shareUrl = `${location.origin}/quiz.html?share=${shareId}`;
-    await navigator.clipboard.writeText(shareUrl);
-    showToast('공유 링크가 복사됐습니다!', 'success');
-  } catch (e) {
-    showToast('공유 링크 생성 실패: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🔗 공유 링크 복사'; }
-  }
-}
 
 // ─── 오답 노트 PDF 다운로드 ───
 function downloadPDF() {
