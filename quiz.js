@@ -6,6 +6,7 @@
 import { onUserChange } from './auth.js';
 import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
+import { marked } from 'https://esm.sh/marked@11';
 
 // ─── State ───
 let questions = [];
@@ -122,7 +123,7 @@ function renderQuestion(idx) {
   typeBadge.textContent = types[q.type] || '📝 문제';
 
   // Question
-  questionText.textContent = q.question;
+  questionText.innerHTML = marked.parse(q.question);
 
   // Options
   mcqOptions.style.display = 'none';

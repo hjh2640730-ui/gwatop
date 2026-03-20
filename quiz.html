@@ -6,6 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GWATOP - 퀴즈 풀기</title>
   <link rel="stylesheet" href="/style.css" />
+  <style>
+    #question-text table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+    #question-text th, #question-text td { border: 1px solid rgba(255,255,255,0.15); padding: 8px 12px; text-align: left; }
+    #question-text th { background: rgba(124,58,237,0.15); font-weight: 700; color: var(--text-primary); }
+    #question-text td { color: var(--text-secondary); }
+    #question-text tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+    #question-text p { margin: 6px 0; }
+    #question-text code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 13px; }
+    #question-text strong { color: var(--text-primary); }
+  </style>
 </head>
 <body>
   <div class="bg-gradient"></div>
