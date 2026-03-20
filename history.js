@@ -327,7 +327,9 @@ function renderScrapActionBar() {
       <button class="btn btn-ghost btn-sm" id="sa-deselect">선택 해제</button>
     `;
     document.getElementById('sa-retry')?.addEventListener('click', startScrapQuiz);
-    document.getElementById('sa-delete')?.addEventListener('click', deleteSelectedScraps);
+    document.getElementById('sa-delete')?.addEventListener('click', () => {
+      document.getElementById('scrap-clear-modal')?.classList.add('visible');
+    });
     document.getElementById('sa-deselect')?.addEventListener('click', () => {
       selectedScrapIds.clear();
       renderScrapGrid();
@@ -441,13 +443,19 @@ function setupScrapModals() {
   });
   document.getElementById('scrap-clear-confirm-btn')?.addEventListener('click', async () => {
     clearModal?.classList.remove('visible');
-    for (const s of scrapData) await unscrapQuestion(s.id);
-    scrapData = [];
-    scrapFilter = 'all';
-    selectedScrapIds.clear();
+    if (selectedScrapIds.size > 0) {
+      for (const id of selectedScrapIds) await unscrapQuestion(id);
+      scrapData = scrapData.filter(s => !selectedScrapIds.has(s.id));
+      selectedScrapIds.clear();
+      showToast('선택한 스크랩이 삭제됐습니다.', 'success');
+    } else {
+      for (const s of scrapData) await unscrapQuestion(s.id);
+      scrapData = [];
+      scrapFilter = 'all';
+      showToast('전체 스크랩이 삭제됐습니다.', 'success');
+    }
     renderScrapFilter();
     renderScrapList();
-    showToast('전체 스크랩이 삭제됐습니다.', 'success');
   });
   document.getElementById('scrap-clear-cancel-btn')?.addEventListener('click', () => {
     clearModal?.classList.remove('visible');
