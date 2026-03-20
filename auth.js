@@ -137,7 +137,7 @@ export async function ensureUserDoc(user, extra = {}) {
       if (email && !data.email) updates.email = email;
       if (photoURL && !data.photoURL) updates.photoURL = photoURL;
       if (phone && !data.phone) updates.phone = phone;
-      if (!data.provider && extra.provider) updates.provider = extra.provider;
+      if (extra.provider && data.provider !== extra.provider) updates.provider = extra.provider;
       if (Object.keys(updates).length > 0) await updateDoc(ref, updates);
     }
   } catch (e) {
