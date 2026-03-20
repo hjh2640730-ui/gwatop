@@ -9,12 +9,16 @@ import {
   getAllQuizzes, getAllDocuments,
   deleteQuiz, deleteDocument,
   savePendingQuiz, getDocument,
-  getQuizQuestionsFromFirestore
+  getQuizQuestionsFromFirestore,
+  getAllScraps, unscrapQuestion
 } from './db.js';
+import { marked } from 'https://esm.sh/marked@11';
 
 // ─── State ───
 let pendingDelete = null; // { type: 'quiz'|'doc', id }
 let currentUid = null;
+let scrapData = [];
+let scrapFilter = 'all';
 
 // ─── Init ───
 async function init() {
@@ -22,6 +26,7 @@ async function init() {
   setupNav();
   setupTabs();
   setupDeleteModal();
+  setupScrapModals();
   setupLoginModal();
 }
 
@@ -61,27 +66,39 @@ function setupNav() {
 
 // ─── Tabs ───
 function setupTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.remove('active');
-        b.classList.add('btn-ghost');
-        b.classList.remove('btn-glass');
-      });
-      btn.classList.add('active', 'btn-glass');
-      btn.classList.remove('btn-ghost');
+  const tabContents = {
+    quizzes: 'tab-quizzes-content',
+    documents: 'tab-documents-content',
+    scrap: 'tab-scrap-content'
+  };
 
-      const tab = btn.dataset.tab;
-      document.getElementById('tab-quizzes-content').style.display = tab === 'quizzes' ? '' : 'none';
-      document.getElementById('tab-documents-content').style.display = tab === 'documents' ? '' : 'none';
+  const switchTab = (tabName) => {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active', 'btn-glass');
+      b.classList.add('btn-ghost');
     });
+    const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+    if (activeBtn) { activeBtn.classList.add('active', 'btn-glass'); activeBtn.classList.remove('btn-ghost'); }
+    Object.entries(tabContents).forEach(([key, id]) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = key === tabName ? '' : 'none';
+    });
+  };
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
+
+  // URL ?tab=scrap 지원
+  const urlTab = new URLSearchParams(location.search).get('tab');
+  if (urlTab && tabContents[urlTab]) switchTab(urlTab);
 }
 
 // ─── Load All ───
 async function loadAll(uid) {
   await loadQuizzes(uid);
   await loadDocuments(uid);
+  await loadScraps(uid);
 }
 
 // ─── Load Quizzes ───
@@ -199,6 +216,198 @@ function renderDocCard(d) {
       </div>
     </div>
   `;
+}
+
+// ─── Scrap ───
+async function loadScraps(uid) {
+  scrapData = await getAllScraps(uid);
+  renderScrapFilter();
+  renderScrapList();
+}
+
+function getScrapFiltered() {
+  return scrapFilter === 'all' ? scrapData : scrapData.filter(s => s.docName === scrapFilter);
+}
+
+function renderScrapFilter() {
+  const bar = document.getElementById('scrap-filter-bar');
+  if (!bar) return;
+  const docNames = [...new Set(scrapData.map(s => s.docName).filter(Boolean))];
+  const filters = [{ key: 'all', label: '📚 전체' }, ...docNames.map(d => ({ key: d, label: '📄 ' + truncate(d, 16) }))];
+  bar.innerHTML = filters.map(f => `
+    <button class="btn btn-sm ${scrapFilter === f.key ? 'btn-primary' : 'btn-glass'}" data-filter="${escapeAttr(f.key)}">
+      ${escapeHtml(f.label)}
+    </button>
+  `).join('');
+  bar.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      scrapFilter = btn.dataset.filter;
+      renderScrapFilter();
+      renderScrapList();
+    });
+  });
+}
+
+function renderScrapList() {
+  const list = document.getElementById('scrap-list');
+  const emptyMsg = document.getElementById('scrap-empty-msg');
+  const toolbar = document.getElementById('scrap-toolbar');
+  const countLabel = document.getElementById('scrap-count-label');
+  if (!list) return;
+
+  const filtered = getScrapFiltered();
+
+  if (scrapData.length === 0) {
+    list.innerHTML = '';
+    if (toolbar) toolbar.style.display = 'none';
+    if (emptyMsg) emptyMsg.style.display = '';
+    return;
+  }
+
+  if (toolbar) toolbar.style.display = '';
+  if (emptyMsg) emptyMsg.style.display = 'none';
+  if (countLabel) countLabel.textContent = `${filtered.length}개의 스크랩 문제`;
+
+  const typeLabels = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX' };
+
+  list.innerHTML = filtered.map(s => {
+    const stem = stripMarkdown(s.question);
+    return `
+      <div class="scrap-item" data-scrap-id="${s.id}">
+        <div class="scrap-item-header">
+          <div class="scrap-item-left">
+            <div class="scrap-item-badges">
+              <span class="scrap-badge">${typeLabels[s.type] || '📝'}</span>
+              ${s.docName ? `<span class="scrap-badge" title="${escapeAttr(s.docName)}">📄 ${escapeHtml(truncate(s.docName, 18))}</span>` : ''}
+            </div>
+            <div class="scrap-item-q">${escapeHtml(stem)}</div>
+          </div>
+          <div class="scrap-item-right">
+            <button class="scrap-remove-btn" title="스크랩 해제" data-id="${s.id}">✕</button>
+            <span class="scrap-expand-icon">▾</span>
+          </div>
+        </div>
+        <div class="scrap-item-detail" style="display:none">
+          ${s.type === 'mcq' && s.options?.length ? `
+            <div class="scrap-detail-options">
+              ${s.options.map((opt, oi) => {
+                const marker = opt.match(/^[①②③④⑤]/) ? opt[0] : String.fromCharCode(9312 + oi);
+                const text = opt.replace(/^[①②③④⑤]\s*/, '').trim();
+                return `<div class="scrap-option-row">${escapeHtml(marker)} ${escapeHtml(text)}</div>`;
+              }).join('')}
+            </div>
+          ` : ''}
+          <div class="scrap-detail-answer">✅ 정답: ${escapeHtml(s.answer)}</div>
+          ${s.explanation ? `<div class="scrap-detail-expl">${formatExplanation(s.explanation)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 삭제
+  list.querySelectorAll('.scrap-remove-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = Number(btn.dataset.id);
+      await unscrapQuestion(id);
+      scrapData = scrapData.filter(s => s.id !== id);
+      renderScrapFilter();
+      renderScrapList();
+      showToast('스크랩이 해제됐습니다.', 'success');
+    });
+  });
+
+  // 클릭으로 확장
+  list.querySelectorAll('.scrap-item-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.scrap-remove-btn')) return;
+      const item = header.closest('.scrap-item');
+      const detail = item.querySelector('.scrap-item-detail');
+      const icon = item.querySelector('.scrap-expand-icon');
+      const isOpen = detail.style.display !== 'none';
+      detail.style.display = isOpen ? 'none' : '';
+      if (icon) icon.textContent = isOpen ? '▾' : '▴';
+      item.classList.toggle('expanded', !isOpen);
+    });
+  });
+}
+
+function setupScrapModals() {
+  const retryModal = document.getElementById('scrap-retry-modal');
+  const clearModal = document.getElementById('scrap-clear-modal');
+
+  document.getElementById('scrap-retry-btn')?.addEventListener('click', () => {
+    const filtered = getScrapFiltered();
+    if (!filtered.length) return;
+    const desc = document.getElementById('scrap-retry-desc');
+    if (desc) desc.textContent = `${filtered.length}개의 스크랩 문제로 퀴즈를 시작합니다.`;
+    retryModal?.classList.add('visible');
+  });
+  document.getElementById('scrap-retry-confirm-btn')?.addEventListener('click', () => {
+    retryModal?.classList.remove('visible');
+    startScrapQuiz();
+  });
+  document.getElementById('scrap-retry-cancel-btn')?.addEventListener('click', () => {
+    retryModal?.classList.remove('visible');
+  });
+  retryModal?.addEventListener('click', (e) => { if (e.target === retryModal) retryModal.classList.remove('visible'); });
+
+  document.getElementById('scrap-clear-btn')?.addEventListener('click', () => {
+    clearModal?.classList.add('visible');
+  });
+  document.getElementById('scrap-clear-confirm-btn')?.addEventListener('click', async () => {
+    clearModal?.classList.remove('visible');
+    for (const s of scrapData) await unscrapQuestion(s.id);
+    scrapData = [];
+    scrapFilter = 'all';
+    renderScrapFilter();
+    renderScrapList();
+    showToast('전체 스크랩이 삭제됐습니다.', 'success');
+  });
+  document.getElementById('scrap-clear-cancel-btn')?.addEventListener('click', () => {
+    clearModal?.classList.remove('visible');
+  });
+  clearModal?.addEventListener('click', (e) => { if (e.target === clearModal) clearModal.classList.remove('visible'); });
+}
+
+function startScrapQuiz() {
+  const filtered = getScrapFiltered();
+  if (!filtered.length) return;
+  const questions = filtered.map(s => ({
+    question: s.question,
+    type: s.type,
+    options: s.options || [],
+    answer: s.answer,
+    explanation: s.explanation || ''
+  })).sort(() => Math.random() - 0.5);
+  savePendingQuiz({
+    uid: currentUid || '',
+    docId: null,
+    docName: scrapFilter === 'all' ? '스크랩 문제 모음' : scrapFilter,
+    type: 'mixed',
+    questions
+  });
+  window.location.href = '/quiz.html';
+}
+
+function formatExplanation(text) {
+  if (!text) return '';
+  const spaced = text.replace(/([^\n])(①|②|③|④)/g, '$1\n\n$2');
+  return marked.parse(spaced);
+}
+
+function stripMarkdown(text) {
+  if (!text) return '';
+  return text
+    .replace(/[#*_`~>[\]]/g, '')
+    .replace(/\|.*\|/g, '[표]')
+    .replace(/\n+/g, ' ')
+    .trim()
+    .slice(0, 120) + (text.length > 120 ? '...' : '');
+}
+
+function truncate(str, max) {
+  return str?.length > max ? str.slice(0, max) + '...' : (str || '');
 }
 
 // ─── Replay Quiz ───

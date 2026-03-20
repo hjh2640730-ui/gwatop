@@ -485,6 +485,31 @@ body {
 .wrong-answer-correct { font-size: 13px; color: var(--success); margin-bottom: 8px; font-weight: 600; }
 .wrong-answer-expl { font-size: 13px; color: var(--text-secondary); line-height: 1.6; padding-top: 10px; border-top: 1px solid var(--glass-border); }
 
+/* ─── Scrap Accordion List ─── */
+.scrap-item {
+  border: 1px solid rgba(245,158,11,0.12); border-radius: var(--radius-md);
+  margin-bottom: 8px; overflow: hidden; transition: border-color var(--transition);
+  background: var(--glass-bg);
+}
+.scrap-item:hover, .scrap-item.expanded { border-color: rgba(245,158,11,0.3); }
+.scrap-item-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px; cursor: pointer; user-select: none;
+}
+.scrap-item-header:hover { background: rgba(255,255,255,0.02); }
+.scrap-item-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.scrap-item-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.scrap-item-q { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scrap-item-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.scrap-expand-icon { font-size: 13px; color: var(--text-muted); transition: transform var(--transition); }
+.scrap-item.expanded .scrap-expand-icon { transform: rotate(180deg); }
+.scrap-item-detail { padding: 0 16px 16px; border-top: 1px solid var(--glass-border); margin-top: 0; }
+.scrap-detail-options { display: flex; flex-direction: column; gap: 4px; margin: 12px 0 10px; font-size: 13px; color: var(--text-secondary); }
+.scrap-option-row { padding: 4px 0; }
+.scrap-detail-answer { font-size: 13px; color: var(--success); font-weight: 600; margin-bottom: 10px; }
+.scrap-detail-expl { font-size: 13px; color: var(--text-secondary); line-height: 1.7; padding-top: 10px; border-top: 1px solid var(--glass-border); }
+.scrap-detail-expl p { margin: 4px 0; }
+
 /* ─── Scrap Button ─── */
 .scrap-btn {
   margin-top: 14px;
