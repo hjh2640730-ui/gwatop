@@ -9,9 +9,10 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const DB_NAME = 'gwatop_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_DOCS = 'documents';
 const STORE_QUIZZES = 'quizzes';
+const STORE_SCRAPS = 'scraps';
 
 let _db = null;
 
@@ -39,6 +40,12 @@ function openDB() {
         if (!docs.indexNames.contains('uid')) docs.createIndex('uid', 'uid', { unique: false });
         const quizzes = tx.objectStore(STORE_QUIZZES);
         if (!quizzes.indexNames.contains('uid')) quizzes.createIndex('uid', 'uid', { unique: false });
+      }
+
+      if (oldVersion < 3) {
+        const scraps = db.createObjectStore(STORE_SCRAPS, { keyPath: 'id', autoIncrement: true });
+        scraps.createIndex('uid', 'uid', { unique: false });
+        scraps.createIndex('scrappedAt', 'scrappedAt', { unique: false });
       }
     };
     req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
@@ -215,6 +222,30 @@ export async function deleteQuiz(id) {
       await deleteDoc(doc(firestoreDb, 'users', quiz.uid, 'quiz_questions', String(id)));
     } catch { /* 무시 */ }
   }
+}
+
+// ─── Scraps ───
+export async function scrapQuestion(uid, questionData) {
+  return txAdd(STORE_SCRAPS, {
+    uid: uid || null,
+    question: questionData.question,
+    type: questionData.type,
+    options: questionData.options || [],
+    answer: questionData.answer,
+    explanation: questionData.explanation || '',
+    docName: questionData.docName || '',
+    scrappedAt: Date.now()
+  });
+}
+
+export async function unscrapQuestion(id) {
+  return txDelete(STORE_SCRAPS, id);
+}
+
+export async function getAllScraps(uid) {
+  if (!uid) return [];
+  const scraps = await txGetAll(STORE_SCRAPS, 'uid', uid);
+  return scraps.sort((a, b) => b.scrappedAt - a.scrappedAt);
 }
 
 // ─── Pending Quiz (sessionStorage bridge) ───

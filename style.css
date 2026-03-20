@@ -485,6 +485,49 @@ body {
 .wrong-answer-correct { font-size: 13px; color: var(--success); margin-bottom: 8px; font-weight: 600; }
 .wrong-answer-expl { font-size: 13px; color: var(--text-secondary); line-height: 1.6; padding-top: 10px; border-top: 1px solid var(--glass-border); }
 
+/* ─── Scrap Button ─── */
+.scrap-btn {
+  margin-top: 14px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px; border-radius: var(--radius-full);
+  font-size: 13px; font-weight: 600;
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--glass-border);
+  cursor: pointer; transition: all var(--transition);
+  font-family: var(--font);
+}
+.scrap-btn:hover { color: #f59e0b; border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.06); }
+.scrap-btn.scrapped { color: #f59e0b; border-color: rgba(245,158,11,0.5); background: rgba(245,158,11,0.1); }
+
+/* ─── Scrap Page ─── */
+.scrap-header { padding: clamp(32px,5vw,56px) 0 clamp(20px,3vw,32px); }
+.scrap-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.scrap-count { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+.scrap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 40px; }
+.scrap-card {
+  background: var(--glass-bg); border: 1px solid rgba(245,158,11,0.12);
+  border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  transition: all var(--transition);
+}
+.scrap-card:hover { border-color: rgba(245,158,11,0.3); background: var(--glass-bg-hover); }
+.scrap-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.scrap-card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.scrap-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); border: 1px solid var(--glass-border); color: var(--text-secondary); background: var(--glass-bg-hover); }
+.scrap-badge.amber { color: #f59e0b; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
+.scrap-remove-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 4px; border-radius: var(--radius-xs); transition: color var(--transition); flex-shrink: 0; }
+.scrap-remove-btn:hover { color: var(--error); }
+.scrap-question { font-size: 14px; font-weight: 600; line-height: 1.6; color: var(--text-primary); }
+.scrap-question p { margin: 4px 0; }
+.scrap-answer { font-size: 13px; color: var(--success); font-weight: 600; }
+.scrap-expl-toggle { background: none; border: none; color: var(--text-muted); font-size: 12px; cursor: pointer; padding: 0; font-family: var(--font); transition: color var(--transition); text-align: left; }
+.scrap-expl-toggle:hover { color: var(--text-secondary); }
+.scrap-expl { font-size: 13px; color: var(--text-secondary); line-height: 1.7; padding-top: 10px; border-top: 1px solid var(--glass-border); }
+.scrap-expl p { margin: 4px 0; }
+.scrap-empty { text-align: center; padding: 80px 20px; }
+.scrap-empty-icon { font-size: 52px; margin-bottom: 16px; }
+.scrap-empty-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+.scrap-empty-desc { font-size: 15px; color: var(--text-secondary); margin-bottom: 28px; }
+
 /* ─── History Page ─── */
 .history-header { padding: clamp(32px,5vw,56px) 0 clamp(20px,3vw,32px); }
 .history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }

@@ -4,7 +4,7 @@
 // ============================================================
 
 import { onUserChange } from './auth.js';
-import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore } from './db.js';
+import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore, scrapQuestion, unscrapQuestion } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 import { marked } from 'https://esm.sh/marked@11';
 
@@ -18,6 +18,7 @@ let answered = false;
 let quizMeta = null;
 let savedQuizId = null;
 let currentUser = null;
+let scrappedMap = new Map(); // questionIdx → scrapId
 
 
 // ─── DOM ───
@@ -228,6 +229,9 @@ function setupControls() {
   // PDF 다운로드 버튼
   document.getElementById('download-pdf-btn')?.addEventListener('click', downloadPDF);
 
+  // 스크랩 버튼
+  document.getElementById('scrap-btn')?.addEventListener('click', toggleScrap);
+
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     // textarea 포커스 상태에서는 Enter 단축키 무시
@@ -287,6 +291,13 @@ function handleSubmit() {
   // Show explanation (항상 표시)
   explanationText.innerHTML = formatExplanation(q.explanation || '해설이 제공되지 않았습니다.');
   explanationBox.classList.add('visible');
+
+  // 스크랩 버튼
+  const scrapBtn = document.getElementById('scrap-btn');
+  if (scrapBtn) {
+    scrapBtn.style.display = '';
+    updateScrapBtn(currentIdx);
+  }
 
   // For short answer and OX, show correct answer if wrong
   if (!isCorrect && (q.type === 'short' || q.type === 'ox')) {
@@ -429,6 +440,7 @@ async function showResults() {
   document.getElementById('stat-correct').textContent = correctCount;
   document.getElementById('stat-wrong').textContent = wrongAnswers.length;
   document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-scrap').textContent = scrappedMap.size;
 
   // Animate score ring
   const circumference = 364.4;
@@ -478,6 +490,41 @@ function formatAnswer(ans) {
   return ans.length > 80 ? ans.slice(0, 80) + '...' : ans;
 }
 
+
+// ─── 스크랩 ───
+function updateScrapBtn(idx) {
+  const btn = document.getElementById('scrap-btn');
+  if (!btn) return;
+  const isScrapped = scrappedMap.has(idx);
+  btn.textContent = isScrapped ? '🔖 스크랩됨' : '🔖 스크랩';
+  btn.classList.toggle('scrapped', isScrapped);
+}
+
+async function toggleScrap() {
+  if (!currentUser) {
+    showToast('로그인 후 스크랩할 수 있습니다.', 'error');
+    return;
+  }
+  const idx = currentIdx;
+  const q = questions[idx];
+  if (scrappedMap.has(idx)) {
+    await unscrapQuestion(scrappedMap.get(idx));
+    scrappedMap.delete(idx);
+    showToast('스크랩이 해제됐습니다.', 'info');
+  } else {
+    const id = await scrapQuestion(currentUser.uid, {
+      question: q.question,
+      type: q.type,
+      options: q.options || [],
+      answer: q.answer,
+      explanation: q.explanation || '',
+      docName: quizMeta?.docName || '알 수 없음'
+    });
+    scrappedMap.set(idx, id);
+    showToast('스크랩됐습니다! 📌', 'success');
+  }
+  updateScrapBtn(idx);
+}
 
 // ─── 오답 노트 PDF 다운로드 ───
 function downloadPDF() {
