@@ -118,7 +118,7 @@ export async function ensureUserDoc(user, extra = {}) {
         credits: freeCredits,
         referralCredits: 0,
         totalQuizzes: 0,
-        provider: extra.provider || 'google',
+        ...(extra.provider ? { provider: extra.provider } : {}),
         createdAt: serverTimestamp()
       });
 
@@ -261,7 +261,9 @@ export function onUserChange(callback) {
   const unsubscribe = onAuthStateChanged(auth, async (user) => {
     try {
       if (user) {
-        await ensureUserDoc(user, { provider: 'google' });
+        const providerData = user.providerData || [];
+        const isGoogle = providerData.some(p => p.providerId === 'google.com');
+        await ensureUserDoc(user, isGoogle ? { provider: 'google' } : {});
         const userData = await getUserData(user.uid);
         localStorage.setItem(NAV_CACHE_KEY, JSON.stringify({
           photoURL: user.photoURL || '',
