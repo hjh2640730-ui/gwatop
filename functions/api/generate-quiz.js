@@ -145,12 +145,22 @@ export async function onRequestPost(context) {
     try {
       quiz = JSON.parse(rawText);
     } catch {
+      // JSON 블록 추출 후 재시도
       const match = rawText.match(/\{[\s\S]*\}/);
       if (match) {
-        try { quiz = JSON.parse(match[0]); }
-        catch {
-          console.error('JSON 파싱 실패. 원문:', rawText.slice(0, 500));
-          return json({ error: '퀴즈 데이터 형식 오류입니다. 다시 시도해주세요.' }, 502);
+        try {
+          quiz = JSON.parse(match[0]);
+        } catch {
+          // 문자열 내 실제 줄바꿈을 \\n으로 치환 후 재시도
+          try {
+            const fixed = match[0].replace(/("(?:[^"\\]|\\.)*")/g, (m) =>
+              m.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+            );
+            quiz = JSON.parse(fixed);
+          } catch {
+            console.error('JSON 파싱 실패. 원문:', rawText.slice(0, 500));
+            return json({ error: '퀴즈 데이터 형식 오류입니다. 다시 시도해주세요.' }, 502);
+          }
         }
       } else {
         console.error('JSON 없음. 원문:', rawText.slice(0, 500));
@@ -310,6 +320,9 @@ ${typeInstructions}
 8. question 필드에 절대 포함하지 말아야 할 것:
    - 공식/수식 자체 (학생이 알고 있어야 하는 내용이므로 문제에 직접 제시하지 마세요)
    - 선지 번호 (①②③④ 또는 A/B/C/D 등). 선지는 반드시 options 배열에만 넣으세요.
+9. JSON 형식 주의사항:
+   - JSON 문자열 값 안의 줄바꿈은 반드시 \\n으로 표시하세요 (실제 줄바꿈 문자 사용 금지)
+   - 쌍따옴표(")는 반드시 \\"로 이스케이프하세요.
 
 [응답 형식]
 {"questions": [ ...문제 배열... ]}
