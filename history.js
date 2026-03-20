@@ -19,6 +19,7 @@ let pendingDelete = null; // { type: 'quiz'|'doc', id }
 let currentUid = null;
 let scrapData = [];
 let scrapFilter = 'all';
+let selectedScrapIds = new Set();
 
 // ─── Init ───
 async function init() {
@@ -248,33 +249,76 @@ function renderScrapFilter() {
   });
 }
 
+function renderScrapToolbar() {
+  const toolbar = document.getElementById('scrap-toolbar');
+  if (!toolbar) return;
+  const filtered = getScrapFiltered();
+  const selCount = selectedScrapIds.size;
+
+  if (selCount > 0) {
+    toolbar.innerHTML = `
+      <div class="scrap-sel-bar">
+        <span class="scrap-sel-count">${selCount}개 선택됨</span>
+        <button class="btn btn-primary btn-sm" id="scrap-sel-retry-btn">⚡ 다시 풀기</button>
+        <button class="btn btn-danger btn-sm" id="scrap-sel-delete-btn">🗑 삭제</button>
+        <button class="btn btn-glass btn-sm" id="scrap-sel-all-btn">전체 선택</button>
+        <button class="btn btn-ghost btn-sm" id="scrap-sel-clear-btn">선택 해제</button>
+      </div>
+    `;
+    document.getElementById('scrap-sel-retry-btn')?.addEventListener('click', startScrapQuiz);
+    document.getElementById('scrap-sel-delete-btn')?.addEventListener('click', deleteSelectedScraps);
+    document.getElementById('scrap-sel-all-btn')?.addEventListener('click', () => {
+      filtered.forEach(s => selectedScrapIds.add(s.id));
+      renderScrapToolbar();
+      renderScrapGrid();
+    });
+    document.getElementById('scrap-sel-clear-btn')?.addEventListener('click', () => {
+      selectedScrapIds.clear();
+      renderScrapToolbar();
+      renderScrapGrid();
+    });
+  } else {
+    toolbar.innerHTML = `
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:13px; color:var(--text-muted); font-weight:600;">${filtered.length}개의 스크랩 문제</span>
+        <button class="btn btn-primary btn-sm" id="scrap-retry-btn">⚡ 전체 다시 풀기</button>
+      </div>
+    `;
+    document.getElementById('scrap-retry-btn')?.addEventListener('click', startScrapQuiz);
+  }
+}
+
 function renderScrapList() {
   const list = document.getElementById('scrap-list');
   const emptyMsg = document.getElementById('scrap-empty-msg');
   const toolbar = document.getElementById('scrap-toolbar');
-  const countLabel = document.getElementById('scrap-count-label');
   if (!list) return;
-
-  const filtered = getScrapFiltered();
 
   if (scrapData.length === 0) {
     list.innerHTML = '';
-    if (toolbar) toolbar.style.display = 'none';
+    if (toolbar) toolbar.innerHTML = '';
     if (emptyMsg) emptyMsg.style.display = '';
     return;
   }
 
-  if (toolbar) toolbar.style.display = '';
   if (emptyMsg) emptyMsg.style.display = 'none';
-  if (countLabel) countLabel.textContent = `${filtered.length}개의 스크랩 문제`;
+  renderScrapToolbar();
+  renderScrapGrid();
+}
 
+function renderScrapGrid() {
+  const list = document.getElementById('scrap-list');
+  if (!list) return;
+  const filtered = getScrapFiltered();
   const typeLabels = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX' };
 
   list.innerHTML = `<div class="scrap-sq-grid">${filtered.map(s => {
     const stem = stripMarkdown(s.question);
+    const isSelected = selectedScrapIds.has(s.id);
     return `
-      <div class="scrap-sq-card" data-scrap-id="${s.id}">
-        <button class="scrap-sq-remove" title="스크랩 해제" data-id="${s.id}">✕</button>
+      <div class="scrap-sq-card${isSelected ? ' selected' : ''}" data-scrap-id="${s.id}">
+        <div class="scrap-sq-check" data-check-id="${s.id}">✓</div>
+        <button class="scrap-sq-remove" data-id="${s.id}">✕</button>
         <span class="scrap-sq-badge">${typeLabels[s.type] || '📝'}</span>
         <div class="scrap-sq-q">${escapeHtml(stem)}</div>
         ${s.docName ? `<div class="scrap-sq-footer">📄 ${escapeHtml(truncate(s.docName, 20))}</div>` : ''}
@@ -282,28 +326,50 @@ function renderScrapList() {
     `;
   }).join('')}</div>`;
 
-  // 카드 클릭 → 상세 모달
+  // 체크박스 클릭 → 선택 토글
+  list.querySelectorAll('.scrap-sq-check').forEach(chk => {
+    chk.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = Number(chk.dataset.checkId);
+      if (selectedScrapIds.has(id)) selectedScrapIds.delete(id);
+      else selectedScrapIds.add(id);
+      renderScrapToolbar();
+      renderScrapGrid();
+    });
+  });
+
+  // 카드 본문 클릭 → 상세 모달
   list.querySelectorAll('.scrap-sq-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.scrap-sq-remove')) return;
+      if (e.target.closest('.scrap-sq-check') || e.target.closest('.scrap-sq-remove')) return;
       const id = Number(card.dataset.scrapId);
       const s = scrapData.find(x => x.id === id);
       if (s) openScrapViewModal(s);
     });
   });
 
-  // X 버튼 → 스크랩 해제
+  // X 버튼 → 즉시 스크랩 해제
   list.querySelectorAll('.scrap-sq-remove').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const id = Number(btn.dataset.id);
       await unscrapQuestion(id);
       scrapData = scrapData.filter(s => s.id !== id);
+      selectedScrapIds.delete(id);
       renderScrapFilter();
       renderScrapList();
       showToast('스크랩이 해제됐습니다.', 'success');
     });
   });
+}
+
+async function deleteSelectedScraps() {
+  for (const id of selectedScrapIds) await unscrapQuestion(id);
+  scrapData = scrapData.filter(s => !selectedScrapIds.has(s.id));
+  selectedScrapIds.clear();
+  renderScrapFilter();
+  renderScrapList();
+  showToast('선택한 스크랩이 삭제됐습니다.', 'success');
 }
 
 let _scrapViewId = null;
@@ -380,22 +446,7 @@ function setupScrapModals() {
     showToast('스크랩이 해제됐습니다.', 'success');
   });
 
-  document.getElementById('scrap-retry-btn')?.addEventListener('click', () => {
-    const filtered = getScrapFiltered();
-    if (!filtered.length) return;
-    const desc = document.getElementById('scrap-retry-desc');
-    if (desc) desc.textContent = `${filtered.length}개의 스크랩 문제로 퀴즈를 시작합니다.`;
-    retryModal?.classList.add('visible');
-  });
-  document.getElementById('scrap-retry-confirm-btn')?.addEventListener('click', () => {
-    retryModal?.classList.remove('visible');
-    startScrapQuiz();
-  });
-  document.getElementById('scrap-retry-cancel-btn')?.addEventListener('click', () => {
-    retryModal?.classList.remove('visible');
-  });
-  retryModal?.addEventListener('click', (e) => { if (e.target === retryModal) retryModal.classList.remove('visible'); });
-
+  // 전체 삭제 버튼 (항상 하단에 고정)
   document.getElementById('scrap-clear-btn')?.addEventListener('click', () => {
     clearModal?.classList.add('visible');
   });
@@ -404,6 +455,7 @@ function setupScrapModals() {
     for (const s of scrapData) await unscrapQuestion(s.id);
     scrapData = [];
     scrapFilter = 'all';
+    selectedScrapIds.clear();
     renderScrapFilter();
     renderScrapList();
     showToast('전체 스크랩이 삭제됐습니다.', 'success');
@@ -415,9 +467,11 @@ function setupScrapModals() {
 }
 
 function startScrapQuiz() {
-  const filtered = getScrapFiltered();
-  if (!filtered.length) return;
-  const questions = filtered.map(s => ({
+  const base = selectedScrapIds.size > 0
+    ? scrapData.filter(s => selectedScrapIds.has(s.id))
+    : getScrapFiltered();
+  if (!base.length) return;
+  const questions = base.map(s => ({
     question: s.question,
     type: s.type,
     options: s.options || [],
@@ -427,7 +481,7 @@ function startScrapQuiz() {
   savePendingQuiz({
     uid: currentUid || '',
     docId: null,
-    docName: scrapFilter === 'all' ? '스크랩 문제 모음' : scrapFilter,
+    docName: selectedScrapIds.size > 0 ? `스크랩 선택 ${base.length}문제` : (scrapFilter === 'all' ? '스크랩 문제 모음' : scrapFilter),
     type: 'mixed',
     questions
   });

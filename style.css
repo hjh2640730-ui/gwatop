@@ -488,8 +488,8 @@ body {
 /* ─── Scrap Square Cards ─── */
 .scrap-sq-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
 }
 .scrap-sq-card {
   aspect-ratio: 1;
@@ -533,6 +533,34 @@ body {
 }
 .scrap-sq-card:hover .scrap-sq-remove { display: flex; }
 .scrap-sq-remove:hover { color: var(--error); }
+
+/* 체크박스 */
+.scrap-sq-check {
+  position: absolute; top: 8px; left: 8px;
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 2; transition: all var(--transition); flex-shrink: 0;
+  font-size: 11px; color: transparent;
+}
+.scrap-sq-card:hover .scrap-sq-check { border-color: rgba(245,158,11,0.6); }
+.scrap-sq-card.selected .scrap-sq-check {
+  background: #f59e0b; border-color: #f59e0b; color: white;
+}
+.scrap-sq-card.selected {
+  border-color: rgba(245,158,11,0.7);
+  background: rgba(245,158,11,0.08);
+  box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
+}
+
+/* 선택 액션 바 */
+.scrap-sel-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px; background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.25); border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+.scrap-sel-count { font-size: 13px; font-weight: 700; color: #f59e0b; }
 
 /* Scrap Detail Modal */
 .scrap-view-modal-inner {
