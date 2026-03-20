@@ -160,6 +160,7 @@ async function getUsers(accessToken) {
       credits: parseInt(f.credits?.integerValue || 0),
       totalQuizzes: parseInt(f.totalQuizzes?.integerValue || 0),
       referralCredits: parseInt(f.referralCredits?.integerValue || 0),
+      provider: f.provider?.stringValue || '',
       createdAt: f.createdAt?.timestampValue || null,
     };
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
