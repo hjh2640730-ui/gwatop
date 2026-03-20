@@ -466,10 +466,10 @@ async function showResults() {
     list.innerHTML = wrongAnswers.map((w, i) => `
       <div class="wrong-answer-card">
         <div class="wrong-answer-num">오답 ${i + 1} · ${getBadgeText(questions[w.idx - 1]?.type)}</div>
-        <div class="wrong-answer-q">${w.question}</div>
+        <div class="wrong-answer-q">${marked.parse(w.question)}</div>
         <div class="wrong-answer-yours">❌ 내 답: ${formatAnswer(w.yourAnswer)}</div>
         <div class="wrong-answer-correct">✅ 정답: ${formatAnswer(w.correctAnswer)}</div>
-        ${w.explanation ? `<div class="wrong-answer-expl">📖 ${w.explanation}</div>` : ''}
+        ${w.explanation ? `<div class="wrong-answer-expl">📖 ${marked.parse(w.explanation)}</div>` : ''}
       </div>
     `).join('');
   }

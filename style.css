@@ -477,6 +477,10 @@ body {
 .wrong-answer-card:hover { border-color: rgba(239,68,68,0.25); }
 .wrong-answer-num { font-size: 11px; font-weight: 700; color: var(--error); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
 .wrong-answer-q { font-size: 15px; font-weight: 600; margin-bottom: 12px; line-height: 1.5; }
+.wrong-answer-q table, .wrong-answer-expl table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; font-weight: 400; }
+.wrong-answer-q th, .wrong-answer-expl th, .wrong-answer-q td, .wrong-answer-expl td { border: 1px solid var(--glass-border); padding: 6px 10px; text-align: left; }
+.wrong-answer-q th, .wrong-answer-expl th { background: rgba(124,58,237,0.12); font-weight: 700; }
+.wrong-answer-q p, .wrong-answer-expl p { margin: 4px 0; }
 .wrong-answer-yours { font-size: 13px; color: var(--error); margin-bottom: 6px; }
 .wrong-answer-correct { font-size: 13px; color: var(--success); margin-bottom: 8px; font-weight: 600; }
 .wrong-answer-expl { font-size: 13px; color: var(--text-secondary); line-height: 1.6; padding-top: 10px; border-top: 1px solid var(--glass-border); }
