@@ -330,8 +330,8 @@ async function generateQuiz() {
     }
 
     // 2) Call API
-    if (isPreloaded) setLoadingStep(2, '🤖 AI가 문제를 출제 중...', 'Gemini AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
-    else setLoadingStep(3, '🤖 AI가 문제를 출제 중...', 'Gemini AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
+    if (isPreloaded) setLoadingStep(2, '🤖 AI가 문제를 출제 중...', 'AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
+    else setLoadingStep(3, '🤖 AI가 문제를 출제 중...', 'AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
     const idToken = await currentUser.getIdToken();
     const response = await fetch('/api/generate-quiz', {
       method: 'POST',
