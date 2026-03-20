@@ -488,8 +488,8 @@ body {
 /* ─── Scrap Square Cards ─── */
 .scrap-sq-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
 }
 .scrap-sq-card {
   aspect-ratio: 1;
