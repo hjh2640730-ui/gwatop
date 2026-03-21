@@ -15,6 +15,7 @@ let activeGameListener = null;  // onSnapshot 구독 해제 함수
 let roomsListener = null;       // 방 목록 구독 해제 함수
 let pendingListener = null;     // 내 방 대기 구독
 let countdownInterval = null;   // 방 만료 타이머
+let allRoomDocs = [];           // 전체 방 목록 (검색 필터링용)
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
 
@@ -71,6 +72,26 @@ function setupUI() {
   const valEl = document.getElementById('wager-val');
   slider?.addEventListener('input', () => { valEl.textContent = slider.value; });
 
+  // 방 제목 글자수 카운터
+  const titleInput = document.getElementById('room-title-input');
+  const titleCount = document.getElementById('room-title-count');
+  titleInput?.addEventListener('input', () => { titleCount.textContent = titleInput.value.length; });
+
+  // 방 검색
+  const searchInput = document.getElementById('room-search');
+  const searchWrap = document.getElementById('room-search-wrap');
+  const searchClear = document.getElementById('room-search-clear');
+  searchInput?.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    searchWrap.classList.toggle('has-value', q.length > 0);
+    renderRooms(filterRooms(q));
+  });
+  searchClear?.addEventListener('click', () => {
+    searchInput.value = '';
+    searchWrap.classList.remove('has-value');
+    renderRooms(allRoomDocs);
+  });
+
   document.getElementById('create-room-btn')?.addEventListener('click', async () => {
     if (!currentUser) { openLoginModal(); return; }
     // 이미 내 방이 있으면 중복 생성 방지
@@ -82,9 +103,12 @@ function setupUI() {
     const btn = document.getElementById('create-room-btn');
     btn.disabled = true;
     btn.textContent = '생성 중...';
-    await createRoom(wager);
+    const title = titleInput?.value.trim() || '';
+    await createRoom(wager, title);
     btn.disabled = false;
     btn.textContent = '✊ 방 만들기';
+    if (titleInput) titleInput.value = '';
+    if (titleCount) titleCount.textContent = '0';
   });
 
   // 게임 모달: 결과 닫기
@@ -151,88 +175,103 @@ function getRemainingMin(createdAt) {
   return Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - t.getTime())) / 60000));
 }
 
+// ─── 검색 필터 ───
+function filterRooms(query) {
+  if (!query) return allRoomDocs;
+  const q = query.toLowerCase();
+  return allRoomDocs.filter(d => {
+    const g = d.data();
+    return (g.title || '').toLowerCase().includes(q) || (g.player1?.name || '').toLowerCase().includes(q);
+  });
+}
+
+// ─── 방 목록 렌더링 ───
+function renderRooms(docs) {
+  const list = document.getElementById('rooms-list');
+  if (!list) return;
+  if (!docs.length) {
+    const isSearch = document.getElementById('room-search')?.value.trim();
+    list.innerHTML = `<div class="room-empty">${isSearch ? '검색 결과가 없습니다' : '열린 게임방이 없습니다'}</div>`;
+    return;
+  }
+  list.innerHTML = docs.map(d => {
+    const g = d.data();
+    const isMine = currentUser && g.player1?.uid === currentUser.uid;
+    const titleHtml = g.title
+      ? `<div class="room-title-on-card">${g.title}</div><div class="room-host-name">${g.player1?.name || '익명'}</div>`
+      : `<div class="room-title-on-card">${g.player1?.name || '익명'}의 방</div>`;
+    if (isMine) {
+      const remaining = getRemainingMin(g.createdAt);
+      return `<div class="room-card mine">
+        <div class="room-card-left">
+          <img class="room-avatar" src="${g.player1?.photo || ''}" onerror="this.src='/favicon.svg'" />
+          <div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${g.title ? `<span class="room-name" style="color:var(--text-primary)">${g.title}</span>` : '<span class="room-name" style="color:var(--text-primary)">내 방</span>'}
+              <span class="room-mine-badge">대기 중</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">상대방 기다리는 중 · <span class="room-expire-min">${remaining}</span>분 후 만료</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="room-wager">🟢 ${g.wager}P</span>
+          <button class="btn btn-ghost btn-sm cancel-inline-btn" data-id="${d.id}" style="white-space:nowrap">방 취소</button>
+        </div>
+      </div>`;
+    }
+    return `<button class="room-card" data-id="${d.id}">
+      <div class="room-card-left">
+        <img class="room-avatar" src="${g.player1?.photo || ''}" onerror="this.src='/favicon.svg'" />
+        <div>${titleHtml}</div>
+      </div>
+      <span class="room-wager">🟢 ${g.wager}P</span>
+    </button>`;
+  }).join('');
+
+  list.querySelectorAll('.room-card:not(.mine)').forEach(card => {
+    card.addEventListener('click', () => joinRoom(card.dataset.id));
+  });
+  list.querySelectorAll('.cancel-inline-btn').forEach(btn => {
+    btn.addEventListener('click', () => cancelRoomById(btn.dataset.id));
+  });
+
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    list.querySelectorAll('.room-expire-min').forEach(el => {
+      const current = parseInt(el.textContent);
+      if (current <= 0) return;
+      el.textContent = current - 1;
+      if (current - 1 <= 2) el.style.color = '#ef4444';
+    });
+  }, 60000);
+}
+
 // ─── 방 목록 (실시간) ───
 function loadRooms() {
   if (roomsListener) { roomsListener(); roomsListener = null; }
   if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
 
-  const q = query(collection(db, 'games'), where('status', '==', 'waiting'), limit(15));
+  const q = query(collection(db, 'games'), where('status', '==', 'waiting'), limit(30));
   roomsListener = onSnapshot(q, snap => {
-    const list = document.getElementById('rooms-list');
-    if (!list) return;
     const now = Date.now();
-    const docs = snap.docs.filter(d => {
+    allRoomDocs = snap.docs.filter(d => {
       const ts = d.data().createdAt;
       if (!ts) return true;
       const t = typeof ts === 'string' ? new Date(ts) : (ts.toDate?.() || new Date());
       return now - t.getTime() < 10 * 60 * 1000;
     });
-    if (!docs.length) {
-      list.innerHTML = '<div class="room-empty">열린 게임방이 없습니다</div>';
-      return;
-    }
-    list.innerHTML = docs.map(d => {
-      const g = d.data();
-      const isMine = currentUser && g.player1?.uid === currentUser.uid;
-      if (isMine) {
-        const remaining = getRemainingMin(g.createdAt);
-        return `<div class="room-card mine">
-          <div class="room-card-left">
-            <img class="room-avatar" src="${g.player1?.photo || ''}" onerror="this.src='/favicon.svg'" />
-            <div>
-              <div style="display:flex;align-items:center;gap:6px">
-                <span class="room-name" style="color:var(--text-primary)">내 방</span>
-                <span class="room-mine-badge">대기 중</span>
-              </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">상대방 기다리는 중 · <span class="room-expire-min">${remaining}</span>분 후 만료</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="room-wager">🟢 ${g.wager}P</span>
-            <button class="btn btn-ghost btn-sm cancel-inline-btn" data-id="${d.id}" style="white-space:nowrap">방 취소</button>
-          </div>
-        </div>`;
-      }
-      return `<button class="room-card" data-id="${d.id}">
-        <div class="room-card-left">
-          <img class="room-avatar" src="${g.player1?.photo || ''}" onerror="this.src='/favicon.svg'" />
-          <span class="room-name">${g.player1?.name || '익명'}</span>
-        </div>
-        <span class="room-wager">🟢 ${g.wager}P</span>
-      </button>`;
-    }).join('');
-
-    // 상대방 방 클릭 → 입장
-    list.querySelectorAll('.room-card:not(.mine)').forEach(card => {
-      card.addEventListener('click', () => joinRoom(card.dataset.id));
-    });
-    // 내 방 취소 버튼
-    list.querySelectorAll('.cancel-inline-btn').forEach(btn => {
-      btn.addEventListener('click', () => cancelRoomById(btn.dataset.id));
-    });
-
-    // 만료 카운트다운 매 분 갱신
-    if (countdownInterval) clearInterval(countdownInterval);
-    countdownInterval = setInterval(() => {
-      list.querySelectorAll('.room-expire-min').forEach(el => {
-        const card = el.closest('.room-card.mine');
-        if (!card) return;
-        const current = parseInt(el.textContent);
-        if (current <= 0) return;
-        el.textContent = current - 1;
-        if (current - 1 <= 2) el.style.color = '#ef4444';
-      });
-    }, 60000);
+    const searchQuery = document.getElementById('room-search')?.value.trim() || '';
+    renderRooms(filterRooms(searchQuery));
   });
 }
 
 // ─── 방 만들기 ───
-async function createRoom(wager) {
+async function createRoom(wager, title = '') {
   const idToken = await currentUser.getIdToken();
   const res = await fetch('/api/game-rps', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'create', wager }),
+    body: JSON.stringify({ action: 'create', wager, title }),
   });
   const data = await res.json();
   if (data.error) { showToast(data.error, 'error'); return; }

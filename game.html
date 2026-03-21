@@ -52,6 +52,22 @@
     }
     .room-empty { color: var(--text-muted); font-size: 14px; text-align: center; padding: 20px 0; }
 
+    /* Title / Search Input */
+    .room-title-input, .room-search-input {
+      width: 100%; background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md); padding: 11px 14px; font-family: var(--font);
+      font-size: 14px; color: var(--text-primary); outline: none;
+      transition: border-color var(--transition);
+    }
+    .room-title-input:focus, .room-search-input:focus { border-color: rgba(52,211,153,0.45); box-shadow: 0 0 0 3px rgba(52,211,153,0.08); }
+    .room-title-input::placeholder, .room-search-input::placeholder { color: var(--text-muted); }
+    .room-title-count { font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 4px; }
+    .room-search-wrap { position: relative; margin-bottom: 10px; }
+    .room-search-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 2px; display: none; }
+    .room-search-wrap.has-value .room-search-clear { display: block; }
+    .room-title-on-card { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+    .room-host-name { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
     /* Create form */
     .create-section {
       background: var(--glass-bg); border: 1px solid var(--glass-border);
@@ -151,6 +167,10 @@
     <div class="create-section">
       <div class="create-section-title">방 만들기</div>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">배팅 포인트 선택 (1~10P)</div>
+      <div style="margin-bottom:14px">
+        <input type="text" class="room-title-input" id="room-title-input" placeholder="방 제목 입력 (선택, 최대 20자)" maxlength="20" />
+        <div class="room-title-count"><span id="room-title-count">0</span>/20</div>
+      </div>
       <div class="wager-row">
         <input type="range" min="1" max="10" value="3" id="wager-slider" />
         <div class="wager-val-display"><span id="wager-val">3</span>P</div>
@@ -160,6 +180,10 @@
 
     <!-- Open Rooms -->
     <div class="section-label">열린 게임방</div>
+    <div class="room-search-wrap" id="room-search-wrap">
+      <input type="text" class="room-search-input" id="room-search" placeholder="🔍 방 제목 또는 닉네임 검색..." />
+      <button class="room-search-clear" id="room-search-clear">✕</button>
+    </div>
     <div class="rooms-wrap" id="rooms-list">
       <div class="room-empty">불러오는 중...</div>
     </div>

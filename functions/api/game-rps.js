@@ -134,13 +134,14 @@ export async function onRequestPost(context) {
   } catch { return json({ error: '서버 인증 실패' }, 500); }
   if (!user) return json({ error: '유효하지 않은 토큰' }, 401);
 
-  const { action, gameId, wager, choice } = body;
+  const { action, gameId, wager, choice, title } = body;
   const uid = user.localId;
 
   // ─── CREATE ───
   if (action === 'create') {
     const w = parseInt(wager);
     if (!w || w < 1 || w > 10) return json({ error: '배팅은 1~10 포인트' }, 400);
+    const roomTitle = (title || '').trim().slice(0, 20);
 
     const userDoc = await fsGet(`users/${uid}`, accessToken);
     if (!userDoc) return json({ error: '유저 정보 없음' }, 404);
@@ -150,6 +151,7 @@ export async function onRequestPost(context) {
     const newId = await fsCreate('games', {
       status: v('waiting'),
       wager: v(w),
+      title: v(roomTitle),
       player1: v({ uid, name: user.displayName || '익명', photo: user.photoUrl || '' }),
       player2: v(null),
       p1Submitted: v(false),
