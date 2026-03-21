@@ -336,16 +336,18 @@ function syncModal(game, isP1) {
 
   if (game.status === 'ready') {
     document.getElementById('chat-section').style.display = '';
-    const p1 = game.player1 || {}, p2 = game.player2 || {};
+    // 나를 항상 오른쪽에 배치
+    const me = isP1 ? (game.player1 || {}) : (game.player2 || {});
+    const opp = isP1 ? (game.player2 || {}) : (game.player1 || {});
     document.getElementById('vs-display').innerHTML = `
       <div class="rps-player">
-        <img class="rps-player-avatar" src="${p1.photo || ''}" onerror="this.src='/favicon.svg'" />
-        <span class="rps-player-name">${p1.name || '익명'}</span>
+        <img class="rps-player-avatar" src="${opp.photo || ''}" onerror="this.src='/favicon.svg'" />
+        <span class="rps-player-name">${opp.name || '익명'}</span>
       </div>
       <span class="rps-vs-text">VS</span>
       <div class="rps-player">
-        <img class="rps-player-avatar" src="${p2.photo || ''}" onerror="this.src='/favicon.svg'" />
-        <span class="rps-player-name">${p2.name || '익명'}</span>
+        <img class="rps-player-avatar" src="${me.photo || ''}" onerror="this.src='/favicon.svg'" />
+        <span class="rps-player-name" style="font-weight:800;color:var(--text-primary)">${me.name || '익명'} <span style="font-size:9px;color:#34d399">나</span></span>
       </div>`;
   }
   if (game.status === 'finished') showResult(game, isP1);
@@ -435,7 +437,7 @@ function openChat(gameId) {
   };
 
   sendBtn.onclick = doSend;
-  input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) doSend(); };
+  input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } };
 }
 
 function renderMessages(docs) {
