@@ -95,14 +95,16 @@ export async function onRequestPost(context) {
     parts.push({ text: prompt });
 
     const geminiBody = JSON.stringify({
+      system_instruction: {
+        parts: [{ text: '당신은 국가 수준의 시험을 10년 이상 출제해온 대학교수이자 교육평가 전문가입니다. 단순 암기 문제가 아닌, 학생의 진짜 이해도와 적용 능력을 정밀하게 측정하는 문제를 출제합니다. 출제한 모든 문제는 교육 전문가의 검토를 통과할 수 있는 수준이어야 합니다.' }]
+      },
       contents: [{ parts }],
       generationConfig: {
         responseMimeType: 'application/json',
-        temperature: 0.7,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-        // Vision 모드: 수식/도표 해석을 위해 약간의 thinking 허용
-        thinkingConfig: { thinkingBudget: isVisionMode ? 1024 : 0 },
+        temperature: 0.4,
+        topP: 0.9,
+        maxOutputTokens: 16384,
+        thinkingConfig: { thinkingBudget: isVisionMode ? 14000 : 10000 },
       },
       safetySettings: [
         { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
@@ -263,85 +265,91 @@ async function checkAndUpdateRateLimit(uid, env) {
 
 // ─── Build Prompt (복수 타입 지원, Vision 모드 포함) ───
 function buildPrompt(text, types, count, isVisionMode = false, language = 'ko') {
-  // 각 타입별 문제 수 분배
   const distribution = distributeCount(count, types);
 
   const typeDescriptions = {
     mcq: (n) => `
-객관식 ${n}개:
-- 4개의 선택지 (①②③④ 형식)
-- answer: "①" ~ "④" 중 하나
-- 예: {"type":"mcq","question":"...","options":["① ...","② ...","③ ...","④ ..."],"answer":"②","explanation":"..."}`,
+▶ 객관식(mcq) ${n}개
+형식: {"type":"mcq","question":"...","options":["① ...","② ...","③ ...","④ ..."],"answer":"②","explanation":"..."}
+- 선지는 ①②③④ 형식, answer는 "①"~"④" 중 하나
+- 오답 선지 필수 조건:
+  · 각 오답은 학생들이 자주 범하는 구체적 오개념을 반영할 것
+  · 정답과 미묘하게 다른 개념을 활용하여 단순히 '명백히 틀린' 선지를 만들지 말 것
+  · "모두 맞다", "모두 틀리다", "해당 없음" 등의 선지 절대 금지
+  · 선지 길이가 비슷해야 함 (정답만 유독 길거나 짧으면 안 됨)
+  · 선지 순서: 수치면 오름차순, 개념이면 논리적 순서`,
 
     short: (n) => `
-주관식 ${n}개:
-- 핵심 키워드 또는 간결한 문장으로 답
-- options 필드 없음
-- 예: {"type":"short","question":"...","answer":"...","explanation":"..."}`,
+▶ 주관식(short) ${n}개
+형식: {"type":"short","question":"...","answer":"...","explanation":"..."}
+- answer는 핵심 개념어 또는 명확한 단문(정답이 하나로 수렴해야 함)
+- 정답이 2가지 이상 가능한 문제 금지
+- options 필드 없음`,
 
     ox: (n) => `
-OX 퀴즈 ${n}개:
-- 참/거짓 판별 진술문
-- answer: "O" 또는 "X"
-- options 필드 없음
-- 예: {"type":"ox","question":"...","answer":"O","explanation":"..."}`
+▶ OX퀴즈(ox) ${n}개
+형식: {"type":"ox","question":"...","answer":"O","explanation":"..."}
+- 참/거짓이 100% 명확한 진술문만 사용
+- 부분적으로만 맞거나 모호한 진술 금지
+- answer는 "O" 또는 "X"
+- options 필드 없음`
   };
 
   const typeInstructions = types.map(t => typeDescriptions[t](distribution[t])).join('\n');
   const totalDesc = types.map(t => `${typeLabels[t]} ${distribution[t]}개`).join(', ');
 
   const visionNote = isVisionMode
-    ? `위에 첨부된 PDF 페이지 이미지들을 분석하여 수식, 도표, 그래프, 계산 과정을 포함한 문제를 출제하세요.${text ? '\n아래 추출된 텍스트도 함께 참고하세요.' : ''}\n이미지를 직접 보고 풀어야 하는 문제에는 반드시 "imageIndex": N (0부터 시작하는 이미지 순서 번호)을 포함하세요.\n`
+    ? `첨부된 PDF 페이지 이미지들을 면밀히 분석하여 수식, 도표, 그래프, 계산 과정을 포함한 문제를 출제하세요.${text ? '\n추출된 텍스트도 함께 참고하세요.' : ''}
+이미지를 직접 보고 풀어야 하는 문제에는 반드시 "imageIndex": N (0부터 시작하는 이미지 순서 번호)을 포함하세요.\n`
     : '';
 
-  const textSection = text
-    ? `[학습 자료]\n${text}\n\n`
-    : '';
-
+  const textSection = text ? `━━━ 학습 자료 ━━━\n${text}\n━━━━━━━━━━━━━━━━\n\n` : '';
   const langRule = language === 'en'
-    ? '1. All questions, options, answers, and explanations must be written in English.'
-    : '1. 반드시 한국어로 작성하세요.';
+    ? 'L1. ALL text (questions, options, answers, explanations) must be in English.'
+    : 'L1. 모든 내용을 반드시 한국어로 작성하세요.';
 
-  return `당신은 대학교 시험을 전문으로 출제하는 교수입니다.
-${isVisionMode ? '첨부된 PDF 이미지와 텍스트 자료' : '아래 텍스트'}를 바탕으로 대학생 수준의 시험 문제 총 ${count}개를 생성해주세요.
+  return `${isVisionMode ? '첨부된 PDF 이미지와 텍스트 자료' : '아래 학습 자료'}를 바탕으로 대학생 수준의 고품질 시험 문제 ${count}개를 생성하세요.
 
-${visionNote}${textSection}[생성할 문제]
-${totalDesc}
+${visionNote}${textSection}━━━ 생성할 문제 구성 ━━━
+${totalDesc} (총 ${count}개)
 
-[각 유형별 형식]
+━━━ 유형별 형식 ━━━
 ${typeInstructions}
 
-[작성 규칙]
+━━━ 문제 품질 기준 (반드시 준수) ━━━
 ${langRule}
-2. 교재의 핵심 개념과 중요 원리를 다루는 문제를 만드세요.
-3. 수식, 계산, 도표가 있다면 해당 내용을 문제에 반영하세요.
-4. 문제는 서로 중복되지 않아야 합니다.
-5. explanation은 왜 정답인지 명확히 설명해야 합니다.
-   - 객관식(mcq) 문제의 경우, 각 선지(①②③④)마다 반드시 \\n\\n으로 구분하여 개별 해설을 작성하세요.
-   - 예시: "① ...이므로 옳다.\\n\\n② ...이므로 틀리다.\\n\\n③ ...이므로 옳다."
-6. 반드시 아래 JSON 형식으로만 응답하세요. 추가 텍스트 없이 순수 JSON만 반환하세요.
-7. Vision 모드에서 이미지를 직접 보고 풀어야 하는 문제:
-   - 반드시 "imageIndex": N 필드를 포함하세요 (N은 0부터 시작하는 이미지 번호)
-   - question에는 "아래 그래프/표/그림을 보고 답하시오." 같은 참조 문구를 넣으세요.
-   - 이미지 참조 없이도 답할 수 있는 문제에는 imageIndex를 넣지 마세요.
-8. question 필드는 마크다운 형식으로 작성하세요:
-   - 표 형태의 자료는 반드시 마크다운 표(| 헤더 | 헤더 | 형식)로 작성하세요.
-   - 수식은 **굵게** 형식으로 강조하세요.
-   - [자료], [문제], [조건], [보기] 같은 대괄호 레이블은 절대 사용하지 마세요. 자료나 조건이 있으면 그냥 본문에 자연스럽게 서술하거나 줄바꿈으로 구분하세요.
-9. question 필드에 절대 포함하지 말아야 할 것:
-   - 공식, 수식, 계산 방법, 풀이 과정 (예: E(r) = Σ..., σ(r) = ... 같은 수식)
-     → 학생이 직접 알고 있어야 하는 내용이므로 절대 문제에 제시하지 마세요.
-   - [계산 과정], [공식], [풀이] 등 원문에 있는 공식 섹션도 그대로 복사하지 마세요.
-   - 선지 번호 (①②③④ 또는 A/B/C/D 등). 선지는 반드시 options 배열에만 넣으세요.
-   ※ 단, 숫자 데이터가 담긴 표나 [자료] 섹션은 포함해도 됩니다.
-10. JSON 형식 주의사항:
-   - JSON 문자열 값 안의 줄바꿈은 반드시 \\n으로 표시하세요 (실제 줄바꿈 문자 사용 금지)
-   - 쌍따옴표(")는 반드시 \\"로 이스케이프하세요.
+L2. 【인지 수준 분배】전체 문제 중:
+   - 단순 암기(정의·용어 재현): 최대 30%
+   - 이해·적용(개념 설명, 다른 상황에 적용): 최소 40%
+   - 분석·평가(원인 분석, 비교·판단, 계산 해석): 최소 30%
+L3. 【내용 범위】학습 자료 전체를 고르게 다루세요. 한 주제에만 집중하지 마세요.
+L4. 【문제 독립성】각 문제는 다른 문제를 풀지 않아도 독립적으로 풀 수 있어야 합니다.
+L5. 【중복 금지】동일 개념을 묻는 문제를 반복 출제하지 마세요.
+L6. 【question 작성 규칙】
+   - 마크다운 형식: 표는 | col | col | 형식, 강조는 **굵게**
+   - 수식·공식·풀이 과정을 문제 본문에 직접 넣지 말 것 (학생이 알고 있어야 하는 내용)
+   - [자료], [조건], [보기] 같은 대괄호 레이블 사용 금지
+   - 선지 번호(①②③④)를 question 안에 넣지 말 것 (options 배열에만)
+   ※ 단, 숫자/수치 데이터가 담긴 표는 포함 가능
+L7. 【explanation 작성 규칙】
+   - 단순히 "정답은 ~이다" 반복 금지
+   - 정답인 이유를 원리·메커니즘 중심으로 설명할 것
+   - 객관식: 각 선지(①②③④)마다 맞고 틀린 이유를 반드시 \\n\\n으로 구분하여 개별 설명
+     예: "① ~이므로 옳다.\\n\\n② ~이므로 틀리다. ~의 개념과 혼동하기 쉬운데...\\n\\n③ ..."
+   - 관련 핵심 개념이나 원리를 해설에 포함하여 학습 가이드 역할을 하게 할 것${isVisionMode ? `
+L8. 【이미지 참조】이미지를 보고 풀어야 하는 문제:
+   - "imageIndex": N 필드 필수 (N은 0부터 시작)
+   - question에 "위 그래프/표/그림을 참고하여..." 참조 문구 포함
+   - 이미지 없이도 풀 수 있는 문제에는 imageIndex 넣지 말 것` : ''}
 
-[응답 형식]
-{"questions": [ ...문제 배열... ]}
+━━━ JSON 출력 형식 ━━━
+- 순수 JSON만 반환 (```나 추가 텍스트 일절 금지)
+- 문자열 내 줄바꿈: \\n 사용 (실제 개행 문자 금지)
+- 쌍따옴표: \\" 로 이스케이프
 
-정확히 총 ${count}개의 문제를 생성하세요.`;
+{"questions": [ ...${count}개의 문제 객체... ]}
+
+정확히 ${count}개를 생성하세요.`;
 }
 
 const typeLabels = { mcq: '객관식', short: '주관식', ox: 'OX 퀴즈' };
