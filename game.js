@@ -5,7 +5,8 @@
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
 import { db } from './auth.js';
 import {
-  collection, doc, query, where, limit, onSnapshot
+  collection, doc, query, where, limit, onSnapshot,
+  addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 let currentUser = null;
@@ -16,6 +17,7 @@ let roomsListener = null;       // 방 목록 구독 해제 함수
 let pendingListener = null;     // 내 방 대기 구독
 let countdownInterval = null;   // 방 만료 타이머
 let allRoomDocs = [];           // 전체 방 목록 (검색 필터링용)
+let chatListener = null;        // 채팅 onSnapshot 구독
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
 
@@ -320,6 +322,8 @@ function openGameModal(gameId, isP1) {
   document.querySelectorAll('.rps-btn').forEach(b => { b.disabled = false; b.classList.remove('selected'); });
   document.getElementById('rps-status').textContent = '';
 
+  openChat(gameId);
+
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
   activeGameListener = onSnapshot(doc(db, 'games', gameId), snap => {
     if (!snap.exists()) return;
@@ -331,6 +335,7 @@ function syncModal(game, isP1) {
   document.getElementById('c-wager').textContent = game.wager;
 
   if (game.status === 'ready') {
+    document.getElementById('chat-section').style.display = '';
     const p1 = game.player1 || {}, p2 = game.player2 || {};
     document.getElementById('vs-display').innerHTML = `
       <div class="rps-player">
@@ -400,10 +405,65 @@ async function submitChoice(choice) {
   if (data.error) showToast(data.error, 'error');
 }
 
+// ─── 채팅 오픈 ───
+function openChat(gameId) {
+  if (chatListener) { chatListener(); chatListener = null; }
+  document.getElementById('chat-section').style.display = '';
+
+  const q = query(
+    collection(db, 'games', gameId, 'messages'),
+    orderBy('createdAt', 'asc'),
+    limit(100)
+  );
+  chatListener = onSnapshot(q, snap => renderMessages(snap.docs));
+
+  const input = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('chat-send-btn');
+
+  const doSend = async () => {
+    const text = input.value.trim();
+    if (!text || !currentUser) return;
+    input.value = '';
+    try {
+      await addDoc(collection(db, 'games', gameId, 'messages'), {
+        uid: currentUser.uid,
+        name: currentUserData?.nickname || currentUser.displayName || '익명',
+        text: text.slice(0, 100),
+        createdAt: serverTimestamp(),
+      });
+    } catch (e) { console.error('chat send error', e); }
+  };
+
+  sendBtn.onclick = doSend;
+  input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) doSend(); };
+}
+
+function renderMessages(docs) {
+  const container = document.getElementById('chat-messages');
+  if (!container) return;
+  if (!docs.length) {
+    container.innerHTML = '<div class="chat-empty">상대방과 채팅해보세요 💬</div>';
+    return;
+  }
+  container.innerHTML = docs.map(d => {
+    const m = d.data();
+    const isMine = m.uid === currentUser?.uid;
+    const name = isMine ? '' : `<span class="chat-msg-name">${escapeHtml(m.name || '익명')}</span>`;
+    return `<div class="chat-msg ${isMine ? 'mine' : 'other'}">${name}<div class="chat-bubble">${escapeHtml(m.text)}</div></div>`;
+  }).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ─── 모달 닫기 ───
 function closeModal() {
   document.getElementById('game-modal').classList.remove('visible');
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
+  if (chatListener) { chatListener(); chatListener = null; }
+  document.getElementById('chat-section').style.display = 'none';
   activeGameId = null;
 }
 

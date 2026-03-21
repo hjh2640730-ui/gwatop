@@ -110,6 +110,25 @@
     .rps-point-change.win { color: #34d399; }
     .rps-point-change.lose { color: #ef4444; }
     .rps-point-change.draw { color: var(--text-muted); }
+
+    /* Chat */
+    .chat-section { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-md); margin: 10px 0 14px; overflow: hidden; }
+    .chat-messages { height: 150px; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; scroll-behavior: smooth; }
+    .chat-messages::-webkit-scrollbar { width: 3px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 2px; }
+    .chat-msg { display: flex; flex-direction: column; max-width: 78%; }
+    .chat-msg.mine { align-self: flex-end; align-items: flex-end; }
+    .chat-msg.other { align-self: flex-start; }
+    .chat-msg-name { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+    .chat-bubble { padding: 7px 11px; border-radius: 14px; font-size: 13px; line-height: 1.4; word-break: break-word; }
+    .chat-msg.mine .chat-bubble { background: rgba(52,211,153,0.18); color: var(--text-primary); border-bottom-right-radius: 4px; }
+    .chat-msg.other .chat-bubble { background: rgba(255,255,255,0.07); color: var(--text-primary); border-bottom-left-radius: 4px; }
+    .chat-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 20px 0; }
+    .chat-input-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--glass-border); }
+    .chat-input { flex: 1; background: transparent; border: none; outline: none; font-family: var(--font); font-size: 13px; color: var(--text-primary); min-width: 0; }
+    .chat-input::placeholder { color: var(--text-muted); }
+    .chat-send-btn { background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.3); border-radius: var(--radius-sm); color: #34d399; font-size: 13px; font-weight: 700; padding: 5px 12px; cursor: pointer; font-family: var(--font); transition: all var(--transition); flex-shrink: 0; }
+    .chat-send-btn:hover { background: rgba(52,211,153,0.25); }
   </style>
 </head>
 <body>
@@ -207,6 +226,17 @@
       <div id="state-choose">
         <div class="rps-vs" id="vs-display"></div>
         <div class="rps-wager">🟢 배팅: <span id="c-wager">0</span>P</div>
+        <!-- 채팅 -->
+        <div class="chat-section" id="chat-section" style="display:none">
+          <div class="chat-messages" id="chat-messages">
+            <div class="chat-empty">상대방과 채팅해보세요 💬</div>
+          </div>
+          <div class="chat-input-row">
+            <input class="chat-input" id="chat-input" type="text" placeholder="메시지 입력..." maxlength="100" />
+            <button class="chat-send-btn" id="chat-send-btn">전송</button>
+          </div>
+        </div>
+
         <div class="rps-choices">
           <button class="rps-btn" data-choice="가위"><span class="rps-emoji">✌️</span>가위</button>
           <button class="rps-btn" data-choice="바위"><span class="rps-emoji">✊</span>바위</button>
