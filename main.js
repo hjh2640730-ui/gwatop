@@ -303,6 +303,9 @@ async function generateQuiz() {
   const count = parseInt(countSlider?.value || 15);
   const lang = document.querySelector('input[name="quiz-lang"]:checked')?.value || 'ko';
 
+  const preventUnload = e => { e.preventDefault(); e.returnValue = ''; };
+  window.addEventListener('beforeunload', preventUnload);
+
   showLoading(true);
   generateBtn.disabled = true;
   setLoadingStep(1, '📖 PDF 텍스트 읽는 중...', 'PDF에서 글자와 내용을 추출합니다');
@@ -396,6 +399,7 @@ async function generateQuiz() {
     generateBtn.disabled = false;
   } finally {
     showLoading(false);
+    window.removeEventListener('beforeunload', preventUnload);
   }
 }
 

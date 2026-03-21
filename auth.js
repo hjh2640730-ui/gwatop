@@ -389,3 +389,37 @@ function _updateNavAvatar(photoURL, displayName) {
 }
 
 export { isConfigured, auth, db, app };
+
+// ─── 게임 대기 중 크로스페이지 알림 배지 ───
+(function initGameBadge() {
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname === '/game.html') return;
+
+  function checkAndShow() {
+    if (document.getElementById('game-active-badge')) return;
+    const stored = localStorage.getItem('gwatop_active_game');
+    if (!stored) return;
+    try {
+      const d = JSON.parse(stored);
+      if (!d?.gameId) return;
+    } catch { return; }
+
+    const badge = document.createElement('a');
+    badge.id = 'game-active-badge';
+    badge.href = '/game.html';
+    badge.innerHTML = '✊ <span>게임 대기 중 · 탭하여 이동</span> <span style="margin-left:2px;opacity:0.7">→</span>';
+    document.body.appendChild(badge);
+  }
+
+  function checkAndHide() {
+    const stored = localStorage.getItem('gwatop_active_game');
+    if (!stored) document.getElementById('game-active-badge')?.remove();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkAndShow);
+  } else {
+    checkAndShow();
+  }
+  window.addEventListener('storage', () => { checkAndHide(); checkAndShow(); });
+})();

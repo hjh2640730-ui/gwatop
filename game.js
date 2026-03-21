@@ -14,6 +14,7 @@ let activeGameId = null;        // 현재 진행 중인 게임 ID
 let activeGameListener = null;  // onSnapshot 구독 해제 함수
 let roomsListener = null;       // 방 목록 구독 해제 함수
 let pendingListener = null;     // 내 방 대기 구독
+let countdownInterval = null;   // 방 만료 타이머
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
 
@@ -40,6 +41,12 @@ function init() {
       lo.style.display = '';
       li.style.display = 'none';
       document.getElementById('my-fp').textContent = '로그인 필요';
+      const bar = document.getElementById('game-fp-bar');
+      if (bar) {
+        bar.style.cursor = 'pointer';
+        bar.title = '로그인하면 무료 포인트를 확인할 수 있어요';
+        bar.onclick = openLoginModal;
+      }
     }
     loadRooms();
   });
@@ -137,9 +144,18 @@ function checkActiveGame() {
   });
 }
 
+// ─── 방 만료까지 남은 분 계산 ───
+function getRemainingMin(createdAt) {
+  if (!createdAt) return 10;
+  const t = typeof createdAt === 'string' ? new Date(createdAt) : (createdAt.toDate?.() || new Date());
+  return Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - t.getTime())) / 60000));
+}
+
 // ─── 방 목록 (실시간) ───
 function loadRooms() {
   if (roomsListener) { roomsListener(); roomsListener = null; }
+  if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+
   const q = query(collection(db, 'games'), where('status', '==', 'waiting'), limit(15));
   roomsListener = onSnapshot(q, snap => {
     const list = document.getElementById('rooms-list');
@@ -159,6 +175,7 @@ function loadRooms() {
       const g = d.data();
       const isMine = currentUser && g.player1?.uid === currentUser.uid;
       if (isMine) {
+        const remaining = getRemainingMin(g.createdAt);
         return `<div class="room-card mine">
           <div class="room-card-left">
             <img class="room-avatar" src="${g.player1?.photo || ''}" onerror="this.src='/favicon.svg'" />
@@ -167,7 +184,7 @@ function loadRooms() {
                 <span class="room-name" style="color:var(--text-primary)">내 방</span>
                 <span class="room-mine-badge">대기 중</span>
               </div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">상대방을 기다리는 중...</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">상대방 기다리는 중 · <span class="room-expire-min">${remaining}</span>분 후 만료</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
@@ -193,6 +210,19 @@ function loadRooms() {
     list.querySelectorAll('.cancel-inline-btn').forEach(btn => {
       btn.addEventListener('click', () => cancelRoomById(btn.dataset.id));
     });
+
+    // 만료 카운트다운 매 분 갱신
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+      list.querySelectorAll('.room-expire-min').forEach(el => {
+        const card = el.closest('.room-card.mine');
+        if (!card) return;
+        const current = parseInt(el.textContent);
+        if (current <= 0) return;
+        el.textContent = current - 1;
+        if (current - 1 <= 2) el.style.color = '#ef4444';
+      });
+    }, 60000);
   });
 }
 

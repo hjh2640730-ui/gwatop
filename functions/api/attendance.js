@@ -102,7 +102,7 @@ export async function onRequestPost(context) {
         {
           transform: {
             document: `${DOC_BASE}/users/${uid}`,
-            fieldTransforms: [{ fieldPath: 'freePoints', increment: { integerValue: '1' } }],
+            fieldTransforms: [{ fieldPath: 'freePoints', increment: { integerValue: '3' } }],
           },
         },
       ],
