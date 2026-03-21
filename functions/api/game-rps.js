@@ -110,6 +110,11 @@ function fromFs(fields) {
   return r;
 }
 
+async function hashPassword(pwd) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('gwatop:' + pwd));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 function determineWinner(c1, c2) {
   if (c1 === c2) return 'draw';
   if ((c1 === '가위' && c2 === '보') || (c1 === '바위' && c2 === '가위') || (c1 === '보' && c2 === '바위')) return 'p1';
@@ -134,7 +139,7 @@ export async function onRequestPost(context) {
   } catch { return json({ error: '서버 인증 실패' }, 500); }
   if (!user) return json({ error: '유효하지 않은 토큰' }, 401);
 
-  const { action, gameId, wager, choice, title } = body;
+  const { action, gameId, wager, choice, title, password } = body;
   const uid = user.localId;
 
   // ─── CREATE ───
@@ -142,6 +147,8 @@ export async function onRequestPost(context) {
     const w = parseInt(wager);
     if (!w || w < 1 || w > 10) return json({ error: '배팅은 1~10 포인트' }, 400);
     const roomTitle = (title || '').trim().slice(0, 20);
+    const roomPw = (password || '').trim().slice(0, 20);
+    const passwordHash = roomPw ? await hashPassword(roomPw) : '';
 
     const userDoc = await fsGet(`users/${uid}`, accessToken);
     if (!userDoc) return json({ error: '유저 정보 없음' }, 404);
@@ -152,6 +159,8 @@ export async function onRequestPost(context) {
       status: v('waiting'),
       wager: v(w),
       title: v(roomTitle),
+      hasPassword: v(!!roomPw),
+      passwordHash: v(passwordHash),
       player1: v({ uid, name: user.displayName || '익명', photo: user.photoUrl || '' }),
       player2: v(null),
       p1Submitted: v(false),
@@ -181,6 +190,11 @@ export async function onRequestPost(context) {
     if (game.status !== 'waiting') return json({ error: '이미 시작된 게임' }, 400);
     if (game.player1?.uid === uid) return json({ error: '자신의 방에는 입장할 수 없습니다' }, 400);
     if ((userData.freePoints || 0) < game.wager) return json({ error: '무료 포인트가 부족합니다' }, 400);
+    if (game.hasPassword) {
+      if (!password) return json({ error: '비밀번호가 필요합니다' }, 403);
+      const inputHash = await hashPassword((password || '').trim().slice(0, 20));
+      if (inputHash !== game.passwordHash) return json({ error: '비밀번호가 틀렸습니다' }, 403);
+    }
 
     const ok = await fsPatch(`games/${gameId}`, {
       status: v('ready'),

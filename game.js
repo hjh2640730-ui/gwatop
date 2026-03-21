@@ -18,6 +18,7 @@ let pendingListener = null;     // 내 방 대기 구독
 let countdownInterval = null;   // 방 만료 타이머
 let allRoomDocs = [];           // 전체 방 목록 (검색 필터링용)
 let chatListener = null;        // 채팅 onSnapshot 구독
+let pendingJoinGameId = null;   // 비밀번호 입력 대기 중인 방 ID
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
 
@@ -79,6 +80,34 @@ function setupUI() {
   const titleCount = document.getElementById('room-title-count');
   titleInput?.addEventListener('input', () => { titleCount.textContent = titleInput.value.length; });
 
+  // 비밀번호 show/hide
+  const pwInput = document.getElementById('room-pw-input');
+  document.getElementById('room-pw-toggle')?.addEventListener('click', () => {
+    pwInput.type = pwInput.type === 'password' ? 'text' : 'password';
+  });
+
+  // 입장 비밀번호 모달
+  const joinPwInput = document.getElementById('join-pw-input');
+  document.getElementById('join-pw-toggle')?.addEventListener('click', () => {
+    joinPwInput.type = joinPwInput.type === 'password' ? 'text' : 'password';
+  });
+  document.getElementById('join-pw-confirm')?.addEventListener('click', () => {
+    const pw = joinPwInput.value.trim();
+    if (!pw) { showToast('비밀번호를 입력해주세요', 'warning'); return; }
+    closeJoinPwModal();
+    joinRoom(pendingJoinGameId, pw);
+  });
+  document.getElementById('join-pw-cancel')?.addEventListener('click', closeJoinPwModal);
+  joinPwInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const pw = joinPwInput.value.trim();
+      if (!pw) return;
+      closeJoinPwModal();
+      joinRoom(pendingJoinGameId, pw);
+    }
+  });
+
   // 방 검색
   const searchInput = document.getElementById('room-search');
   const searchWrap = document.getElementById('room-search-wrap');
@@ -106,11 +135,13 @@ function setupUI() {
     btn.disabled = true;
     btn.textContent = '생성 중...';
     const title = titleInput?.value.trim() || '';
-    await createRoom(wager, title);
+    const password = pwInput?.value.trim() || '';
+    await createRoom(wager, title, password);
     btn.disabled = false;
     btn.textContent = '✊ 방 만들기';
     if (titleInput) titleInput.value = '';
     if (titleCount) titleCount.textContent = '0';
+    if (pwInput) pwInput.value = '';
   });
 
   // 게임 모달: 결과 닫기
@@ -199,9 +230,10 @@ function renderRooms(docs) {
   list.innerHTML = docs.map(d => {
     const g = d.data();
     const isMine = currentUser && g.player1?.uid === currentUser.uid;
+    const lockBadge = g.hasPassword ? ' <span class="room-lock-badge">🔒 비공개</span>' : '';
     const titleHtml = g.title
-      ? `<div class="room-title-on-card">${g.title}</div><div class="room-host-name">${g.player1?.name || '익명'}</div>`
-      : `<div class="room-title-on-card">${g.player1?.name || '익명'}의 방</div>`;
+      ? `<div class="room-title-on-card">${g.title}${lockBadge}</div><div class="room-host-name">${g.player1?.name || '익명'}</div>`
+      : `<div class="room-title-on-card">${g.player1?.name || '익명'}의 방${lockBadge}</div>`;
     if (isMine) {
       const remaining = getRemainingMin(g.createdAt);
       return `<div class="room-card mine">
@@ -229,7 +261,11 @@ function renderRooms(docs) {
   }).join('');
 
   list.querySelectorAll('.room-card:not(.mine)').forEach(card => {
-    card.addEventListener('click', () => joinRoom(card.dataset.id));
+    card.addEventListener('click', () => {
+      const doc = allRoomDocs.find(d => d.id === card.dataset.id);
+      if (doc?.data().hasPassword) openJoinPwModal(card.dataset.id);
+      else joinRoom(card.dataset.id);
+    });
   });
   list.querySelectorAll('.cancel-inline-btn').forEach(btn => {
     btn.addEventListener('click', () => cancelRoomById(btn.dataset.id));
@@ -266,12 +302,12 @@ function loadRooms() {
 }
 
 // ─── 방 만들기 ───
-async function createRoom(wager, title = '') {
+async function createRoom(wager, title = '', password = '') {
   const idToken = await currentUser.getIdToken();
   const res = await fetch('/api/game-rps', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'create', wager, title }),
+    body: JSON.stringify({ action: 'create', wager, title, password }),
   });
   const data = await res.json();
   if (data.error) { showToast(data.error, 'error'); return; }
@@ -284,15 +320,27 @@ async function createRoom(wager, title = '') {
   checkActiveGame();
 }
 
+// ─── 비밀번호 모달 ───
+function openJoinPwModal(gameId) {
+  pendingJoinGameId = gameId;
+  const input = document.getElementById('join-pw-input');
+  if (input) { input.value = ''; input.type = 'password'; }
+  document.getElementById('join-pw-modal').classList.add('visible');
+  setTimeout(() => input?.focus(), 100);
+}
+function closeJoinPwModal() {
+  document.getElementById('join-pw-modal').classList.remove('visible');
+  pendingJoinGameId = null;
+}
+
 // ─── 방 입장 ───
-async function joinRoom(gameId) {
+async function joinRoom(gameId, password = '') {
   if (!currentUser) { openLoginModal(); return; }
-  const fp = currentUserData?.freePoints ?? 0;
   const idToken = await currentUser.getIdToken();
   const res = await fetch('/api/game-rps', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'join', gameId }),
+    body: JSON.stringify({ action: 'join', gameId, password }),
   });
   const data = await res.json();
   if (data.error) { showToast(data.error, 'error'); return; }
