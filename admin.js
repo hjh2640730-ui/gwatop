@@ -1253,6 +1253,9 @@ function renderMonitor(data) {
   document.getElementById('mon-posts-label').textContent  = `${data.totalPosts} / 10,000 (${postsRatio.toFixed(1)}%)`;
   document.getElementById('mon-kv-label').textContent     = `${(data.estimatedDailyKvReads||0).toLocaleString()} / 100,000 (${kvRatio.toFixed(1)}%)`;
 
+  // 로드맵
+  renderRoadmap(data);
+
   // 경고 (조치 방법 포함)
   const warningsEl = document.getElementById('monitor-warnings');
   if (!data.warnings || data.warnings.length === 0) {
@@ -1269,6 +1272,91 @@ function renderMonitor(data) {
       </div>`;
     }).join('');
   }
+}
+
+function renderRoadmap(data) {
+  // Firebase 월 예상 비용 계산
+  const monthlyReads  = (data.estimatedDailyReads  || 0) * 30;
+  const monthlyWrites = (data.estimatedDailyWrites || 0) * 30;
+  const freeReads  = 1500000, freeWrites = 600000;
+  const KRW_PER_USD = 1500;
+  const readsCost  = Math.max(0, monthlyReads  - freeReads)  / 100000 * 0.06 * KRW_PER_USD;
+  const writesCost = Math.max(0, monthlyWrites - freeWrites) / 100000 * 0.18 * KRW_PER_USD;
+  const firebaseMonthlyCost = Math.round(readsCost + writesCost);
+
+  const costEl = document.getElementById('mon-firebase-monthly-cost');
+  if (costEl) {
+    costEl.textContent = firebaseMonthlyCost === 0
+      ? '₩0 (무료 티어 내)'
+      : `₩${firebaseMonthlyCost.toLocaleString()}/월`;
+  }
+
+  // 현재 단계 판단
+  const readsRatio  = (data.estimatedDailyReads  || 0) / 50000;
+  const postsRatio  = (data.totalPosts           || 0) / 10000;
+  let currentStage = 0;
+  if (firebaseMonthlyCost >= 150000)                         currentStage = 3;
+  else if (firebaseMonthlyCost >= 100000 || readsRatio >= 0.8) currentStage = 2;
+  else if (readsRatio >= 0.6 || postsRatio >= 0.7)           currentStage = 1;
+
+  const stages = [
+    {
+      label: '1단계 · 초기',
+      color: '#34d399',
+      desc: 'Firebase 무료 티어 내 운영',
+      trigger: 'Firestore 읽기 < 60% · 게시글 < 7,000개',
+      action: '현재 구조 유지. 모니터링 계속.',
+      done: currentStage >= 0,
+      active: currentStage === 0,
+    },
+    {
+      label: '2단계 · 성장 주의',
+      color: '#fbbf24',
+      desc: 'Firestore 읽기 60% 초과 or 게시글 7,000개 이상',
+      trigger: `현재: 읽기 ${((readsRatio)*100).toFixed(1)}% · 게시글 ${data.totalPosts || 0}개`,
+      action: '📧 이메일 알림 발송됨 — Gemini 유료 전환 준비, Algolia → Firestore 검색 교체 검토',
+      done: currentStage >= 1,
+      active: currentStage === 1,
+    },
+    {
+      label: '3단계 · 유료 전환',
+      color: '#f97316',
+      desc: 'Firebase 월 비용 ₩100,000 초과 or 읽기 80% 초과',
+      trigger: `현재 월 예상 비용: ₩${firebaseMonthlyCost.toLocaleString()}`,
+      action: '📧 이메일 알림 발송됨 — Algolia 교체 즉시 실행, Cloudflare Workers Paid 업그레이드',
+      done: currentStage >= 2,
+      active: currentStage === 2,
+    },
+    {
+      label: '4단계 · 서버 이전 준비',
+      color: '#ef4444',
+      desc: 'Firebase 월 비용 ₩150,000 초과',
+      trigger: '기준: ₩150,000/월',
+      action: '📧 이메일 알림 발송됨 — Firebase → 자체 서버 + PostgreSQL 병렬 이전 시작 (서비스 중단 없음)',
+      done: currentStage >= 3,
+      active: currentStage === 3,
+    },
+  ];
+
+  const roadmapEl = document.getElementById('mon-roadmap');
+  if (!roadmapEl) return;
+  roadmapEl.innerHTML = stages.map((s, i) => {
+    const isActive = s.active;
+    const isPast   = s.done && !s.active;
+    const isFuture = !s.done;
+    const bg     = isActive ? `rgba(${s.color === '#34d399' ? '52,211,153' : s.color === '#fbbf24' ? '251,191,36' : s.color === '#f97316' ? '249,115,22' : '239,68,68'},0.08)` : 'rgba(255,255,255,0.02)';
+    const border = isActive ? s.color : 'rgba(255,255,255,0.07)';
+    const dot    = isPast ? '#34d399' : isActive ? s.color : 'rgba(255,255,255,0.15)';
+    const icon   = isPast ? '✅' : isActive ? '📍' : '⬜';
+    return `<div style="display:flex;gap:14px;padding:14px 16px;background:${bg};border:1px solid ${border};border-radius:10px">
+      <div style="width:10px;height:10px;border-radius:50%;background:${dot};margin-top:4px;flex-shrink:0"></div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:${isActive ? s.color : isFuture ? 'var(--text-muted)' : 'var(--text-primary)'};margin-bottom:2px">${icon} ${s.label}${isActive ? ' ← 현재' : ''}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:${isActive ? '8px' : '0'}">${isActive ? s.trigger : s.desc}</div>
+        ${isActive ? `<div style="font-size:12px;color:var(--text-secondary);line-height:1.5">👉 ${s.action}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 init();
