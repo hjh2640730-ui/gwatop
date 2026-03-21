@@ -19,7 +19,8 @@ let countdownInterval = null;   // 방 만료 타이머
 let allRoomDocs = [];           // 전체 방 목록 (검색 필터링용)
 let chatListener = null;        // 채팅 onSnapshot 구독
 let pendingJoinGameId = null;   // 비밀번호 입력 대기 중인 방 ID
-let lastGameWager = 1;          // 재대결용 마지막 wager 기억
+let resultShown = false;         // 결과 중복 렌더 방지
+let lastIsP1 = false;           // 현재 게임에서 내가 p1인지
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
 
@@ -157,10 +158,55 @@ function setupUI() {
   // 재대결 신청
   document.getElementById('rematch-btn')?.addEventListener('click', async () => {
     if (!currentUser) { openLoginModal(); return; }
+    const wager = parseInt(document.getElementById('rematch-wager-input').value);
+    if (!wager || wager < 1 || wager > 10) { showToast('배팅은 1~10P', 'warning'); return; }
     const fp = currentUserData?.freePoints ?? 0;
-    if (fp < lastGameWager) { showToast(`무료 포인트 부족 (보유: ${fp}P)`, 'error'); return; }
+    if (fp < wager) { showToast(`무료 포인트 부족 (보유: ${fp}P)`, 'error'); return; }
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch('/api/game-rps', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rematch_request', gameId: activeGameId, wager }),
+    });
+    const data = await res.json();
+    if (data.error) { showToast(data.error, 'error'); return; }
+    showRematchSection('pending', wager);
+  });
+
+  // 신청 취소
+  document.getElementById('rematch-cancel-btn')?.addEventListener('click', async () => {
+    const idToken = await currentUser.getIdToken();
+    await fetch('/api/game-rps', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rematch_decline', gameId: activeGameId }),
+    });
+    showRematchSection('request');
+  });
+
+  // 수락
+  document.getElementById('rematch-accept-btn')?.addEventListener('click', async () => {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch('/api/game-rps', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rematch_accept', gameId: activeGameId }),
+    });
+    const data = await res.json();
+    if (data.error) { showToast(data.error, 'error'); return; }
     closeModal();
-    await createRoom(lastGameWager);
+    openGameModal(data.newGameId, data.isP1);
+  });
+
+  // 거절
+  document.getElementById('rematch-decline-btn')?.addEventListener('click', async () => {
+    const idToken = await currentUser.getIdToken();
+    await fetch('/api/game-rps', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rematch_decline', gameId: activeGameId }),
+    });
+    showRematchSection('request');
   });
 
   // 가위바위보 선택
@@ -376,6 +422,8 @@ async function cancelRoomById(gameId) {
 // ─── 게임 모달 오픈 (선택 단계) ───
 function openGameModal(gameId, isP1) {
   activeGameId = gameId;
+  resultShown = false;
+  lastIsP1 = isP1;
   document.getElementById('game-modal').classList.add('visible');
 
   // 리스너 먼저 연결
@@ -431,7 +479,40 @@ function syncModal(game, isP1) {
     }
   }
 
-  if (game.status === 'finished') showResult(game, isP1);
+  if (game.status === 'finished') {
+    if (!resultShown) {
+      resultShown = true;
+      showResult(game, isP1);
+    }
+    // 재대결 신청 상태 실시간 반영
+    const rr = game.rematchRequest;
+    if (!rr) return;
+    if (rr.status === 'pending') {
+      if (rr.fromUid === currentUser?.uid) {
+        showRematchSection('pending', rr.wager);
+      } else {
+        showRematchSection('incoming');
+        document.getElementById('rematch-incoming-text').textContent =
+          `${rr.fromName || '상대방'}이 재대결을 신청했습니다! (${rr.wager}P)`;
+      }
+    } else if (rr.status === 'accepted' && rr.newGameId && rr.fromUid === currentUser?.uid) {
+      // 신청자: 수락됐으면 새 게임으로 이동
+      closeModal();
+      openGameModal(rr.newGameId, game.player1?.uid === currentUser.uid);
+    } else if (rr.status === 'declined' && rr.fromUid === currentUser?.uid) {
+      showRematchSection('request');
+      showToast('상대방이 재대결을 거절했습니다', 'warning');
+    }
+  }
+}
+
+function showRematchSection(section, wager) {
+  document.getElementById('rematch-request-section').style.display  = section === 'request'  ? '' : 'none';
+  document.getElementById('rematch-pending-section').style.display  = section === 'pending'  ? '' : 'none';
+  document.getElementById('rematch-incoming-section').style.display = section === 'incoming' ? '' : 'none';
+  if (section === 'pending' && wager) {
+    document.getElementById('rematch-pending-text').textContent = `재대결 신청 중... (${wager}P)`;
+  }
 }
 
 function showState(state) {

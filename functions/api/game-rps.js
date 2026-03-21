@@ -282,6 +282,89 @@ export async function onRequestPost(context) {
     }
   }
 
+  // ─── REMATCH REQUEST ───
+  if (action === 'rematch_request') {
+    if (!gameId || !wager) return json({ error: 'gameId, wager 필요' }, 400);
+    const w = parseInt(wager);
+    if (!w || w < 1 || w > 10) return json({ error: '배팅은 1~10 포인트' }, 400);
+    const [gameDoc, userDoc] = await Promise.all([
+      fsGet(`games/${gameId}`, accessToken),
+      fsGet(`users/${uid}`, accessToken),
+    ]);
+    if (!gameDoc) return json({ error: '게임방 없음' }, 404);
+    const game = fromFs(gameDoc.fields);
+    if (game.status !== 'finished') return json({ error: '종료된 게임만 재대결 가능' }, 400);
+    if (game.player1?.uid !== uid && game.player2?.uid !== uid) return json({ error: '게임 참가자 아님' }, 403);
+    if (game.rematchRequest?.status === 'pending') return json({ error: '이미 재대결 신청 중' }, 400);
+    const userData = fromFs(userDoc?.fields);
+    if ((userData.freePoints || 0) < w) return json({ error: '무료 포인트 부족' }, 400);
+    await fsPatch(`games/${gameId}`, {
+      rematchRequest: v({ fromUid: uid, fromName: user.displayName || '익명', wager: w, status: 'pending' }),
+    }, accessToken);
+    return json({ success: true });
+  }
+
+  // ─── REMATCH ACCEPT ───
+  if (action === 'rematch_accept') {
+    if (!gameId) return json({ error: 'gameId 필요' }, 400);
+    const [gameDoc, userDoc] = await Promise.all([
+      fsGet(`games/${gameId}`, accessToken),
+      fsGet(`users/${uid}`, accessToken),
+    ]);
+    if (!gameDoc) return json({ error: '게임방 없음' }, 404);
+    const game = fromFs(gameDoc.fields);
+    const rr = game.rematchRequest;
+    if (!rr || rr.status !== 'pending') return json({ error: '유효한 재대결 신청 없음' }, 400);
+    if (rr.fromUid === uid) return json({ error: '자신의 신청은 수락 불가' }, 403);
+    const userData = fromFs(userDoc?.fields);
+    if ((userData.freePoints || 0) < rr.wager) return json({ error: '무료 포인트 부족' }, 400);
+    const requesterDoc = await fsGet(`users/${rr.fromUid}`, accessToken);
+    const requesterData = fromFs(requesterDoc?.fields);
+    if ((requesterData.freePoints || 0) < rr.wager) return json({ error: '신청자 포인트 부족' }, 400);
+
+    const newId = await fsCreate('games', {
+      status: v('ready'),
+      wager: v(rr.wager),
+      title: v(''),
+      hasPassword: v(false),
+      passwordHash: v(''),
+      player1: v({ uid: game.player1.uid, name: game.player1.name, photo: game.player1.photo || '' }),
+      player2: v({ uid: game.player2.uid, name: game.player2.name, photo: game.player2.photo || '' }),
+      p1Submitted: v(false),
+      p2Submitted: v(false),
+      p1Choice: v(null),
+      p2Choice: v(null),
+      winner: v(null),
+      result: v(null),
+      rematchRequest: v(null),
+      createdAt: { timestampValue: new Date().toISOString() },
+    }, accessToken);
+    if (!newId) return json({ error: '재대결 게임 생성 실패' }, 500);
+
+    await fsPatch(`games/${gameId}`, {
+      rematchRequest: v({ fromUid: rr.fromUid, fromName: rr.fromName, wager: rr.wager, status: 'accepted', newGameId: newId }),
+    }, accessToken);
+
+    const isP1ForAcceptor = game.player1?.uid === uid;
+    return json({ success: true, newGameId: newId, isP1: isP1ForAcceptor });
+  }
+
+  // ─── REMATCH DECLINE / CANCEL ───
+  if (action === 'rematch_decline') {
+    if (!gameId) return json({ error: 'gameId 필요' }, 400);
+    const gameDoc = await fsGet(`games/${gameId}`, accessToken);
+    if (!gameDoc) return json({ error: '게임방 없음' }, 404);
+    const game = fromFs(gameDoc.fields);
+    const rr = game.rematchRequest;
+    if (!rr || rr.status !== 'pending') return json({ error: '유효한 신청 없음' }, 400);
+    // 신청자가 취소하면 null로 지움, 수신자가 거절하면 'declined' 상태로
+    const newRR = rr.fromUid === uid
+      ? null
+      : { fromUid: rr.fromUid, fromName: rr.fromName, wager: rr.wager, status: 'declined' };
+    await fsPatch(`games/${gameId}`, { rematchRequest: v(newRR) }, accessToken);
+    return json({ success: true });
+  }
+
   // ─── CANCEL ───
   if (action === 'cancel') {
     if (!gameId) return json({ error: 'gameId 필요' }, 400);

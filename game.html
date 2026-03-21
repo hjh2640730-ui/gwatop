@@ -266,9 +266,34 @@
         <h2 class="modal-title" id="result-title">승리!</h2>
         <div class="rps-result-row" id="result-choices"></div>
         <div class="rps-point-change" id="result-points"></div>
-        <div style="display:flex;gap:10px;margin-top:4px">
-          <button class="btn btn-glass" id="rematch-btn" style="flex:1">재대결 신청</button>
-          <button class="btn btn-primary" id="result-close-btn" style="flex:1">확인</button>
+
+        <!-- 재대결 신청 (기본) -->
+        <div id="rematch-request-section">
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px">
+            <span style="font-size:13px;color:var(--text-secondary)">재대결 포인트</span>
+            <input type="number" id="rematch-wager-input" min="1" max="10" value="1"
+              style="width:56px;padding:6px 8px;border-radius:8px;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-primary);font-size:14px;font-weight:700;text-align:center" />
+            <span style="font-size:13px;color:var(--text-muted)">P</span>
+          </div>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-glass" id="rematch-btn" style="flex:1">재대결 신청</button>
+            <button class="btn btn-primary" id="result-close-btn" style="flex:1">확인</button>
+          </div>
+        </div>
+
+        <!-- 신청 중 (requester) -->
+        <div id="rematch-pending-section" style="display:none">
+          <p id="rematch-pending-text" style="text-align:center;color:var(--text-secondary);font-size:13px;margin-bottom:10px">재대결 신청 중...</p>
+          <button class="btn btn-ghost btn-full" id="rematch-cancel-btn">신청 취소</button>
+        </div>
+
+        <!-- 수신 (recipient) -->
+        <div id="rematch-incoming-section" style="display:none">
+          <p id="rematch-incoming-text" style="text-align:center;font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-primary)"></p>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-glass" id="rematch-decline-btn" style="flex:1">거절</button>
+            <button class="btn btn-primary" id="rematch-accept-btn" style="flex:1">수락 ✊</button>
+          </div>
         </div>
       </div>
 
