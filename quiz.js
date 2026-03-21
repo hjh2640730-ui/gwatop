@@ -25,6 +25,10 @@ let generatingMore = false;
 let waitingForQuestions = false;
 let pendingStreamingRemainder = null;
 
+// ─── Per-question answered state ───
+// idx → { isCorrect, userAnswer }
+let answeredState = {};
+
 
 // ─── DOM ───
 const quizTopbar = document.getElementById('quiz-topbar');
@@ -42,6 +46,7 @@ const shortOptions = document.getElementById('short-options');
 const shortInput = document.getElementById('short-input');
 const submitBtn = document.getElementById('submit-btn');
 const nextBtn = document.getElementById('next-btn');
+const prevBtn = document.getElementById('prev-btn');
 const correctAnswerBox = document.getElementById('correct-answer-box');
 const explanationBox = document.getElementById('explanation-box');
 const explanationText = document.getElementById('explanation-text');
@@ -127,6 +132,24 @@ function renderQuestion(idx) {
   const q = questions[idx];
   if (!q) return;
 
+  // Progress
+  const pct = Math.round((idx / questions.length) * 100);
+  progressFill.style.width = `${pct}%`;
+  const totalLabel = generatingMore ? `${questions.length}+` : questions.length;
+  quizCounter.textContent = `${idx + 1} / ${totalLabel}`;
+  const streamingBadge = document.getElementById('quiz-streaming-badge');
+  if (streamingBadge) streamingBadge.style.display = generatingMore ? '' : 'none';
+
+  // 이전 버튼: 이전에 답한 문제가 있으면 표시
+  prevBtn.style.display = idx > 0 ? '' : 'none';
+
+  // 이미 답한 문제면 복습 모드로 렌더
+  const state = answeredState[idx];
+  if (state) {
+    renderReviewMode(idx, q, state);
+    return;
+  }
+
   answered = false;
   currentAnswer = null;
 
@@ -136,13 +159,6 @@ function renderQuestion(idx) {
   submitBtn.disabled = true;
   correctAnswerBox.classList.remove('visible');
   explanationBox.classList.remove('visible');
-  // Progress
-  const pct = Math.round((idx / questions.length) * 100);
-  progressFill.style.width = `${pct}%`;
-  const totalLabel = generatingMore ? `${questions.length}+` : questions.length;
-  quizCounter.textContent = `${idx + 1} / ${totalLabel}`;
-  const streamingBadge = document.getElementById('quiz-streaming-badge');
-  if (streamingBadge) streamingBadge.style.display = generatingMore ? '' : 'none';
 
   // Type badge
   const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
@@ -180,6 +196,74 @@ function renderQuestion(idx) {
   }
 
   // Animate card
+  quizCard.classList.remove('shake', 'correct-flash', 'card-enter');
+  requestAnimationFrame(() => quizCard.classList.add('card-enter'));
+}
+
+// ─── Review Mode (이미 답한 문제 복습) ───
+function renderReviewMode(idx, q, state) {
+  answered = true;
+  currentAnswer = state.userAnswer;
+
+  submitBtn.style.display = 'none';
+  nextBtn.style.display = '';
+  nextBtn.textContent = idx < questions.length - 1 ? '다음 문제 →' : '결과 보기';
+
+  correctAnswerBox.classList.remove('visible');
+  explanationBox.classList.remove('visible');
+
+  // Type badge
+  const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
+  typeBadge.textContent = types[q.type] || '📝 문제';
+
+  // Image
+  let questionImage = document.getElementById('question-image');
+  if (q.imageData) {
+    if (!questionImage) {
+      questionImage = document.createElement('img');
+      questionImage.id = 'question-image';
+      questionImage.style.cssText = 'width:100%;max-width:600px;border-radius:8px;margin-bottom:12px;display:block';
+      questionText.parentNode.insertBefore(questionImage, questionText);
+    }
+    questionImage.src = `data:image/jpeg;base64,${q.imageData}`;
+    questionImage.style.display = 'block';
+  } else if (questionImage) {
+    questionImage.style.display = 'none';
+  }
+
+  questionText.innerHTML = marked.parse(q.question);
+
+  mcqOptions.style.display = 'none';
+  oxOptions.style.display = 'none';
+  shortOptions.style.display = 'none';
+
+  if (q.type === 'mcq') {
+    renderMCQ(q);
+    revealAnswer(q, state.isCorrect);
+  } else if (q.type === 'ox') {
+    renderOX(q);
+    revealAnswer(q, state.isCorrect);
+    document.getElementById('ox-o-btn').disabled = true;
+    document.getElementById('ox-x-btn').disabled = true;
+  } else if (q.type === 'short') {
+    renderShort();
+    shortInput.value = state.userAnswer;
+    shortInput.disabled = true;
+    if (!state.isCorrect) {
+      correctAnswerBox.textContent = `✅ 정답: ${q.answer}`;
+      correctAnswerBox.classList.add('visible');
+    }
+  }
+
+  explanationText.innerHTML = formatExplanation(q.explanation || '해설이 제공되지 않았습니다.');
+  explanationBox.classList.add('visible');
+
+  const scrapBtn = document.getElementById('scrap-btn');
+  if (scrapBtn) {
+    scrapBtn.style.display = '';
+    updateScrapBtn(idx);
+  }
+
   quizCard.classList.remove('shake', 'correct-flash', 'card-enter');
   requestAnimationFrame(() => quizCard.classList.add('card-enter'));
 }
@@ -249,6 +333,7 @@ function renderShort() {
 function setupControls() {
   submitBtn.addEventListener('click', handleSubmit);
   nextBtn.addEventListener('click', handleNext);
+  prevBtn.addEventListener('click', handlePrev);
 
   quitBtn.addEventListener('click', () => quitModal.classList.add('visible'));
   document.getElementById('quit-confirm-btn')?.addEventListener('click', () => {
@@ -282,6 +367,7 @@ function setupControls() {
     }
     if (e.key === 'Enter' && !answered && !submitBtn.disabled) handleSubmit();
     else if (e.key === 'Enter' && answered) handleNext();
+    if ((e.key === 'ArrowLeft' || e.key === 'Backspace') && answered && currentIdx > 0) handlePrev();
     if (e.key === 'Escape' && !answered) quitModal.classList.toggle('visible');
     // MCQ shortcuts 1-4
     if (!answered) {
@@ -340,8 +426,11 @@ async function handleSubmit() {
   }
 
   answered = true;
+  answeredState[currentIdx] = { isCorrect, userAnswer: currentAnswer };
+
   submitBtn.style.display = 'none';
   nextBtn.style.display = '';
+  nextBtn.textContent = currentIdx < questions.length - 1 ? '다음 문제 →' : '결과 보기';
 
   if (isCorrect) {
     correctCount++;
@@ -495,8 +584,26 @@ function showFeedback(emoji) {
   setTimeout(() => feedbackOverlay.classList.remove('visible'), 700);
 }
 
-// ─── Next Question ───
+// ─── Prev / Next ───
+function handlePrev() {
+  if (currentIdx <= 0) return;
+  currentIdx--;
+  renderQuestion(currentIdx);
+}
+
 function handleNext() {
+  // 이미 답한 문제에서 다음으로 이동 (복습 모드 네비게이션)
+  if (answeredState[currentIdx] && currentIdx < questions.length - 1) {
+    currentIdx++;
+    renderQuestion(currentIdx);
+    return;
+  }
+  // 마지막 답한 문제에서 결과로
+  if (answeredState[currentIdx] && currentIdx >= questions.length - 1 && !generatingMore) {
+    showResults();
+    return;
+  }
+
   currentIdx++;
   if (currentIdx >= questions.length) {
     if (generatingMore) {

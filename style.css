@@ -517,6 +517,7 @@ body {
 
 /* Quiz Actions */
 .quiz-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 4px; }
+.quiz-actions #prev-btn { margin-right: auto; }
 
 /* ─── Results ─── */
 .results-wrap { display: flex; align-items: center; justify-content: center; flex-direction: column; padding: calc(var(--nav-height) + 40px) clamp(16px,4vw,32px) 60px; min-height: 100vh; }
