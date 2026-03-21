@@ -204,7 +204,6 @@ function renderRooms(docs) {
       const remaining = getRemainingMin(g.createdAt);
       return `<div class="room-card mine">
         <div class="room-card-left">
-          <img class="room-avatar" src="${g.player1?.photo || ''}" onerror="this.src='/favicon.svg'" />
           <div>
             <div style="display:flex;align-items:center;gap:6px">
               ${g.title ? `<span class="room-name" style="color:var(--text-primary)">${g.title}</span>` : '<span class="room-name" style="color:var(--text-primary)">내 방</span>'}
@@ -221,7 +220,6 @@ function renderRooms(docs) {
     }
     return `<button class="room-card" data-id="${d.id}">
       <div class="room-card-left">
-        <img class="room-avatar" src="${g.player1?.photo || ''}" onerror="this.src='/favicon.svg'" />
         <div>${titleHtml}</div>
       </div>
       <span class="room-wager">🟢 ${g.wager}P</span>
