@@ -164,21 +164,6 @@ function renderQuestion(idx) {
   const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
   typeBadge.textContent = types[q.type] || '📝 문제';
 
-  // Question image (from PDF page)
-  let questionImage = document.getElementById('question-image');
-  if (q.imageData) {
-    if (!questionImage) {
-      questionImage = document.createElement('img');
-      questionImage.id = 'question-image';
-      questionImage.style.cssText = 'width:100%;max-width:600px;border-radius:8px;margin-bottom:12px;display:block';
-      questionText.parentNode.insertBefore(questionImage, questionText);
-    }
-    questionImage.src = `data:image/jpeg;base64,${q.imageData}`;
-    questionImage.style.display = 'block';
-  } else if (questionImage) {
-    questionImage.style.display = 'none';
-  }
-
   // Question
   questionText.innerHTML = marked.parse(q.question);
 
@@ -215,21 +200,6 @@ function renderReviewMode(idx, q, state) {
   // Type badge
   const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
   typeBadge.textContent = types[q.type] || '📝 문제';
-
-  // Image
-  let questionImage = document.getElementById('question-image');
-  if (q.imageData) {
-    if (!questionImage) {
-      questionImage = document.createElement('img');
-      questionImage.id = 'question-image';
-      questionImage.style.cssText = 'width:100%;max-width:600px;border-radius:8px;margin-bottom:12px;display:block';
-      questionText.parentNode.insertBefore(questionImage, questionText);
-    }
-    questionImage.src = `data:image/jpeg;base64,${q.imageData}`;
-    questionImage.style.display = 'block';
-  } else if (questionImage) {
-    questionImage.style.display = 'none';
-  }
 
   questionText.innerHTML = marked.parse(q.question);
 

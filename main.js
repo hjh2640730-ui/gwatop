@@ -34,7 +34,6 @@ let currentUser = null;
 let currentUserData = null;
 let selectedFile = null;
 let extractedText = '';
-let extractedImages = []; // Vision: base64 JPEG 이미지 배열
 
 // ─── DOM Elements ───
 const uploadZone = document.getElementById('upload-zone');
@@ -197,7 +196,6 @@ async function handleFile(file) {
 function clearFile() {
   selectedFile = null;
   extractedText = '';
-  extractedImages = [];
   fileInput.value = '';
   fileInfo.classList.remove('visible');
   uploadZone.classList.remove('has-file');
@@ -302,35 +300,6 @@ async function extractTextFromPDF(pdf) {
   return text.trim();
 }
 
-// ─── Core: Render PDF Pages as JPEG Images (Vision용) ───
-async function renderPagesAsImages(pdf, maxPages = 15) {
-  const images = [];
-  const pageCount = Math.min(pdf.numPages, maxPages);
-  for (let i = 1; i <= pageCount; i++) {
-    try {
-      const page = await pdf.getPage(i);
-      const baseViewport = page.getViewport({ scale: 1 });
-      // 최대 너비 1400px로 정규화 (모바일 메모리 보호)
-      const scale = Math.min(1.5, 1400 / baseViewport.width);
-      const viewport = page.getViewport({ scale });
-
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d');
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      // base64만 추출 (data:image/jpeg;base64, 제거)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-      images.push(dataUrl.split(',')[1]);
-
-      // 메모리 해제
-      canvas.width = 0;
-      canvas.height = 0;
-    } catch { /* 개별 페이지 실패 시 건너뜀 */ }
-  }
-  return images;
-}
 
 // ─── Core: Generate Quiz via API ───
 async function generateQuiz(useFreeFirst = false) {
@@ -350,22 +319,14 @@ async function generateQuiz(useFreeFirst = false) {
     // 1) Extract text + images (저장된 문서에서 로드한 경우 스킵)
     const isPreloaded = !!selectedFile._preloadedDocId;
 
-    if (!isPreloaded && (!extractedText || extractedImages.length === 0)) {
+    if (!isPreloaded && !extractedText) {
       setLoadingStep(1, '📖 PDF 텍스트 읽는 중...', 'PDF에서 글자와 내용을 추출합니다');
       const pdf = await loadPDFDocument(selectedFile);
-
-      if (!extractedText) {
-        extractedText = await extractTextFromPDF(pdf);
-      }
-      if (extractedImages.length === 0) {
-        setLoadingStep(2, '🖼️ 페이지 이미지 변환 중...', '수식·도표·그래프를 AI가 볼 수 있는 형태로 변환합니다 (최대 30페이지)');
-        extractedImages = await renderPagesAsImages(pdf, 30);
-      }
+      extractedText = await extractTextFromPDF(pdf);
     }
 
     const hasText = extractedText && extractedText.length >= 100;
-    const hasImages = extractedImages.length > 0;
-    if (!hasText && !hasImages) {
+    if (!hasText) {
       throw new Error('PDF 내용을 읽을 수 없습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.');
     }
 
@@ -373,16 +334,14 @@ async function generateQuiz(useFreeFirst = false) {
     const firstBatch = Math.min(5, count);
     const remaining = count - firstBatch;
 
-    if (isPreloaded) setLoadingStep(2, '🤖 AI가 첫 문제를 출제 중...', `첫 ${firstBatch}문제를 먼저 만듭니다. 나머지는 풀면서 자동 생성됩니다`);
-    else setLoadingStep(3, '🤖 AI가 첫 문제를 출제 중...', `첫 ${firstBatch}문제를 먼저 만듭니다. 나머지는 풀면서 자동 생성됩니다`);
+    setLoadingStep(isPreloaded ? 2 : 2, '🤖 AI가 첫 문제를 출제 중...', `첫 ${firstBatch}문제를 먼저 만듭니다. 나머지는 풀면서 자동 생성됩니다`);
 
     const idToken = await currentUser.getIdToken();
     const response = await fetch('/api/generate-quiz', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: hasText ? extractedText.slice(0, 60000) : '',
-        images: hasImages ? extractedImages : undefined,
+        text: extractedText.slice(0, 60000),
         types,
         count: firstBatch,
         lang,
@@ -398,16 +357,6 @@ async function generateQuiz(useFreeFirst = false) {
     const data = await response.json();
     if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
       throw new Error('퀴즈 데이터를 파싱하지 못했습니다. 다시 시도해주세요.');
-    }
-
-    // Attach image data to questions that reference a specific PDF page image
-    if (hasImages && extractedImages.length > 0) {
-      data.questions = data.questions.map(q => {
-        if (q.imageIndex !== undefined && extractedImages[q.imageIndex]) {
-          return { ...q, imageData: extractedImages[q.imageIndex] };
-        }
-        return q;
-      });
     }
 
     // 3) Deduct credits (전체 문제 수 기준, 무료P 우선 or 일반 크레딧)
