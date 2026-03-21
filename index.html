@@ -73,6 +73,41 @@
     .scenario-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
     .scenario-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.65; }
 
+    /* 월정액 비교 박스 */
+    .sub-compare {
+      max-width: 760px; margin: 0 auto 32px;
+      border-radius: var(--radius-xl); overflow: hidden;
+    }
+    .sub-compare-header {
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
+      border-bottom: none; border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      padding: 20px 28px;
+      text-align: center;
+    }
+    .sub-compare-header h3 { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+    .sub-compare-header p { font-size: 13px; color: var(--text-secondary); }
+    .sub-compare-grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .sub-col {
+      padding: 24px 28px; border: 1px solid;
+    }
+    .sub-col.bad {
+      background: rgba(239,68,68,0.05); border-color: rgba(239,68,68,0.2);
+      border-right: none; border-radius: 0 0 0 var(--radius-xl);
+    }
+    .sub-col.good {
+      background: rgba(124,58,237,0.06); border-color: rgba(124,58,237,0.2);
+      border-radius: 0 0 var(--radius-xl) 0;
+    }
+    .sub-col-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .sub-col.bad .sub-col-label { color: #f87171; }
+    .sub-col.good .sub-col-label { color: #a78bfa; }
+    .sub-col-rows { display: flex; flex-direction: column; gap: 8px; }
+    .sub-col-row { font-size: 13px; color: var(--text-secondary); display: flex; align-items: flex-start; gap: 6px; }
+    .sub-col-row strong { color: var(--text-primary); }
+    .sub-col-total { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--glass-border); font-size: 15px; font-weight: 800; }
+    .sub-col.bad .sub-col-total { color: #f87171; }
+    .sub-col.good .sub-col-total { color: #a78bfa; }
+
     @media (max-width: 600px) {
       .hero-pills { gap: 8px; }
       .hero-pill { font-size: 12px; padding: 7px 14px; }
@@ -81,6 +116,9 @@
       .pricing-insight-item + .pricing-insight-item { border-left: none; border-top: 1px solid var(--glass-border); }
       .steps-grid { grid-template-columns: 1fr 1fr !important; }
       .scenario-grid { grid-template-columns: 1fr !important; }
+      .sub-compare-grid { grid-template-columns: 1fr !important; }
+      .sub-col.bad { border-right: 1px solid rgba(239,68,68,0.2); border-bottom: none; border-radius: 0; }
+      .sub-col.good { border-radius: 0 0 var(--radius-xl) var(--radius-xl); }
     }
   </style>
 </head>
@@ -131,7 +169,8 @@
         대학 시험 수준의 문제를 즉시 만들어드립니다.
       </p>
       <div class="hero-pills">
-        <span class="hero-pill">💳 문제 1개당 최저 <strong>₩9.9</strong></span>
+        <span class="hero-pill" style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.3);color:#fca5a5">🔥 <strong style="color:#fff">50% 할인</strong> 진행 중 · <span id="hero-countdown"></span></span>
+        <span class="hero-pill">💳 프로모션 중 문제당 최저 <strong>₩4.95</strong></span>
         <span class="hero-pill">🚫 월정액 없음</span>
         <span class="hero-pill">⏳ 유효기간 없음</span>
         <span class="hero-pill">🎁 신규 가입 <strong>30문제 무료</strong></span>
@@ -184,26 +223,56 @@
           <p class="section-subtitle">월정액 없이, 실제로 생성한 문제 개수대로 차감됩니다.</p>
         </div>
 
+        <!-- 월정액 vs 충전 비교 -->
+        <div class="sub-compare">
+          <div class="sub-compare-header">
+            <h3>💡 월정액 무제한은 왜 손해일까?</h3>
+            <p>대학생은 시험 기간에만 몰아서 씁니다. 나머지 기간의 구독료는 순수 낭비입니다.</p>
+          </div>
+          <div class="sub-compare-grid">
+            <div class="sub-col bad">
+              <div class="sub-col-label">❌ 월정액 무제한 (가상)</div>
+              <div class="sub-col-rows">
+                <div class="sub-col-row">📅 <span><strong>₩9,900/월</strong> × 12개월 약정</span></div>
+                <div class="sub-col-row">🎓 실제 사용: <strong>중간·기말고사 각 2주</strong></div>
+                <div class="sub-col-row">😴 나머지 <strong>44주는 방치</strong></div>
+                <div class="sub-col-row">🔁 안 써도 <strong>자동 결제</strong>됨</div>
+              </div>
+              <div class="sub-col-total">연간 ₩118,800 — 뽕 못 뽑음</div>
+            </div>
+            <div class="sub-col good">
+              <div class="sub-col-label">✅ GWATOP 크레딧 방식</div>
+              <div class="sub-col-rows">
+                <div class="sub-col-row">🎯 <span>시험 기간에만 <strong>필요한 만큼 충전</strong></span></div>
+                <div class="sub-col-row">🏖️ 방학엔 <strong>충전 안 해도 됨</strong></div>
+                <div class="sub-col-row">⏳ 남은 크레딧 <strong>유효기간 없음</strong></div>
+                <div class="sub-col-row">🚫 자동 결제 <strong>절대 없음</strong></div>
+              </div>
+              <div class="sub-col-total">연간 ₩4,950~₩9,900 — 쓴 만큼만</div>
+            </div>
+          </div>
+        </div>
+
         <!-- 핵심 인사이트 박스 -->
         <div class="pricing-insight">
-          <div class="pricing-insight-label">패키지별 문제당 가격</div>
+          <div class="pricing-insight-label">🔥 50% 할인 프로모션 적용가</div>
           <div class="pricing-insight-main">많이 충전할수록 <span class="gradient-text">문제당 가격이 낮아집니다</span></div>
           <div class="pricing-insight-sub">한 번 충전하면 유효기간 없이 사용할 수 있어,<br />방학이나 휴학 중에도 문제가 사라지지 않습니다.</div>
           <div class="pricing-insight-grid">
             <div class="pricing-insight-item">
-              <div class="pricing-insight-price">₩19</div>
+              <div class="pricing-insight-price">₩9.5</div>
               <div class="pricing-insight-name">🌱 스타터</div>
-              <div class="pricing-insight-detail">100문제 · ₩1,900</div>
+              <div class="pricing-insight-detail">100문제 · <s style="color:var(--text-muted);font-size:11px">₩1,900</s> <strong style="color:#f87171">₩950</strong></div>
             </div>
             <div class="pricing-insight-item">
-              <div class="pricing-insight-price">₩13</div>
+              <div class="pricing-insight-price">₩6.5</div>
               <div class="pricing-insight-name">⚡ 스탠다드</div>
-              <div class="pricing-insight-detail">300문제 · ₩3,900</div>
+              <div class="pricing-insight-detail">300문제 · <s style="color:var(--text-muted);font-size:11px">₩3,900</s> <strong style="color:#f87171">₩1,950</strong></div>
             </div>
             <div class="pricing-insight-item">
-              <div class="pricing-insight-price">₩9.9</div>
+              <div class="pricing-insight-price">₩4.95</div>
               <div class="pricing-insight-name">👑 프리미엄</div>
-              <div class="pricing-insight-detail">1,000문제 · ₩9,900</div>
+              <div class="pricing-insight-detail">1,000문제 · <s style="color:var(--text-muted);font-size:11px">₩9,900</s> <strong style="color:#f87171">₩4,950</strong></div>
             </div>
           </div>
         </div>
@@ -237,45 +306,68 @@
           <h2 class="section-title">필요한 만큼 충전하세요</h2>
           <p class="section-subtitle">월정액 없이 한 번 충전하면 유효기간 없이 사용합니다.</p>
         </div>
+
+        <!-- 프로모션 배너 -->
+        <div style="max-width:860px;margin:0 auto 28px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12));border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-xl);padding:20px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+          <div style="font-size:32px">🎉</div>
+          <div style="flex:1">
+            <div style="font-size:16px;font-weight:800;color:#f87171;margin-bottom:4px">기간 한정 50% 할인 프로모션</div>
+            <div style="font-size:13px;color:var(--text-secondary)">지금 충전하면 모든 패키지 50% 할인 · 한정 기간만 적용됩니다</div>
+          </div>
+          <div id="pricing-countdown" style="font-size:13px;font-weight:700;color:#fbbf24;white-space:nowrap"></div>
+        </div>
+
         <div class="pricing-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));max-width:860px;margin:0 auto;">
           <div class="pricing-card">
             <div class="pricing-plan">🌱 스타터</div>
-            <div class="pricing-price">₩1,900</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+              <div style="font-size:14px;color:var(--text-muted);text-decoration:line-through">₩1,900</div>
+              <div style="font-size:11px;font-weight:700;background:#ef4444;color:white;padding:2px 6px;border-radius:4px">-50%</div>
+            </div>
+            <div class="pricing-price" style="color:#f87171">₩950</div>
             <div class="pricing-period">100문제</div>
             <ul class="pricing-features">
               <li><span class="check">✅</span> 문제 100개 생성</li>
               <li><span class="check">✅</span> 객관식 · 주관식 · OX</li>
               <li><span class="check">✅</span> 유효기간 없음</li>
-              <li><span class="check">✅</span> 문제당 ₩19</li>
+              <li><span class="check">✅</span> 문제당 ₩9.5</li>
             </ul>
-            <button class="btn btn-glass btn-full" id="pricing-starter-btn">충전하기</button>
+            <button class="btn btn-glass btn-full" id="pricing-starter-btn">지금 충전하기</button>
           </div>
 
           <div class="pricing-card">
             <div class="pricing-plan">⚡ 스탠다드</div>
-            <div class="pricing-price">₩3,900</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+              <div style="font-size:14px;color:var(--text-muted);text-decoration:line-through">₩3,900</div>
+              <div style="font-size:11px;font-weight:700;background:#ef4444;color:white;padding:2px 6px;border-radius:4px">-50%</div>
+            </div>
+            <div class="pricing-price" style="color:#f87171">₩1,950</div>
             <div class="pricing-period">300문제</div>
             <ul class="pricing-features">
               <li><span class="check">✅</span> 문제 300개 생성</li>
               <li><span class="check">✅</span> 객관식 · 주관식 · OX</li>
               <li><span class="check">✅</span> 유효기간 없음</li>
-              <li><span class="check">✅</span> 문제당 ₩13 <span style="color:#a78bfa;font-size:11px">32% 할인</span></li>
+              <li><span class="check">✅</span> 문제당 ₩6.5</li>
             </ul>
-            <button class="btn btn-glass btn-full" id="pricing-standard-btn">충전하기</button>
+            <button class="btn btn-glass btn-full" id="pricing-standard-btn">지금 충전하기</button>
           </div>
 
           <div class="pricing-card featured">
-            <div class="pricing-badge">🔥 가장 저렴</div>
+            <div class="pricing-badge">🔥 최대 혜택</div>
             <div class="pricing-plan">👑 프리미엄</div>
-            <div class="pricing-price gradient-text">₩9,900</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+              <div style="font-size:14px;color:var(--text-muted);text-decoration:line-through">₩9,900</div>
+              <div style="font-size:11px;font-weight:700;background:#ef4444;color:white;padding:2px 6px;border-radius:4px">-50%</div>
+            </div>
+            <div class="pricing-price gradient-text">₩4,950</div>
             <div class="pricing-period">1,000문제</div>
             <ul class="pricing-features">
               <li><span class="check">✅</span> 문제 1,000개 생성</li>
               <li><span class="check">✅</span> 객관식 · 주관식 · OX</li>
               <li><span class="check">✅</span> 유효기간 없음</li>
-              <li><span class="check">✅</span> 문제당 ₩9.9 <span style="color:#a78bfa;font-size:11px">48% 할인</span></li>
+              <li><span class="check">✅</span> 문제당 ₩4.95</li>
             </ul>
-            <button class="btn btn-primary btn-full" id="pricing-premium-btn">충전하기</button>
+            <button class="btn btn-primary btn-full" id="pricing-premium-btn">지금 충전하기</button>
           </div>
         </div>
         <p style="text-align:center;margin-top:24px;font-size:13px;color:var(--text-muted)">
@@ -369,6 +461,25 @@
         window.location.href = '/payment.html';
       });
     });
+
+    // 프로모션 카운트다운
+    (function() {
+      const end = new Date('2026-04-20T23:59:59+09:00');
+      function updateCountdowns() {
+        const diff = end - Date.now();
+        if (diff <= 0) return;
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const text = `D-${d} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} 남음`;
+        ['hero-countdown','pricing-countdown'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = text;
+        });
+      }
+      updateCountdowns();
+      setInterval(updateCountdowns, 60000);
+    })();
 
     onUserChange((user, userData) => {
       const lo = document.getElementById('nav-auth-logged-out');
