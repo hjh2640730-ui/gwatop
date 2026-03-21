@@ -129,7 +129,7 @@ export async function ensureUserDoc(user, extra = {}) {
         displayName,
         photoURL,
         phone,
-        credits: freeCredits,
+        credits: 30,
         referralCredits: 0,
         totalQuizzes: 0,
         ...(extra.provider ? { provider: extra.provider } : {}),
