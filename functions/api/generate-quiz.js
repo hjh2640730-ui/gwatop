@@ -50,8 +50,9 @@ export async function onRequestPost(context) {
   }
 
   // ─── Rate Limiting (idToken 기반, 유저당 30초 제한) ───
-  const { idToken } = body;
-  if (idToken && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
+  // continuation: true이면 앞선 요청의 후속 배치로 rate limit 면제
+  const { idToken, continuation } = body;
+  if (!continuation && idToken && env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) {
     try {
       const tokenPayload = decodeJWT(idToken);
       const uid = tokenPayload?.user_id || tokenPayload?.sub;

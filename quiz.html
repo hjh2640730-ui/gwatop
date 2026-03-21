@@ -47,6 +47,7 @@
         <div class="quiz-progress-fill" id="progress-fill" style="width:0%"></div>
       </div>
       <span class="quiz-counter" id="quiz-counter">0 / 0</span>
+      <span class="quiz-streaming-badge" id="quiz-streaming-badge" style="display:none" title="나머지 문제 생성 중">⟳</span>
       <button class="quiz-quit-btn" id="quit-btn" title="퀴즈 종료">✕</button>
     </div>
   </div>
@@ -55,6 +56,13 @@
   <div id="quiz-area" style="display:none">
     <div class="quiz-main">
       <div class="quiz-card-container">
+        <!-- 백그라운드 생성 대기 오버레이 -->
+        <div id="quiz-waiting" style="display:none" class="quiz-card" style="text-align:center;padding:60px 20px">
+          <div style="font-size:52px;margin-bottom:20px">⏳</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:10px">다음 문제 생성 중...</div>
+          <div style="color:var(--text-secondary);font-size:14px;line-height:1.6">AI가 나머지 문제를 만들고 있어요.<br>잠시만 기다려주세요.</div>
+        </div>
+
         <div class="quiz-card" id="quiz-card">
 
           <!-- Type Badge -->

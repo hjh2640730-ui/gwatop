@@ -437,6 +437,11 @@ body {
 .quiz-progress-bar { flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: var(--radius-full); overflow: hidden; }
 .quiz-progress-fill { height: 100%; background: var(--accent-gradient); border-radius: var(--radius-full); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); box-shadow: 0 0 10px rgba(124,58,237,0.5); }
 .quiz-counter { font-size: 13px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+.quiz-streaming-badge {
+  font-size: 14px; color: #a78bfa; animation: spin 1.2s linear infinite;
+  display: inline-block; flex-shrink: 0;
+}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .quiz-quit-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px; padding: 4px; border-radius: var(--radius-xs); transition: color var(--transition); flex-shrink: 0; }
 .quiz-quit-btn:hover { color: var(--error); }
 

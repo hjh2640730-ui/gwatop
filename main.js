@@ -369,9 +369,13 @@ async function generateQuiz(useFreeFirst = false) {
       throw new Error('PDF 내용을 읽을 수 없습니다. 파일이 손상되었거나 지원하지 않는 형식일 수 있습니다.');
     }
 
-    // 2) Call API
-    if (isPreloaded) setLoadingStep(2, '🤖 AI가 문제를 출제 중...', 'AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
-    else setLoadingStep(3, '🤖 AI가 문제를 출제 중...', 'AI가 내용을 분석하고 문제를 만듭니다 (15~25초 소요)');
+    // 2) Call API – 첫 배치만 빠르게 생성 (5문제), 나머지는 quiz.html에서 백그라운드 생성
+    const firstBatch = Math.min(5, count);
+    const remaining = count - firstBatch;
+
+    if (isPreloaded) setLoadingStep(2, '🤖 AI가 첫 문제를 출제 중...', `첫 ${firstBatch}문제를 먼저 만듭니다. 나머지는 풀면서 자동 생성됩니다`);
+    else setLoadingStep(3, '🤖 AI가 첫 문제를 출제 중...', `첫 ${firstBatch}문제를 먼저 만듭니다. 나머지는 풀면서 자동 생성됩니다`);
+
     const idToken = await currentUser.getIdToken();
     const response = await fetch('/api/generate-quiz', {
       method: 'POST',
@@ -380,7 +384,7 @@ async function generateQuiz(useFreeFirst = false) {
         text: hasText ? extractedText.slice(0, 60000) : '',
         images: hasImages ? extractedImages : undefined,
         types,
-        count,
+        count: firstBatch,
         lang,
         idToken
       })
@@ -406,7 +410,7 @@ async function generateQuiz(useFreeFirst = false) {
       });
     }
 
-    // 3) Deduct credits (무료P 우선 or 일반 크레딧)
+    // 3) Deduct credits (전체 문제 수 기준, 무료P 우선 or 일반 크레딧)
     const deductAmount = calcCredits(count);
     const ok = await deductCreditMixed(currentUser.uid, deductAmount, useFreeFirst);
     if (!ok) throw new Error('크레딧 차감에 실패했습니다. 잔액을 확인해주세요.');
@@ -423,17 +427,23 @@ async function generateQuiz(useFreeFirst = false) {
     // 4) Save document (저장된 문서에서 로드한 경우 기존 docId 재사용)
     const docId = selectedFile._preloadedDocId || await saveDocument(currentUser.uid, selectedFile.name, extractedText, selectedFile.size);
 
-    // 5) Pass to quiz page via sessionStorage
+    // 5) Pass to quiz page via sessionStorage (나머지 배치 정보 포함)
     savePendingQuiz({
       uid: currentUser.uid,
       docId,
       docName: selectedFile.name,
       questions: data.questions,
-      type: types.join(',')
+      type: types.join(','),
+      streamingRemainder: remaining > 0 ? {
+        count: remaining,
+        text: hasText ? extractedText.slice(0, 60000) : '',
+        types,
+        lang,
+      } : null,
     });
 
-    showToast(`✅ ${data.questions.length}문제 생성 완료!`, 'success');
-    setTimeout(() => { window.location.href = '/quiz.html'; }, 500);
+    showToast(`✅ 첫 ${data.questions.length}문제 생성! 나머지는 풀면서 자동 생성됩니다`, 'success');
+    setTimeout(() => { window.location.href = '/quiz.html'; }, 400);
 
   } catch (err) {
     console.error('Quiz generation error:', err);

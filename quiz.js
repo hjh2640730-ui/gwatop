@@ -20,6 +20,11 @@ let savedQuizId = null;
 let currentUser = null;
 let scrappedMap = new Map(); // questionIdx → scrapId
 
+// ─── Streaming State ───
+let generatingMore = false;
+let waitingForQuestions = false;
+let pendingStreamingRemainder = null;
+
 
 // ─── DOM ───
 const quizTopbar = document.getElementById('quiz-topbar');
@@ -57,6 +62,12 @@ async function init() {
   quizMeta = data;
   questions = data.questions;
 
+  // 나머지 배치 생성 예약 (auth 확인 후 시작)
+  if (data.streamingRemainder?.count > 0) {
+    pendingStreamingRemainder = data.streamingRemainder;
+    generatingMore = true;
+  }
+
   // Save quiz to IndexedDB early
   savedQuizId = await saveQuiz(data.uid || '', data.docId, data.docName, data.questions, data.type, 0);
 
@@ -80,6 +91,13 @@ function setupNav() {
       document.getElementById('nav-avatar').src = user.photoURL || '';
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
       checkAndShowNicknameModal(user, userData);
+
+      // 백그라운드 나머지 문제 생성 시작
+      if (pendingStreamingRemainder) {
+        const r = pendingStreamingRemainder;
+        pendingStreamingRemainder = null;
+        fetchRemainingQuestions(user, r);
+      }
     } else {
       lo.style.display = '';
       li.style.display = 'none';
@@ -121,7 +139,10 @@ function renderQuestion(idx) {
   // Progress
   const pct = Math.round((idx / questions.length) * 100);
   progressFill.style.width = `${pct}%`;
-  quizCounter.textContent = `${idx + 1} / ${questions.length}`;
+  const totalLabel = generatingMore ? `${questions.length}+` : questions.length;
+  quizCounter.textContent = `${idx + 1} / ${totalLabel}`;
+  const streamingBadge = document.getElementById('quiz-streaming-badge');
+  if (streamingBadge) streamingBadge.style.display = generatingMore ? '' : 'none';
 
   // Type badge
   const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
@@ -478,9 +499,71 @@ function showFeedback(emoji) {
 function handleNext() {
   currentIdx++;
   if (currentIdx >= questions.length) {
-    showResults();
+    if (generatingMore) {
+      waitingForQuestions = true;
+      showWaitingForQuestions();
+    } else {
+      showResults();
+    }
   } else {
     renderQuestion(currentIdx);
+  }
+}
+
+function showWaitingForQuestions() {
+  quizCard.style.display = 'none';
+  document.getElementById('quiz-waiting').style.display = '';
+  submitBtn.style.display = 'none';
+  nextBtn.style.display = 'none';
+}
+
+function hideWaitingForQuestions() {
+  document.getElementById('quiz-waiting').style.display = 'none';
+  quizCard.style.display = '';
+}
+
+// ─── 백그라운드 나머지 문제 생성 ───
+async function fetchRemainingQuestions(user, remainder) {
+  try {
+    const idToken = await user.getIdToken();
+    const res = await fetch('/api/generate-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: remainder.text,
+        types: remainder.types,
+        count: remainder.count,
+        lang: remainder.lang,
+        idToken,
+        continuation: true,
+      }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.questions?.length) {
+      const offset = questions.length;
+      data.questions.forEach((q, i) => questions.push({ ...q, id: offset + i + 1 }));
+    }
+  } catch (_) {
+    // 실패 시 조용히 무시 (이미 첫 배치로 퀴즈 진행 가능)
+  } finally {
+    generatingMore = false;
+    const badge = document.getElementById('quiz-streaming-badge');
+    if (badge) badge.style.display = 'none';
+
+    if (waitingForQuestions) {
+      waitingForQuestions = false;
+      hideWaitingForQuestions();
+      if (currentIdx < questions.length) {
+        renderQuestion(currentIdx);
+      } else {
+        showResults();
+      }
+    } else {
+      // 카운터 업데이트 (현재 문제 다시 렌더하지 않고 카운터만)
+      const totalLabel = questions.length;
+      quizCounter.textContent = `${currentIdx + 1} / ${totalLabel}`;
+    }
   }
 }
 
