@@ -99,28 +99,24 @@ export async function ensureUserDoc(user, extra = {}) {
     const snap = await getDoc(ref);
     if (!snap.exists()) {
       // 중복 확인: 전화번호 우선, 없으면 이메일로 체크
-      try {
-        if (phone) {
-          const phoneSnap = await getDocs(query(collection(db, 'users'), where('phone', '==', phone), limit(1)));
-          if (!phoneSnap.empty) {
-            try { await user.delete(); } catch (_) {}
-            await signOut(auth);
-            const err = new Error('이미 다른 방법으로 가입된 전화번호입니다. 기존 로그인 방법을 사용해주세요.');
-            err.code = 'auth/duplicate-account';
-            throw err;
-          }
-        } else if (email) {
-          const emailSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email), limit(1)));
-          if (!emailSnap.empty) {
-            try { await user.delete(); } catch (_) {}
-            await signOut(auth);
-            const err = new Error('이미 다른 방법으로 가입된 이메일입니다. 기존 로그인 방법을 사용해주세요.');
-            err.code = 'auth/duplicate-account';
-            throw err;
-          }
+      if (phone) {
+        const phoneSnap = await getDocs(query(collection(db, 'users'), where('phone', '==', phone), limit(1)));
+        if (!phoneSnap.empty) {
+          try { await user.delete(); } catch (_) {}
+          await signOut(auth);
+          const err = new Error('이미 다른 방법으로 가입된 전화번호입니다. 기존 로그인 방법을 사용해주세요.');
+          err.code = 'auth/duplicate-account';
+          throw err;
         }
-      } catch (e) {
-        if (e.code === 'auth/duplicate-account') throw e;
+      } else if (email) {
+        const emailSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email), limit(1)));
+        if (!emailSnap.empty) {
+          try { await user.delete(); } catch (_) {}
+          await signOut(auth);
+          const err = new Error('이미 다른 방법으로 가입된 이메일입니다. 기존 로그인 방법을 사용해주세요.');
+          err.code = 'auth/duplicate-account';
+          throw err;
+        }
       }
 
       await setDoc(ref, {
