@@ -64,7 +64,8 @@ export async function onRequestPost(context) {
     } catch { /* rate limit 실패 시 통과 허용 */ }
   }
 
-  const { text, images, types, type, count } = body;
+  const { text, images, types, type, count, lang } = body;
+  const language = lang === 'en' ? 'en' : 'ko';
 
   // 단일 type 또는 복수 types 모두 지원
   const selectedTypes = types || (type ? [type] : ['mcq']);
@@ -81,7 +82,7 @@ export async function onRequestPost(context) {
   const isVisionMode = safeImages.length > 0;
 
   const truncatedText = hasText ? text.slice(0, 55000) : '';
-  const prompt = buildPrompt(truncatedText, validTypes, Math.min(parseInt(count), 50), isVisionMode);
+  const prompt = buildPrompt(truncatedText, validTypes, Math.min(parseInt(count), 50), isVisionMode, language);
 
   try {
     // Vision 모드: 이미지를 parts 앞에 삽입
@@ -261,7 +262,7 @@ async function checkAndUpdateRateLimit(uid, env) {
 }
 
 // ─── Build Prompt (복수 타입 지원, Vision 모드 포함) ───
-function buildPrompt(text, types, count, isVisionMode = false) {
+function buildPrompt(text, types, count, isVisionMode = false, language = 'ko') {
   // 각 타입별 문제 수 분배
   const distribution = distributeCount(count, types);
 
@@ -290,12 +291,16 @@ OX 퀴즈 ${n}개:
   const totalDesc = types.map(t => `${typeLabels[t]} ${distribution[t]}개`).join(', ');
 
   const visionNote = isVisionMode
-    ? `위에 첨부된 PDF 페이지 이미지들을 분석하여 수식, 도표, 그래프, 계산 과정을 포함한 문제를 출제하세요.${text ? '\n아래 추출된 텍스트도 함께 참고하세요.' : ''}\n`
+    ? `위에 첨부된 PDF 페이지 이미지들을 분석하여 수식, 도표, 그래프, 계산 과정을 포함한 문제를 출제하세요.${text ? '\n아래 추출된 텍스트도 함께 참고하세요.' : ''}\n이미지를 직접 보고 풀어야 하는 문제에는 반드시 "imageIndex": N (0부터 시작하는 이미지 순서 번호)을 포함하세요.\n`
     : '';
 
   const textSection = text
     ? `[학습 자료]\n${text}\n\n`
     : '';
+
+  const langRule = language === 'en'
+    ? '1. All questions, options, answers, and explanations must be written in English.'
+    : '1. 반드시 한국어로 작성하세요.';
 
   return `당신은 대학교 시험을 전문으로 출제하는 교수입니다.
 ${isVisionMode ? '첨부된 PDF 이미지와 텍스트 자료' : '아래 텍스트'}를 바탕으로 대학생 수준의 시험 문제 총 ${count}개를 생성해주세요.
@@ -307,7 +312,7 @@ ${totalDesc}
 ${typeInstructions}
 
 [작성 규칙]
-1. 반드시 한국어로 작성하세요.
+${langRule}
 2. 교재의 핵심 개념과 중요 원리를 다루는 문제를 만드세요.
 3. 수식, 계산, 도표가 있다면 해당 내용을 문제에 반영하세요.
 4. 문제는 서로 중복되지 않아야 합니다.
@@ -315,17 +320,21 @@ ${typeInstructions}
    - 객관식(mcq) 문제의 경우, 각 선지(①②③④)마다 반드시 \\n\\n으로 구분하여 개별 해설을 작성하세요.
    - 예시: "① ...이므로 옳다.\\n\\n② ...이므로 틀리다.\\n\\n③ ...이므로 옳다."
 6. 반드시 아래 JSON 형식으로만 응답하세요. 추가 텍스트 없이 순수 JSON만 반환하세요.
-7. question 필드는 마크다운 형식으로 작성하세요:
+7. Vision 모드에서 이미지를 직접 보고 풀어야 하는 문제:
+   - 반드시 "imageIndex": N 필드를 포함하세요 (N은 0부터 시작하는 이미지 번호)
+   - question에는 "아래 그래프/표/그림을 보고 답하시오." 같은 참조 문구를 넣으세요.
+   - 이미지 참조 없이도 답할 수 있는 문제에는 imageIndex를 넣지 마세요.
+8. question 필드는 마크다운 형식으로 작성하세요:
    - 표 형태의 자료는 반드시 마크다운 표(| 헤더 | 헤더 | 형식)로 작성하세요.
    - 수식은 **굵게** 형식으로 강조하세요.
-   - 자료, 조건 등 구분이 필요한 항목은 **[자료]** 처럼 굵게 표시하고 줄바꿈으로 구분하세요.
-8. question 필드에 절대 포함하지 말아야 할 것:
+   - [자료], [문제], [조건], [보기] 같은 대괄호 레이블은 절대 사용하지 마세요. 자료나 조건이 있으면 그냥 본문에 자연스럽게 서술하거나 줄바꿈으로 구분하세요.
+9. question 필드에 절대 포함하지 말아야 할 것:
    - 공식, 수식, 계산 방법, 풀이 과정 (예: E(r) = Σ..., σ(r) = ... 같은 수식)
      → 학생이 직접 알고 있어야 하는 내용이므로 절대 문제에 제시하지 마세요.
    - [계산 과정], [공식], [풀이] 등 원문에 있는 공식 섹션도 그대로 복사하지 마세요.
    - 선지 번호 (①②③④ 또는 A/B/C/D 등). 선지는 반드시 options 배열에만 넣으세요.
    ※ 단, 숫자 데이터가 담긴 표나 [자료] 섹션은 포함해도 됩니다.
-9. JSON 형식 주의사항:
+10. JSON 형식 주의사항:
    - JSON 문자열 값 안의 줄바꿈은 반드시 \\n으로 표시하세요 (실제 줄바꿈 문자 사용 금지)
    - 쌍따옴표(")는 반드시 \\"로 이스케이프하세요.
 

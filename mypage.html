@@ -187,8 +187,7 @@
         <div id="nav-auth-logged-in" class="nav-user" style="display:none">
           <img class="nav-avatar" id="nav-avatar" src="" alt="avatar" />
           <a href="/mypage.html" class="nav-username" id="nav-username" style="text-decoration:none;color:inherit"></a>
-          <span class="nav-credits" id="nav-credits">0</span>
-          <span class="nav-plan-badge free" id="nav-plan-badge">Free</span>
+          <a href="/payment.html" class="nav-plan-badge free" style="text-decoration:none;cursor:pointer">⚡ <span id="nav-credits">0</span>문제</a>
           <button class="btn btn-ghost btn-sm" id="nav-logout-btn">로그아웃</button>
         </div>
       </div>
@@ -232,6 +231,10 @@
             <div class="stat-label">⚡ 보유 크레딧</div>
           </div>
           <div class="stat-card">
+            <div class="stat-value" id="stat-free-points" style="color:#34d399">-</div>
+            <div class="stat-label">🟢 무료 포인트</div>
+          </div>
+          <div class="stat-card">
             <div class="stat-value" id="stat-quizzes">-</div>
             <div class="stat-label">📝 생성한 퀴즈</div>
           </div>
@@ -265,6 +268,14 @@
           </div>
           <div id="my-posts-more" style="display:none;margin-top:12px">
             <a href="/community.html" class="btn btn-ghost btn-sm">놀이터에서 전체 보기</a>
+          </div>
+        </div>
+
+        <!-- 북마크 -->
+        <div class="mypage-section">
+          <div class="section-title">🔖 저장한 게시글</div>
+          <div id="bookmarks-list">
+            <div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">불러오는 중...</div>
           </div>
         </div>
 

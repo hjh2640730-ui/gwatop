@@ -127,6 +127,21 @@ function renderQuestion(idx) {
   const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
   typeBadge.textContent = types[q.type] || '📝 문제';
 
+  // Question image (from PDF page)
+  let questionImage = document.getElementById('question-image');
+  if (q.imageData) {
+    if (!questionImage) {
+      questionImage = document.createElement('img');
+      questionImage.id = 'question-image';
+      questionImage.style.cssText = 'width:100%;max-width:600px;border-radius:8px;margin-bottom:12px;display:block';
+      questionText.parentNode.insertBefore(questionImage, questionText);
+    }
+    questionImage.src = `data:image/jpeg;base64,${q.imageData}`;
+    questionImage.style.display = 'block';
+  } else if (questionImage) {
+    questionImage.style.display = 'none';
+  }
+
   // Question
   questionText.innerHTML = marked.parse(q.question);
 
@@ -234,8 +249,16 @@ function setupControls() {
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
-    // textarea 포커스 상태에서는 Enter 단축키 무시
-    if (e.target === shortInput) return;
+    if (e.target === shortInput) {
+      // 주관식 입력창에서 Enter → 제출
+      if (e.key === 'Enter' && !answered && !submitBtn.disabled) {
+        e.preventDefault();
+        handleSubmit();
+      } else if (e.key === 'Enter' && answered) {
+        handleNext();
+      }
+      return;
+    }
     if (e.key === 'Enter' && !answered && !submitBtn.disabled) handleSubmit();
     else if (e.key === 'Enter' && answered) handleNext();
     if (e.key === 'Escape' && !answered) quitModal.classList.toggle('visible');
@@ -251,22 +274,53 @@ function setupControls() {
 }
 
 // ─── Submit ───
-function handleSubmit() {
+async function handleSubmit() {
   if (answered) return;
   const q = questions[currentIdx];
 
-  // Get answer
   if (q.type === 'short') {
     currentAnswer = shortInput.value.trim();
   }
 
   if (!currentAnswer) return;
 
+  submitBtn.disabled = true;
+
+  let isCorrect;
+  if (q.type === 'short') {
+    const ua = normalizeKorean(currentAnswer);
+    const ca = normalizeKorean(q.answer);
+    // 빠른 경로: 정확 일치 또는 포함 관계
+    if (ua === ca || ua.includes(ca) || ca.includes(ua)) {
+      isCorrect = true;
+    } else if (keywordOverlap(ua, ca)) {
+      isCorrect = true;
+    } else {
+      // 문장형은 AI 채점
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = '채점 중...';
+      try {
+        const res = await fetch('/api/grade-short', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userAnswer: currentAnswer, correctAnswer: q.answer }),
+        });
+        const data = await res.json();
+        isCorrect = (data.correct !== null && data.correct !== undefined)
+          ? data.correct
+          : checkAnswer(q, currentAnswer);
+      } catch {
+        isCorrect = checkAnswer(q, currentAnswer);
+      }
+      submitBtn.textContent = originalText;
+    }
+  } else {
+    isCorrect = checkAnswer(q, currentAnswer);
+  }
+
   answered = true;
   submitBtn.style.display = 'none';
   nextBtn.style.display = '';
-
-  const isCorrect = checkAnswer(q, currentAnswer);
 
   if (isCorrect) {
     correctCount++;
@@ -329,7 +383,7 @@ function checkAnswer(q, userAnswer) {
     if (ua === ca) return true;
     if (ua.includes(ca) || ca.includes(ua)) return true;
     // Similarity check
-    if (ca.length >= 4 && similarity(ua, ca) > 0.75) return true;
+    if (ca.length >= 4 && similarity(ua, ca) >= 0.80) return true;
     return false;
   }
   return false;
@@ -341,20 +395,40 @@ function normalizeAnswer(ans) {
 
 function normalizeKorean(str) {
   return (str || '').trim().toLowerCase()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()\[\]]/g, '')
-    .replace(/\s+/g, ' ');
+    .replace(/[₀₁₂₃₄₅₆₇₈₉]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x2050))  // 아랫첨자 → 숫자
+    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, c => '0123456789'['⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)])       // 윗첨자 → 숫자
+    .replace(/[_\-]/g, '')   // P_O2 → PO2, P-H2O → PH2O
+    .replace(/[.,\/#!$%\^&\*;:{}=`~()\[\]]/g, '')
+    .replace(/\s+/g, '');
+}
+
+// 정답의 핵심 키워드(2글자 이상)가 사용자 답안에 모두 포함되는지 검사
+function keywordOverlap(userNorm, correctNorm) {
+  // 2글자 이상 토큰 추출 (공백/구두점 기준 분리 전 원본 문자열로)
+  const tokens = correctNorm.match(/[가-힣a-z0-9]{2,}/g) || [];
+  if (tokens.length === 0) return false;
+  return tokens.every(token => userNorm.includes(token));
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
 }
 
 function similarity(a, b) {
   if (!a || !b) return 0;
-  const longer = a.length > b.length ? a : b;
-  const shorter = a.length > b.length ? b : a;
-  if (longer.length === 0) return 1.0;
-  let matches = 0;
-  for (let i = 0; i < shorter.length; i++) {
-    if (longer.includes(shorter[i])) matches++;
-  }
-  return matches / longer.length;
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1.0;
+  return 1 - levenshtein(a, b) / maxLen;
 }
 
 // ─── Reveal Answer UI ───

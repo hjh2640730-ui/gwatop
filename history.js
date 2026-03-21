@@ -47,10 +47,8 @@ function setupNav() {
       li.style.display = 'flex';
       document.getElementById('nav-avatar').src = user.photoURL || '';
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
-      const plan = userData?.plan || 'free';
-      const badge = document.getElementById('nav-plan-badge');
-      badge.textContent = plan === 'premium' ? 'Premium' : 'Free';
-      badge.className = `nav-plan-badge ${plan}`;
+      const creditsEl = document.getElementById('nav-credits');
+      if (creditsEl) creditsEl.textContent = userData?.credits ?? 0;
       loadAll(currentUid);
       checkAndShowNicknameModal(user, userData);
     } else {

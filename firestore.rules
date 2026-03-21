@@ -58,6 +58,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── 가위바위보 게임 ──
+    match /games/{gameId} {
+      // 로그인 유저는 게임 목록 읽기 가능 (방 목록 표시)
+      allow read: if request.auth != null;
+      // 쓰기는 서버(Cloudflare Function)에서만
+      allow write: if false;
+    }
+
     // ── 나머지 모든 접근 거부 ──
     match /{document=**} {
       allow read, write: if false;

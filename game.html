@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GWATOP - 가위바위보 게임</title>
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .game-page { max-width: 480px; margin: 0 auto; padding: calc(var(--nav-height) + 32px) 16px 100px; }
+
+    /* Header */
+    .game-header { margin-bottom: 24px; }
+    .game-header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .game-title { font-size: clamp(22px,5vw,32px); font-weight: 900; letter-spacing: -1px; }
+    .game-desc { font-size: 13px; color: var(--text-muted); }
+    .game-fp-bar {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--glass-bg); border: 1px solid rgba(52,211,153,0.25);
+      border-radius: var(--radius-lg); padding: 14px 18px; margin-bottom: 20px;
+    }
+    .game-fp-icon { font-size: 22px; }
+    .game-fp-label { font-size: 13px; color: var(--text-muted); }
+    .game-fp-value { font-size: 22px; font-weight: 900; color: #34d399; margin-left: auto; }
+    .game-fp-hint { font-size: 11px; color: var(--text-muted); }
+
+    /* Rooms list */
+    .section-label {
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;
+    }
+    .rooms-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; min-height: 48px; }
+    .room-card {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-radius: var(--radius-lg);
+      border: 1px solid var(--glass-border); background: var(--glass-bg);
+      cursor: pointer; transition: all var(--transition); font-family: var(--font); width: 100%;
+    }
+    .room-card:hover { background: var(--glass-bg-hover); border-color: rgba(52,211,153,0.4); }
+    .room-card.mine { cursor: default; border-color: rgba(124,58,237,0.3); background: rgba(124,58,237,0.05); }
+    .room-card-left { display: flex; align-items: center; gap: 10px; }
+    .room-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: var(--glass-bg); flex-shrink: 0; }
+    .room-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+    .room-mine-badge {
+      font-size: 10px; font-weight: 700; color: #a78bfa;
+      background: rgba(124,58,237,0.12); border-radius: var(--radius-full);
+      padding: 2px 6px; margin-left: 6px;
+    }
+    .room-wager {
+      font-size: 13px; font-weight: 800; color: #34d399;
+      background: rgba(16,185,129,0.1); border-radius: var(--radius-full); padding: 4px 10px;
+    }
+    .room-empty { color: var(--text-muted); font-size: 14px; text-align: center; padding: 20px 0; }
+
+    /* Create form */
+    .create-section {
+      background: var(--glass-bg); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg); padding: 20px; margin-bottom: 20px;
+    }
+    .create-section-title { font-size: 14px; font-weight: 800; margin-bottom: 16px; }
+    .wager-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .wager-row input[type=range] { flex: 1; accent-color: #34d399; height: 4px; }
+    .wager-val-display {
+      font-size: 28px; font-weight: 900; color: #34d399; min-width: 40px; text-align: right; line-height: 1;
+    }
+    .wager-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+
+    /* Game Modal */
+    .rps-vs { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 4px; gap: 8px; }
+    .rps-player { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; }
+    .rps-player-avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--glass-bg); }
+    .rps-player-name { font-size: 11px; color: var(--text-muted); text-align: center; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rps-vs-text { font-size: 14px; font-weight: 900; color: var(--text-muted); flex-shrink: 0; }
+    .rps-wager { text-align: center; font-size: 13px; color: #34d399; font-weight: 700; margin: 8px 0 14px; }
+    .rps-choices { display: flex; justify-content: center; gap: 10px; margin: 12px 0; }
+    .rps-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 16px 18px; border-radius: var(--radius-lg);
+      border: 2px solid var(--glass-border); background: var(--glass-bg);
+      color: var(--text-primary); font-family: var(--font); font-size: 13px; font-weight: 700;
+      cursor: pointer; transition: all var(--transition); min-width: 86px;
+    }
+    .rps-btn .rps-emoji { font-size: 30px; line-height: 1; }
+    .rps-btn:hover:not(:disabled) { border-color: rgba(52,211,153,0.55); background: rgba(16,185,129,0.08); }
+    .rps-btn.selected { border-color: #34d399; background: rgba(16,185,129,0.15); }
+    .rps-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .rps-status { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 8px; min-height: 20px; }
+    .rps-result-row { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 16px 0; }
+    .rps-result-side { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .rps-result-emoji { font-size: 40px; line-height: 1; }
+    .rps-result-label { font-size: 11px; color: var(--text-muted); }
+    .rps-result-vs-txt { font-size: 18px; color: var(--text-muted); font-weight: 900; }
+    .rps-point-change { text-align: center; font-size: 20px; font-weight: 900; margin: 10px 0 18px; }
+    .rps-point-change.win { color: #34d399; }
+    .rps-point-change.lose { color: #ef4444; }
+    .rps-point-change.draw { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="bg-gradient"></div>
+  <div class="bg-noise"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo"><span class="nav-logo-text">GWATOP</span></a>
+      <ul class="nav-links">
+        <li><a href="/">홈</a></li>
+        <li><a href="/community.html">놀이터</a></li>
+        <li><a href="/game.html" class="active">게임</a></li>
+      </ul>
+      <div class="nav-right">
+        <div id="nav-auth-logged-out" style="display:none">
+          <button class="btn btn-primary" id="nav-login-btn">로그인</button>
+        </div>
+        <div id="nav-auth-logged-in" class="nav-user" style="display:none">
+          <img class="nav-avatar" id="nav-avatar" src="" alt="avatar" />
+          <a href="/mypage.html" class="nav-username" id="nav-username" style="text-decoration:none;color:inherit"></a>
+          <a href="/payment.html" class="nav-plan-badge free" style="text-decoration:none;cursor:pointer">⚡ <span id="nav-credits">0</span>문제</a>
+          <button class="btn btn-ghost btn-sm" id="nav-logout-btn">로그아웃</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="game-page">
+
+    <div class="game-header">
+      <div class="game-header-top">
+        <h1 class="game-title">✊ 가위바위보</h1>
+        <a href="/community.html" class="btn btn-ghost btn-sm">← 놀이터</a>
+      </div>
+      <p class="game-desc">무료 포인트로 즐기는 1:1 배팅 게임 · 출석체크로 포인트를 획득하세요</p>
+    </div>
+
+    <!-- Free Points Bar -->
+    <div class="game-fp-bar" id="game-fp-bar">
+      <span class="game-fp-icon">🟢</span>
+      <div>
+        <div class="game-fp-label">내 무료 포인트</div>
+        <div class="game-fp-hint">출석체크 시 +1P 지급</div>
+      </div>
+      <div class="game-fp-value" id="my-fp">-</div>
+    </div>
+
+    <!-- Create Room -->
+    <div class="create-section">
+      <div class="create-section-title">방 만들기</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">배팅 포인트 선택 (1~10P)</div>
+      <div class="wager-row">
+        <input type="range" min="1" max="10" value="3" id="wager-slider" />
+        <div class="wager-val-display"><span id="wager-val">3</span>P</div>
+      </div>
+      <button class="btn btn-primary btn-full" id="create-room-btn">✊ 방 만들기</button>
+    </div>
+
+    <!-- Open Rooms -->
+    <div class="section-label">열린 게임방</div>
+    <div class="rooms-wrap" id="rooms-list">
+      <div class="room-empty">불러오는 중...</div>
+    </div>
+
+  </main>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="mobile-bottom-nav">
+    <a href="/" class="mbn-item"><span class="mbn-icon">🏠</span>홈</a>
+    <a href="/create.html" class="mbn-item"><span class="mbn-icon">⚡</span>퀴즈</a>
+    <a href="/community.html" class="mbn-item"><span class="mbn-icon">🎮</span>놀이터</a>
+    <a href="/game.html" class="mbn-item active"><span class="mbn-icon">✊</span>게임</a>
+  </nav>
+
+  <!-- Game Play Modal -->
+  <div class="modal-overlay" id="game-modal">
+    <div class="modal" style="max-width:360px">
+
+      <!-- choose -->
+      <div id="state-choose">
+        <div class="rps-vs" id="vs-display"></div>
+        <div class="rps-wager">🟢 배팅: <span id="c-wager">0</span>P</div>
+        <div class="rps-choices">
+          <button class="rps-btn" data-choice="가위"><span class="rps-emoji">✌️</span>가위</button>
+          <button class="rps-btn" data-choice="바위"><span class="rps-emoji">✊</span>바위</button>
+          <button class="rps-btn" data-choice="보"><span class="rps-emoji">🖐️</span>보</button>
+        </div>
+        <p class="rps-status" id="rps-status"></p>
+      </div>
+
+      <!-- result -->
+      <div id="state-result" style="display:none">
+        <div class="modal-icon" id="result-icon" style="font-size:44px">🏆</div>
+        <h2 class="modal-title" id="result-title">승리!</h2>
+        <div class="rps-result-row" id="result-choices"></div>
+        <div class="rps-point-change" id="result-points"></div>
+        <button class="btn btn-primary btn-full" id="result-close-btn">확인</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal">
+      <div class="modal-icon">👋</div>
+      <h2 class="modal-title">로그인하기</h2>
+      <p class="modal-desc">소셜 계정으로 간편하게 시작하세요.</p>
+      <div class="social-login-btns">
+        <button class="btn btn-google btn-full" id="modal-login-google">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+          Google로 계속하기
+        </button>
+        <button class="btn btn-kakao btn-full" id="modal-login-kakao">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:#3C1E1E;color:#FEE500;font-size:13px;font-weight:900;border-radius:3px;flex-shrink:0">K</span>
+          카카오로 계속하기
+        </button>
+        <button class="btn btn-naver btn-full" id="modal-login-naver">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;background:white;color:#03C75A;font-size:13px;font-weight:900;border-radius:3px;flex-shrink:0">N</span>
+          네이버로 계속하기
+        </button>
+      </div>
+      <button class="btn btn-ghost btn-full" id="modal-close-btn" style="margin-top:8px">취소</button>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script type="module" src="/game.js"></script>
+</body>
+</html>

@@ -289,6 +289,7 @@ function openEditModal(uid) {
   document.getElementById('edit-university-input').value = user.university || '';
   document.getElementById('edit-nickname-input').value = user.nickname || '';
   document.getElementById('edit-credits-input').value = user.credits;
+  document.getElementById('edit-freepoints-input').value = user.freePoints ?? 0;
   document.getElementById('edit-referral-input').value = user.referralCredits ?? 0;
   document.getElementById('edit-modal').classList.add('visible');
 }
@@ -301,12 +302,17 @@ function closeEditModal() {
 async function saveEdits() {
   if (!editingUid) return;
   const credits = parseInt(document.getElementById('edit-credits-input').value);
+  const freePoints = parseInt(document.getElementById('edit-freepoints-input').value);
   const referralCredits = parseInt(document.getElementById('edit-referral-input').value);
   const nickname = document.getElementById('edit-nickname-input').value.trim();
   const university = document.getElementById('edit-university-input').value.trim();
 
   if (isNaN(credits) || credits < 0) {
     showToast('올바른 크레딧 값을 입력해주세요.', 'error');
+    return;
+  }
+  if (isNaN(freePoints) || freePoints < 0) {
+    showToast('올바른 무료 포인트 값을 입력해주세요.', 'error');
     return;
   }
 
@@ -318,7 +324,7 @@ async function saveEdits() {
     const res = await fetch('/api/admin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: idToken, action: 'updateUser', uid: editingUid, credits, referralCredits, nickname, university }),
+      body: JSON.stringify({ token: idToken, action: 'updateUser', uid: editingUid, credits, freePoints, referralCredits, nickname, university }),
     });
     const data = await res.json();
 
@@ -330,6 +336,7 @@ async function saveEdits() {
     const user = allUsers.find(u => u.uid === editingUid);
     if (user) {
       user.credits = credits;
+      user.freePoints = freePoints;
       user.referralCredits = referralCredits;
       user.nickname = nickname;
       user.university = university;

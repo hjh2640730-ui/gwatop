@@ -301,6 +301,7 @@ async function generateQuiz() {
   const checked = [...document.querySelectorAll('input[name="quiz-type"]:checked')].map(el => el.value);
   const types = checked.length > 0 ? checked : ['mcq'];
   const count = parseInt(countSlider?.value || 15);
+  const lang = document.querySelector('input[name="quiz-lang"]:checked')?.value || 'ko';
 
   showLoading(true);
   generateBtn.disabled = true;
@@ -341,6 +342,7 @@ async function generateQuiz() {
         images: hasImages ? extractedImages : undefined,
         types,
         count,
+        lang,
         idToken
       })
     });
@@ -353,6 +355,16 @@ async function generateQuiz() {
     const data = await response.json();
     if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
       throw new Error('퀴즈 데이터를 파싱하지 못했습니다. 다시 시도해주세요.');
+    }
+
+    // Attach image data to questions that reference a specific PDF page image
+    if (hasImages && extractedImages.length > 0) {
+      data.questions = data.questions.map(q => {
+        if (q.imageIndex !== undefined && extractedImages[q.imageIndex]) {
+          return { ...q, imageData: extractedImages[q.imageIndex] };
+        }
+        return q;
+      });
     }
 
     // 3) Deduct credits (문제 수 기반)

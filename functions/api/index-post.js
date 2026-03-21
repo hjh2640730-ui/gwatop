@@ -129,6 +129,8 @@ export async function onRequestPost(context) {
       likes: post.likes || 0,
       commentCount: post.commentCount || 0,
       imageUrl: post.imageUrl || '',
+      imageUrls: Array.isArray(post.imageUrls) ? post.imageUrls : [],
+      category: post.category || '',
     };
 
     const res = await fetch(`${algoliaBase}/${postId}`, {

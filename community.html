@@ -9,24 +9,187 @@
   <style>
     /* ── Community Layout ── */
     .community-header {
-      padding: clamp(32px,5vw,56px) 0 28px;
+      padding: clamp(32px,5vw,56px) 0 20px;
+    }
+    .community-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
     }
     .community-title {
       font-size: clamp(26px,5vw,40px);
       font-weight: 900;
       letter-spacing: -1px;
-      margin-bottom: 6px;
     }
-    .community-desc { color: var(--text-secondary); font-size: 15px; }
+    .community-desc { color: var(--text-secondary); font-size: 14px; margin-bottom: 16px; }
+
+    /* ── Attendance Button ── */
+    .attendance-btn {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 16px;
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(124,58,237,0.3);
+      background: rgba(124,58,237,0.08);
+      color: #a78bfa;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+    .attendance-btn:hover { background: rgba(124,58,237,0.15); border-color: rgba(124,58,237,0.5); }
+    .attendance-btn.checked {
+      background: rgba(16,185,129,0.08);
+      border-color: rgba(16,185,129,0.3);
+      color: #10b981;
+      cursor: default;
+    }
+
+    /* ── Ranking Widget ── */
+    .ranking-widget {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+    .ranking-widget-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+    .ranking-widget-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+    .ranking-toggle-icon {
+      font-size: 12px;
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+    .ranking-widget.collapsed .ranking-toggle-icon { transform: rotate(-90deg); }
+    .ranking-list { display: flex; flex-direction: column; gap: 6px; }
+    .ranking-widget.collapsed .ranking-list { display: none; }
+    .ranking-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background var(--transition);
+      text-decoration: none;
+    }
+    .ranking-item:hover { background: var(--glass-bg-hover); }
+    .ranking-num {
+      font-size: 13px;
+      font-weight: 900;
+      min-width: 20px;
+      color: var(--text-muted);
+    }
+    .ranking-num.top1 { color: #f59e0b; }
+    .ranking-num.top2 { color: #94a3b8; }
+    .ranking-num.top3 { color: #cd7c2f; }
+    .ranking-text {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .ranking-likes {
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    /* ── Game Entry Card ── */
+    .game-entry-card {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--glass-bg); border: 1px solid rgba(52,211,153,0.25);
+      border-radius: var(--radius-lg); padding: 16px 20px; margin-bottom: 16px;
+      text-decoration: none; cursor: pointer; transition: all var(--transition);
+    }
+    .game-entry-card:hover { background: rgba(16,185,129,0.06); border-color: rgba(52,211,153,0.5); }
+    .game-entry-left { display: flex; align-items: center; gap: 14px; }
+    .game-entry-icon { font-size: 28px; line-height: 1; }
+    .game-entry-title { font-size: 14px; font-weight: 800; color: var(--text-primary); margin-bottom: 3px; }
+    .game-entry-desc { font-size: 12px; color: var(--text-muted); }
+    .game-entry-arrow { font-size: 22px; color: #34d399; font-weight: 900; }
+
+    /* ── Search ── */
+    .community-search-wrap {
+      margin-bottom: 16px;
+    }
+    .community-search-input {
+      width: 100%;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      padding: 11px 18px;
+      font-family: var(--font);
+      font-size: 14px;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color var(--transition);
+      box-sizing: border-box;
+    }
+    .community-search-input:focus { border-color: rgba(124,58,237,0.4); }
+    .community-search-input::placeholder { color: var(--text-muted); }
+
+    /* ── Category Tabs ── */
+    .category-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-bottom: 2px;
+    }
+    .category-tabs::-webkit-scrollbar { display: none; }
+    .cat-tab {
+      padding: 7px 14px;
+      border-radius: var(--radius-full);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--glass-border);
+      background: transparent;
+      color: var(--text-secondary);
+      transition: all var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .cat-tab:hover { color: var(--text-primary); background: var(--glass-bg); }
+    .cat-tab.active {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(37,99,235,0.15));
+      border-color: rgba(124,58,237,0.35);
+      color: #a78bfa;
+    }
 
     /* ── Sort Controls ── */
     .community-controls {
       display: flex;
       align-items: center;
-      justify-content: flex-end;
-      gap: 6px;
+      justify-content: space-between;
+      gap: 8px;
       margin-bottom: 20px;
+      flex-wrap: wrap;
     }
+    .sort-group { display: flex; gap: 6px; }
     .sort-btn {
       padding: 8px 16px;
       border-radius: var(--radius-full);
@@ -44,6 +207,24 @@
       background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(37,99,235,0.15));
       border-color: rgba(124,58,237,0.35);
       color: #a78bfa;
+    }
+    .my-uni-btn {
+      padding: 8px 14px;
+      border-radius: var(--radius-full);
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--glass-border);
+      background: transparent;
+      color: var(--text-muted);
+      transition: all var(--transition);
+    }
+    .my-uni-btn:hover { color: var(--text-secondary); background: var(--glass-bg); }
+    .my-uni-btn.active {
+      background: rgba(37,99,235,0.1);
+      border-color: rgba(37,99,235,0.3);
+      color: #60a5fa;
     }
 
     /* ── Post Cards ── */
@@ -76,7 +257,7 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 15px; font-weight: 800; color: white; flex-shrink: 0;
     }
-    .post-author-name { font-size: 14px; font-weight: 700; margin-right: 6px; }
+    .post-author-name { font-size: 14px; font-weight: 700; margin-right: 4px; }
     .post-uni-badge {
       display: inline-block;
       font-size: 11px; font-weight: 600;
@@ -87,41 +268,53 @@
       color: #a78bfa;
       vertical-align: middle;
     }
+    .post-category-badge {
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      background: rgba(16,185,129,0.08);
+      border: 1px solid rgba(16,185,129,0.2);
+      color: #34d399;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
     .post-time { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
 
-    /* ── Card Body (title + preview + thumb) ── */
-    .post-card-body {
-      margin-bottom: 14px;
-    }
+    /* ── Card Body ── */
+    .post-card-body { margin-bottom: 14px; }
     .post-card-title {
-      font-size: 16px;
-      font-weight: 800;
-      color: var(--text-primary);
-      margin-bottom: 6px;
-      line-height: 1.4;
-      word-break: break-word;
+      font-size: 16px; font-weight: 800;
+      color: var(--text-primary); margin-bottom: 6px;
+      line-height: 1.4; word-break: break-word;
     }
     .post-card-preview {
-      font-size: 14px;
-      line-height: 1.65;
-      color: var(--text-secondary);
-      word-break: break-word;
-      white-space: pre-line;
+      font-size: 14px; line-height: 1.65;
+      color: var(--text-secondary); word-break: break-word; white-space: pre-line;
     }
     .post-card-thumb {
-      display: block;
-      width: 80px;
-      height: 80px;
-      object-fit: cover;
-      border-radius: var(--radius-md);
-      margin-top: 10px;
-      border: 1px solid var(--glass-border);
+      display: block; width: 80px; height: 80px;
+      object-fit: cover; border-radius: var(--radius-md);
+      margin-top: 10px; border: 1px solid var(--glass-border);
+    }
+    .post-card-images {
+      display: flex; gap: 6px; margin-top: 10px;
+    }
+    .post-card-images img {
+      width: 72px; height: 72px;
+      object-fit: cover; border-radius: var(--radius-md);
+      border: 1px solid var(--glass-border); flex-shrink: 0;
     }
 
+    /* ── Card Footer ── */
     .post-footer {
       display: flex; align-items: center; gap: 8px;
       padding-top: 12px;
       border-top: 1px solid var(--glass-border);
+    }
+    .post-footer-right {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 6px;
     }
     .post-like-btn {
       display: flex; align-items: center; gap: 5px;
@@ -134,30 +327,31 @@
       color: var(--text-secondary);
       transition: all var(--transition), transform 0.15s var(--transition-bounce);
     }
-    .post-like-btn:hover:not(:disabled) {
-      background: var(--glass-bg); color: var(--text-primary); border-color: var(--glass-border-hover);
-    }
-    .post-like-btn.liked {
-      background: rgba(239,68,68,0.08);
-      border-color: rgba(239,68,68,0.25);
-      color: #f87171;
-    }
+    .post-like-btn:hover:not(:disabled) { background: var(--glass-bg); color: var(--text-primary); border-color: var(--glass-border-hover); }
+    .post-like-btn.liked { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); color: #f87171; }
     .post-like-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .like-maxed {
-      font-size: 9px; font-weight: 800;
-      background: linear-gradient(135deg,#7c3aed,#2563eb);
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-left: 2px;
-    }
+    .like-maxed { font-size: 9px; font-weight: 800; background: linear-gradient(135deg,#7c3aed,#2563eb); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-left: 2px; }
     .post-comment-count-wrap {
       display: flex; align-items: center; gap: 5px;
       padding: 6px 12px;
       border-radius: var(--radius-full);
       border: 1px solid var(--glass-border);
-      font-size: 13px; font-weight: 600;
-      color: var(--text-secondary);
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
     }
+    .post-action-btn {
+      display: flex; align-items: center; justify-content: center;
+      height: 32px; padding: 0 10px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--glass-border);
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px; font-weight: 600; font-family: var(--font);
+      transition: all var(--transition);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .post-action-btn:hover { background: var(--glass-bg); color: var(--text-secondary); border-color: var(--glass-border-hover); }
+    .post-action-btn.bookmarked { color: #f59e0b; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.08); }
 
     /* ── Skeleton ── */
     .post-skeleton {
@@ -180,9 +374,9 @@
 
     /* ── FAB ── */
     #write-fab {
-      position: fixed; bottom: 32px; right: 32px;
+      position: fixed; bottom: 84px; right: 20px;
       display: flex; align-items: center; gap: 8px;
-      padding: 14px 24px;
+      padding: 14px 22px;
       background: var(--accent-gradient); color: white;
       border: none; border-radius: var(--radius-full);
       font-family: var(--font); font-size: 15px; font-weight: 700;
@@ -192,11 +386,12 @@
     }
     #write-fab:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 12px 40px rgba(124,58,237,0.55); }
     #write-fab:active { transform: scale(0.97); }
+    @media (min-width: 769px) {
+      #write-fab { bottom: 32px; right: 32px; }
+    }
 
     /* ── University Setup Modal ── */
     #university-setup-modal { z-index: 210; }
-
-    /* ── Shared: Uni Search ── */
     .uni-search-input {
       width: 100%; background: var(--glass-bg); border: 1px solid var(--glass-border);
       border-radius: var(--radius-md); padding: 12px 16px;
@@ -235,6 +430,24 @@
     }
     .write-uni-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
     #write-modal-uni { font-size: 13px; font-weight: 700; color: #a78bfa; }
+    .write-category-row {
+      display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .write-cat-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-full);
+      font-family: var(--font); font-size: 12px; font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--glass-border);
+      background: transparent; color: var(--text-muted);
+      transition: all var(--transition);
+    }
+    .write-cat-btn:hover { color: var(--text-secondary); background: var(--glass-bg); }
+    .write-cat-btn.active {
+      background: rgba(16,185,129,0.1);
+      border-color: rgba(16,185,129,0.3);
+      color: #34d399;
+    }
     #post-title {
       width: 100%;
       background: var(--glass-bg); border: 1px solid var(--glass-border);
@@ -275,25 +488,77 @@
     #post-content::placeholder { color: var(--text-muted); }
     .write-footer-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
     #post-char-count { font-size: 12px; color: var(--text-muted); }
-    .image-upload-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-    .image-upload-label { font-size: 12px; color: var(--text-muted); }
-    #image-preview-wrap {
-      position: relative; margin-top: 10px;
-      border-radius: var(--radius-md); overflow: hidden;
-    }
-    #image-preview { width: 100%; max-height: 200px; object-fit: cover; display: block; border-radius: var(--radius-md); }
-    #image-remove-btn {
-      position: absolute; top: 8px; right: 8px;
-      background: rgba(0,0,0,0.6); border: none; color: white;
-      width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
-      font-size: 14px; display: flex; align-items: center; justify-content: center;
-    }
-    .write-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
 
-    /* ── Mobile ── */
-    @media (max-width: 768px) {
-      #write-fab { bottom: 80px; right: 16px; padding: 12px 18px; font-size: 14px; }
+    /* ── Multi-Image Upload ── */
+    .image-upload-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .image-upload-label { font-size: 12px; color: var(--text-muted); }
+    .image-previews-wrap {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
     }
+    .image-preview-item {
+      position: relative; width: 80px; height: 80px;
+      border-radius: var(--radius-md); overflow: hidden;
+      border: 1px solid var(--glass-border); flex-shrink: 0;
+    }
+    .image-preview-item img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .image-preview-remove {
+      position: absolute; top: 4px; right: 4px;
+      background: rgba(0,0,0,0.65); border: none; color: white;
+      width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+      font-size: 11px; display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Poll Builder ── */
+    .poll-section {
+      margin-top: 14px;
+      padding: 14px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+    }
+    .poll-section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .poll-section-title { font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+    .poll-remove-btn {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 12px; cursor: pointer; transition: color var(--transition);
+    }
+    .poll-remove-btn:hover { color: #f87171; }
+    .poll-option-row { display: flex; gap: 6px; margin-bottom: 6px; }
+    .poll-option-input {
+      flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm); padding: 8px 12px;
+      font-family: var(--font); font-size: 13px; color: var(--text-primary);
+      outline: none; transition: border-color var(--transition);
+    }
+    .poll-option-input:focus { border-color: rgba(124,58,237,0.4); }
+    .poll-option-input::placeholder { color: var(--text-muted); }
+    .poll-option-del {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 16px; padding: 0 4px;
+      transition: color var(--transition);
+    }
+    .poll-option-del:hover { color: #f87171; }
+    .poll-add-option-btn {
+      background: none; border: 1px dashed var(--glass-border);
+      border-radius: var(--radius-sm); padding: 7px;
+      font-family: var(--font); font-size: 12px; color: var(--text-muted);
+      cursor: pointer; width: 100%; transition: all var(--transition);
+    }
+    .poll-add-option-btn:hover { border-color: rgba(124,58,237,0.3); color: #a78bfa; }
+    .add-poll-btn {
+      background: none; border: 1px dashed var(--glass-border);
+      border-radius: var(--radius-sm); padding: 8px 14px;
+      font-family: var(--font); font-size: 12px; color: var(--text-muted);
+      cursor: pointer; transition: all var(--transition); margin-top: 10px;
+    }
+    .add-poll-btn:hover { border-color: rgba(124,58,237,0.3); color: #a78bfa; background: rgba(124,58,237,0.05); }
+
+    .write-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
 
     /* ── Pagination ── */
     .pagination-wrap { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 20px 0 8px; flex-wrap: wrap; }
@@ -303,12 +568,6 @@
     .page-btn[disabled] { opacity: 0.3; cursor: default; }
     .page-ellipsis { display: flex; align-items: center; font-size: 13px; color: var(--text-muted); padding: 0 4px; }
 
-    /* ── Search ── */
-    .community-search-wrap { padding: 4px 0 80px; }
-    .community-search-input { width: 100%; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius-full); padding: 10px 18px; font-family: var(--font); font-size: 14px; color: var(--text-primary); outline: none; transition: border-color var(--transition); box-sizing: border-box; }
-    .community-search-input:focus { border-color: rgba(124,58,237,0.4); }
-    .community-search-input::placeholder { color: var(--text-muted); }
-
     /* ── Feed Banner ── */
     .feed-banner {
       position: relative;
@@ -317,10 +576,17 @@
       border-radius: var(--radius-lg);
       margin-bottom: 12px;
       min-height: 90px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+
+    /* ── Hot Posts Banner ── */
+    .hot-mode-banner {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; margin-bottom: 16px;
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: var(--radius-md);
+      font-size: 13px; color: #f59e0b;
     }
   </style>
 </head>
@@ -345,7 +611,7 @@
         </div>
         <div id="nav-auth-logged-in" class="nav-user" style="display:none">
           <img class="nav-avatar" id="nav-avatar" src="" alt="avatar" />
-          <span class="nav-username" id="nav-username"></span>
+          <a href="/mypage.html" class="nav-username" id="nav-username" style="text-decoration:none;color:inherit"></a>
           <a href="/payment.html" class="nav-plan-badge free" style="text-decoration:none;cursor:pointer">⚡ <span id="nav-credits">0</span>문제</a>
           <button class="btn btn-ghost btn-sm" id="nav-logout-btn">로그아웃</button>
         </div>
@@ -356,15 +622,33 @@
   <main class="page">
     <div class="container" style="max-width:700px">
 
+      <!-- Header -->
       <div class="community-header">
-        <h1 class="community-title">🎮 놀이터</h1>
+        <div class="community-header-top">
+          <h1 class="community-title">🎮 놀이터</h1>
+          <button class="attendance-btn" id="attendance-btn">📅 출석 체크</button>
+        </div>
         <p class="community-desc">전국 대학생들의 자유로운 이야기 공간 · 좋아요 1개당 크레딧 1개 (게시물당 최대 5개)</p>
       </div>
 
-      <!-- Sort -->
+      <!-- Ranking Widget -->
+      <div class="ranking-widget" id="ranking-widget">
+        <div class="ranking-widget-header" id="ranking-toggle">
+          <span class="ranking-widget-title">🔥 이번 주 인기 TOP 5</span>
+          <span class="ranking-toggle-icon">▼</span>
+        </div>
+        <div class="ranking-list" id="ranking-list">
+          <div style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px 0">불러오는 중...</div>
+        </div>
+      </div>
+
+      <!-- Sort Controls -->
       <div class="community-controls">
-        <button class="sort-btn active" id="sort-latest">최신순</button>
-        <button class="sort-btn" id="sort-popular">인기순</button>
+        <div class="sort-group">
+          <button class="sort-btn active" id="sort-latest">최신순</button>
+          <button class="sort-btn" id="sort-popular">인기순</button>
+        </div>
+        <button class="my-uni-btn" id="my-uni-btn">🏫 내 학교만</button>
       </div>
 
       <!-- Feed -->
@@ -373,7 +657,7 @@
       <!-- Empty -->
       <div id="posts-empty" style="display:none" class="posts-empty">
         <div class="posts-empty-icon">💬</div>
-        <h2 class="posts-empty-title">아직 글이 없습니다</h2>
+        <h2 class="posts-empty-title">게시글이 없습니다</h2>
         <p class="posts-empty-desc">첫 번째 글을 작성해보세요!</p>
       </div>
 
@@ -381,9 +665,21 @@
       <div id="pagination-wrap" class="pagination-wrap"></div>
 
       <!-- Search -->
-      <div class="community-search-wrap">
+      <div class="community-search-wrap" style="margin-top:8px;margin-bottom:16px">
         <input type="text" id="community-search" class="community-search-input" placeholder="🔍 제목, 내용, 작성자 검색..." autocomplete="off" />
       </div>
+
+      <!-- Game Entry -->
+      <a href="/game.html" class="game-entry-card" style="margin-bottom:32px">
+        <div class="game-entry-left">
+          <span class="game-entry-icon">✊</span>
+          <div>
+            <div class="game-entry-title">가위바위보 배팅 게임</div>
+            <div class="game-entry-desc">무료 포인트로 즐기는 1:1 배팅 게임 · 최대 10P</div>
+          </div>
+        </div>
+        <span class="game-entry-arrow">›</span>
+      </a>
 
     </div>
   </main>
@@ -399,7 +695,7 @@
     <a href="/mypage.html" class="mbn-item"><span class="mbn-icon">👤</span>마이</a>
   </nav>
 
-  <!-- University Setup Modal (처음 1회만) -->
+  <!-- University Setup Modal -->
   <div class="modal-overlay" id="university-setup-modal">
     <div class="modal" style="max-width:420px">
       <div class="modal-icon">🎮</div>
@@ -420,22 +716,22 @@
 
   <!-- Write Modal -->
   <div class="modal-overlay" id="write-modal">
-    <div class="modal" style="max-width:520px">
+    <div class="modal" style="max-width:520px;max-height:90vh;overflow-y:auto">
       <div class="write-modal-header">
         <span class="write-modal-title">✏️ 새 글 작성</span>
         <button class="write-modal-close-btn" id="write-modal-close">✕</button>
       </div>
 
-      <!-- 학교 (read-only) -->
+      <!-- 학교 -->
       <div class="write-uni-row">
         <span class="write-uni-label">📍 학교</span>
         <span id="write-modal-uni"></span>
       </div>
 
-      <!-- Title -->
+      <!-- 제목 -->
       <input type="text" id="post-title" placeholder="제목 (선택사항)" maxlength="100" />
 
-      <!-- Anonymous Toggle -->
+      <!-- 익명 토글 -->
       <div class="anon-toggle-row">
         <div>
           <div class="anon-toggle-label">익명으로 게시</div>
@@ -447,22 +743,30 @@
         </label>
       </div>
 
-      <!-- Content -->
+      <!-- 내용 -->
       <textarea id="post-content" placeholder="자유롭게 이야기를 나눠보세요...&#10;공부 팁, 시험 후기, 학교 생활 등 무엇이든!"></textarea>
       <div class="write-footer-row">
         <span id="post-char-count">0 / 1000</span>
       </div>
 
-      <!-- Image Upload -->
+      <!-- 이미지 업로드 (최대 3장) -->
       <div class="image-upload-row">
-        <input type="file" id="post-image-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" />
+        <input type="file" id="post-image-input" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none" multiple />
         <button type="button" class="btn btn-glass btn-sm" id="image-upload-btn">📎 사진 첨부</button>
-        <span class="image-upload-label">JPG · PNG · GIF · WEBP · 최대 5MB</span>
+        <span class="image-upload-label">최대 3장 · JPG/PNG/GIF/WEBP · 5MB 이하</span>
       </div>
-      <div id="image-preview-wrap" style="display:none">
-        <img id="image-preview" src="" alt="미리보기" />
-        <button id="image-remove-btn" type="button">✕</button>
+      <div id="image-previews-wrap" class="image-previews-wrap"></div>
+
+      <!-- 투표 추가 -->
+      <div id="poll-section" style="display:none" class="poll-section">
+        <div class="poll-section-header">
+          <span class="poll-section-title">📊 투표</span>
+          <button class="poll-remove-btn" id="poll-remove-btn">투표 제거</button>
+        </div>
+        <div id="poll-options-list"></div>
+        <button class="poll-add-option-btn" id="poll-add-option-btn">+ 선택지 추가 (최대 4개)</button>
       </div>
+      <button class="add-poll-btn" id="add-poll-btn">📊 투표 추가</button>
 
       <!-- Actions -->
       <div class="write-modal-actions">

@@ -94,10 +94,11 @@ export async function onRequestPost(context) {
   }
 
   if (action === 'updateUser') {
-    const { uid, credits, referralCredits, nickname, university } = body;
+    const { uid, credits, freePoints, referralCredits, nickname, university } = body;
     if (!uid) return json({ error: 'uid 누락' }, 400);
     const fields = {};
     if (credits !== undefined) fields.credits = parseInt(credits);
+    if (freePoints !== undefined) fields.freePoints = parseInt(freePoints);
     if (referralCredits !== undefined) fields.referralCredits = parseInt(referralCredits);
     if (nickname !== undefined) fields.nickname = nickname;
     if (university !== undefined) fields.university = university;
@@ -268,6 +269,10 @@ async function updateUserFields(uid, fields, accessToken) {
   if (fields.university !== undefined) {
     firestoreFields.university = { stringValue: fields.university };
     updateMasks.push('university');
+  }
+  if (fields.freePoints !== undefined) {
+    firestoreFields.freePoints = { integerValue: String(fields.freePoints) };
+    updateMasks.push('freePoints');
   }
   if (fields.referralCredits !== undefined) {
     firestoreFields.referralCredits = { integerValue: String(fields.referralCredits) };

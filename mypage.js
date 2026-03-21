@@ -8,7 +8,7 @@ import {
 } from '/auth.js';
 import {
   getFirestore, collection, query, where, orderBy, limit,
-  getDocs, getCountFromServer, writeBatch, doc
+  getDocs, getCountFromServer, writeBatch, doc, getDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { app } from '/auth.js';
@@ -83,6 +83,7 @@ function renderProfile(user, userData) {
 // ─── 통계 렌더 ───
 async function renderStats(user, userData) {
   document.getElementById('stat-credits').textContent = userData?.credits ?? 0;
+  document.getElementById('stat-free-points').textContent = userData?.freePoints ?? 0;
   document.getElementById('stat-quizzes').textContent = userData?.totalQuizzes ?? 0;
   document.getElementById('stat-referrals').textContent = (userData?.referralCredits ?? 0) + ' / 3';
 
@@ -138,6 +139,47 @@ async function renderMyPosts(user) {
     if (snap.docs.length === 5) {
       document.getElementById('my-posts-more').style.display = 'block';
     }
+  } catch {
+    wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">불러오기 실패</div>';
+  }
+}
+
+// ─── 북마크 ───
+async function renderBookmarks() {
+  const wrap = document.getElementById('bookmarks-list');
+  const BOOKMARK_KEY = 'gwatop_bookmarks';
+  let bookmarkIds = [];
+  try { bookmarkIds = JSON.parse(localStorage.getItem(BOOKMARK_KEY) || '[]'); } catch { bookmarkIds = []; }
+
+  if (!bookmarkIds.length) {
+    wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">저장한 게시글이 없습니다.</div>';
+    return;
+  }
+
+  try {
+    const ids = bookmarkIds.slice(0, 10);
+    const docs = await Promise.all(ids.map(id => getDoc(doc(db, 'community_posts', id))));
+    const valid = docs.filter(d => d.exists());
+    if (!valid.length) {
+      wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">저장한 게시글이 없습니다.</div>';
+      return;
+    }
+    wrap.innerHTML = valid.map(d => {
+      const p = d.data();
+      const title = p.title || '(제목 없음)';
+      const likes = p.likes || 0;
+      const comments = p.commentCount || 0;
+      const ago = timeAgo(p.createdAt);
+      const cat = p.category ? `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);margin-right:6px">${p.category}</span>` : '';
+      return `<div class="post-item" onclick="location.href='/post.html?id=${d.id}'">
+        <div class="post-item-title">${cat}${title}</div>
+        <div class="post-item-meta">
+          <span>❤️ ${likes}</span>
+          <span>💬 ${comments}</span>
+          <span>${ago}</span>
+        </div>
+      </div>`;
+    }).join('');
   } catch {
     wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">불러오기 실패</div>';
   }
@@ -264,6 +306,7 @@ onUserChange(async (user, userData) => {
   await Promise.all([
     renderStats(user, userData),
     renderMyPosts(user),
+    renderBookmarks(),
   ]);
 });
 
