@@ -152,6 +152,11 @@ export async function ensureUserDoc(user, extra = {}) {
     }
   } catch (e) {
     console.warn('ensureUserDoc error:', e);
+    // 권한 오류 발생 시 로그인 상태를 유지하면 닉네임 모달에 갇히므로 강제 로그아웃
+    if (e.code === 'permission-denied' || e.code === 'auth/duplicate-account') {
+      try { await signOut(auth); } catch (_) {}
+      throw e;
+    }
   }
 }
 
@@ -309,6 +314,11 @@ export function onUserChange(callback) {
     } catch (e) {
       if (e.code === 'auth/duplicate-account') {
         alert(e.message);
+        callback(null, null);
+        return;
+      }
+      if (e.code === 'permission-denied') {
+        alert('계정 설정 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
         callback(null, null);
         return;
       }

@@ -4,7 +4,9 @@ service cloud.firestore {
 
     // ── 유저 데이터 ──
     match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow get: if request.auth != null && request.auth.uid == uid;
+      // 이메일/전화번호 중복 확인용 (limit 1 쿼리만 허용)
+      allow list: if request.auth != null && request.query.limit == 1;
       allow create: if request.auth != null && request.auth.uid == uid;
       // 본인만 수정 가능. credits/referralCredits는 서버(Cloud Function)에서만 변경
       allow update: if request.auth != null && request.auth.uid == uid;
