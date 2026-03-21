@@ -655,8 +655,6 @@ async function showResults() {
     await updateQuizScore(savedQuizId, pct, wrongAnswers);
   }
 
-  showArea('results');
-
   // Emoji & message
   let emoji = '🎉';
   let title = '훌륭합니다!';
@@ -705,6 +703,9 @@ async function showResults() {
   // Progress bar to 100%
   progressFill.style.width = '100%';
   quizCounter.textContent = `${total} / ${total}`;
+
+  // 모든 DOM 준비 후 한 번에 표시
+  showArea('results');
 }
 
 function getBadgeText(type) {
