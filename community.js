@@ -404,7 +404,7 @@ async function loadAllPosts() {
 async function loadHotPosts() {
   const feed = document.getElementById('posts-feed');
   const emptyEl = document.getElementById('posts-empty');
-  feed.innerHTML = '<div class="post-skeleton"></div><div class="post-skeleton"></div><div class="post-skeleton"></div>';
+  feed.classList.add('feed-loading');
   emptyEl.style.display = 'none';
   document.getElementById('pagination-wrap').innerHTML = '';
 
@@ -425,6 +425,7 @@ async function loadHotPosts() {
     posts.sort((a, b) => (b.likes || 0) - (a.likes || 0));
 
     feed.innerHTML = '';
+    feed.classList.remove('feed-loading');
     if (!posts.length) { emptyEl.style.display = ''; return; }
 
     // Hot 배너
@@ -433,6 +434,7 @@ async function loadHotPosts() {
     await loadLikesForPosts(posts.map(p => p.id));
     posts.forEach(post => renderPostCard(post));
   } catch (e) {
+    feed.classList.remove('feed-loading');
     feed.innerHTML = '';
     console.error('loadHotPosts:', e);
     showToast('게시글을 불러오지 못했습니다.', 'error');
@@ -443,7 +445,7 @@ async function loadHotPosts() {
 async function loadByCategory(category) {
   const feed = document.getElementById('posts-feed');
   const emptyEl = document.getElementById('posts-empty');
-  feed.innerHTML = '<div class="post-skeleton"></div><div class="post-skeleton"></div><div class="post-skeleton"></div>';
+  feed.classList.add('feed-loading');
   emptyEl.style.display = 'none';
   document.getElementById('pagination-wrap').innerHTML = '';
 
@@ -461,8 +463,10 @@ async function loadByCategory(category) {
     isCategoryMode = true;
     currentPage = 1;
     await loadLikesForPosts(categoryPosts.map(p => p.id));
+    feed.classList.remove('feed-loading');
     renderCategoryPage(1);
   } catch (e) {
+    feed.classList.remove('feed-loading');
     feed.innerHTML = '';
     console.error('loadByCategory:', e);
     showToast('게시글을 불러오지 못했습니다.', 'error');
@@ -487,7 +491,7 @@ function renderCategoryPage(page) {
 async function loadPage(pageNum) {
   const feed = document.getElementById('posts-feed');
   const emptyEl = document.getElementById('posts-empty');
-  feed.innerHTML = '<div class="post-skeleton"></div><div class="post-skeleton"></div><div class="post-skeleton"></div>';
+  feed.classList.add('feed-loading');
   emptyEl.style.display = 'none';
   document.getElementById('pagination-wrap').innerHTML = '';
 
@@ -515,8 +519,10 @@ async function loadPage(pageNum) {
     }
     currentPagePosts = posts;
     await loadLikesForPosts(currentPagePosts.map(p => p.id));
+    feed.classList.remove('feed-loading');
     renderCurrentPage();
   } catch (e) {
+    feed.classList.remove('feed-loading');
     feed.innerHTML = '';
     console.error('loadPage:', e);
     showToast('게시글을 불러오지 못했습니다.', 'error');
@@ -528,7 +534,7 @@ async function loadPostsForSearch(searchQuery) {
   if (searchLoading) return;
   searchLoading = true;
   const feed = document.getElementById('posts-feed');
-  feed.innerHTML = '<div class="post-skeleton"></div><div class="post-skeleton"></div><div class="post-skeleton"></div>';
+  feed.classList.add('feed-loading');
   document.getElementById('posts-empty').style.display = 'none';
   document.getElementById('pagination-wrap').innerHTML = '';
   try {
@@ -570,8 +576,10 @@ async function loadPostsForSearch(searchQuery) {
       }));
     filteredPosts = searchAllPosts;
     isSearchMode = true;
+    feed.classList.remove('feed-loading');
     renderSearchPage(1);
   } catch {
+    feed.classList.remove('feed-loading');
     feed.innerHTML = '';
     showToast('검색 중 오류가 발생했습니다.', 'error');
   } finally {

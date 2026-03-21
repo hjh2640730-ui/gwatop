@@ -109,6 +109,20 @@ function setupUI() {
     pwInput.type = pwInput.type === 'password' ? 'text' : 'password';
   });
 
+  // 방 만들기 모달 열기/닫기
+  document.getElementById('open-create-modal-btn')?.addEventListener('click', () => {
+    if (!currentUser) { openLoginModal(); return; }
+    document.getElementById('create-room-modal')?.classList.add('visible');
+  });
+  document.getElementById('create-room-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('create-room-modal')?.classList.remove('visible');
+  });
+  document.getElementById('create-room-modal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('create-room-modal')) {
+      document.getElementById('create-room-modal').classList.remove('visible');
+    }
+  });
+
   const joinPwInput = document.getElementById('join-pw-input');
   document.getElementById('join-pw-toggle')?.addEventListener('click', () => {
     joinPwInput.type = joinPwInput.type === 'password' ? 'text' : 'password';
@@ -160,7 +174,8 @@ function setupUI() {
     const password = pwInput?.value.trim() || '';
     await createRoom(wager, title, password);
     btn.disabled = false;
-    btn.textContent = '✌️ 방 만들기';
+    btn.textContent = '방 만들기';
+    document.getElementById('create-room-modal')?.classList.remove('visible');
     if (titleInput) titleInput.value = '';
     if (titleCount) titleCount.textContent = '0';
     if (pwInput) pwInput.value = '';

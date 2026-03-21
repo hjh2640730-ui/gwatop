@@ -220,26 +220,8 @@
       🟢 <strong style="color:var(--text-secondary)">무료 포인트</strong>는 출석체크 등으로 얻는 포인트로, 유료 ⚡ 크레딧과 별개입니다. 게임에서만 사용 가능하며 환불되지 않습니다.
     </div>
 
-    <!-- Create Room -->
-    <div class="create-section">
-      <div class="create-section-title">방 만들기</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">배팅 포인트 선택 (1~10P)</div>
-      <div style="margin-bottom:10px">
-        <input type="text" class="room-title-input" id="room-title-input" placeholder="방 제목 입력 (선택, 최대 20자)" maxlength="20" />
-        <div class="room-title-count"><span id="room-title-count">0</span>/20</div>
-      </div>
-      <div style="margin-bottom:14px">
-        <div class="pw-input-wrap">
-          <input type="password" class="room-title-input" id="room-pw-input" placeholder="🔒 비밀번호 설정 (선택, 비워두면 공개방)" maxlength="20" />
-          <button type="button" class="pw-toggle-btn" id="room-pw-toggle">👁</button>
-        </div>
-      </div>
-      <div class="wager-row">
-        <input type="range" min="1" max="10" value="3" id="wager-slider" />
-        <div class="wager-val-display"><span id="wager-val">3</span>P</div>
-      </div>
-      <button class="btn btn-primary btn-full" id="create-room-btn">✌️ 방 만들기</button>
-    </div>
+    <!-- Create Room Button -->
+    <button class="btn btn-primary btn-full" id="open-create-modal-btn" style="margin-bottom:20px">✌️ 방 만들기</button>
 
     <!-- Open Rooms -->
     <div class="section-label">열린 게임방</div>
@@ -391,6 +373,33 @@
         </button>
       </div>
       <button class="btn btn-ghost btn-full" id="modal-close-btn" style="margin-top:8px">취소</button>
+    </div>
+  </div>
+
+  <!-- Create Room Modal -->
+  <div class="modal-overlay" id="create-room-modal">
+    <div class="modal" style="max-width:360px">
+      <div class="modal-icon">✌️</div>
+      <h2 class="modal-title">방 만들기</h2>
+      <div style="margin-bottom:12px">
+        <input type="text" class="room-title-input" id="room-title-input" placeholder="방 제목 입력 (선택, 최대 20자)" maxlength="20" style="width:100%;box-sizing:border-box" />
+        <div class="room-title-count" style="text-align:right;margin-top:4px;font-size:11px;color:var(--text-muted)"><span id="room-title-count">0</span>/20</div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div class="pw-input-wrap">
+          <input type="password" class="room-title-input" id="room-pw-input" placeholder="🔒 비밀번호 설정 (선택, 비워두면 공개방)" maxlength="20" style="width:100%;box-sizing:border-box" />
+          <button type="button" class="pw-toggle-btn" id="room-pw-toggle">👁</button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">배팅 포인트 선택 (1~10P)</div>
+      <div class="wager-row" style="margin-bottom:20px">
+        <input type="range" min="1" max="10" value="3" id="wager-slider" />
+        <div class="wager-val-display"><span id="wager-val">3</span>P</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" id="create-room-cancel-btn" style="flex:1">취소</button>
+        <button class="btn btn-primary" id="create-room-btn" style="flex:2">방 만들기</button>
+      </div>
     </div>
   </div>
 
