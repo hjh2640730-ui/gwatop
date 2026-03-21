@@ -405,7 +405,6 @@ async function handleSubmit() {
     } else {
       // 문장형은 AI 채점
       const originalText = submitBtn.textContent;
-      submitBtn.textContent = '채점 중...';
       try {
         const res = await fetch('/api/grade-short', {
           method: 'POST',
