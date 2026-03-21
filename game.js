@@ -169,7 +169,6 @@ function setupUI() {
       if (!activeGameId || btn.disabled) return;
       document.querySelectorAll('.rps-btn').forEach(b => { b.disabled = true; b.classList.remove('selected'); });
       btn.classList.add('selected');
-      document.getElementById('rps-status').textContent = '선택 완료! 상대방 기다리는 중...';
       submitChoice(btn.dataset.choice);
     });
   });
@@ -415,6 +414,23 @@ function syncModal(game, isP1) {
         <span class="rps-player-name" style="font-weight:800;color:var(--text-primary)">${me.name || '익명'} <span style="font-size:9px;color:#34d399">나</span></span>
       </div>`;
   }
+  // 상대방 선택 여부 표시
+  if (game.status === 'ready') {
+    const oppSubmitted = isP1 ? game.p2Submitted : game.p1Submitted;
+    const mySubmitted  = isP1 ? game.p1Submitted : game.p2Submitted;
+    const statusEl = document.getElementById('rps-status');
+    if (oppSubmitted && !mySubmitted) {
+      statusEl.textContent = '상대방이 선택했습니다! 빨리 선택하세요 ⚡';
+      statusEl.style.color = '#f59e0b';
+    } else if (oppSubmitted && mySubmitted) {
+      statusEl.textContent = '둘 다 선택 완료! 결과 집계 중...';
+      statusEl.style.color = '';
+    } else if (!oppSubmitted && mySubmitted) {
+      statusEl.textContent = '선택 완료! 상대방 기다리는 중...';
+      statusEl.style.color = '';
+    }
+  }
+
   if (game.status === 'finished') showResult(game, isP1);
 }
 
