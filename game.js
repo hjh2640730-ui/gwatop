@@ -94,8 +94,9 @@ function setupUI() {
   document.getElementById('join-pw-confirm')?.addEventListener('click', () => {
     const pw = joinPwInput.value.trim();
     if (!pw) { showToast('비밀번호를 입력해주세요', 'warning'); return; }
+    const gameId = pendingJoinGameId;
     closeJoinPwModal();
-    joinRoom(pendingJoinGameId, pw);
+    joinRoom(gameId, pw);
   });
   document.getElementById('join-pw-cancel')?.addEventListener('click', closeJoinPwModal);
   joinPwInput?.addEventListener('keydown', e => {
@@ -103,8 +104,9 @@ function setupUI() {
       e.preventDefault();
       const pw = joinPwInput.value.trim();
       if (!pw) return;
+      const gameId = pendingJoinGameId;
       closeJoinPwModal();
-      joinRoom(pendingJoinGameId, pw);
+      joinRoom(gameId, pw);
     }
   });
 
