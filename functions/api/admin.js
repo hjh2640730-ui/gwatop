@@ -54,6 +54,40 @@ export async function onRequestGet(context) {
       return json({ posts });
     }
 
+    if (type === 'comments') {
+      const comments = await getComments(accessToken);
+      return json({ comments });
+    }
+
+    if (type === 'shared_quizzes') {
+      const quizzes = await getSharedQuizzes(accessToken);
+      return json({ quizzes });
+    }
+
+    if (type === 'games') {
+      const games = await getGames(accessToken);
+      return json({ games });
+    }
+
+    if (type === 'user_quizzes') {
+      const uid = url.searchParams.get('uid');
+      if (!uid) return json({ error: 'uid 필요' }, 400);
+      const quizzes = await getUserQuizHistory(uid, accessToken);
+      return json({ quizzes });
+    }
+
+    if (type === 'global_messages') {
+      const messages = await getGlobalMessages(accessToken);
+      return json({ messages });
+    }
+
+    if (type === 'user_payments') {
+      const uid = url.searchParams.get('uid');
+      if (!uid) return json({ error: 'uid 필요' }, 400);
+      const payments = await getPaymentsByUid(uid, accessToken);
+      return json({ payments });
+    }
+
     // 기본: 유저 목록 + 통계
     const users = await getUsers(accessToken);
     const stats = {
@@ -136,6 +170,46 @@ export async function onRequestPost(context) {
     }
   }
 
+  if (action === 'deleteSharedQuiz') {
+    const { quizId } = body;
+    if (!quizId) return json({ error: 'quizId 누락' }, 400);
+    try {
+      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      await deleteFirestoreDoc(`shared_quizzes/${quizId}`, accessToken);
+      return json({ success: true });
+    } catch (e) { return json({ error: e.message }, 500); }
+  }
+
+  if (action === 'deleteComment') {
+    const { postId, commentId } = body;
+    if (!postId || !commentId) return json({ error: 'postId, commentId 누락' }, 400);
+    try {
+      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      await deleteFirestoreDoc(`community_posts/${postId}/comments/${commentId}`, accessToken);
+      return json({ success: true });
+    } catch (e) { return json({ error: e.message }, 500); }
+  }
+
+  if (action === 'cancelGame') {
+    const { gameId } = body;
+    if (!gameId) return json({ error: 'gameId 누락' }, 400);
+    try {
+      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      await patchFirestoreDoc(`games/${gameId}`, { status: { stringValue: 'cancelled' } }, ['status'], accessToken);
+      return json({ success: true });
+    } catch (e) { return json({ error: e.message }, 500); }
+  }
+
+  if (action === 'grantFreePoints') {
+    const amount = parseInt(body.amount);
+    if (!amount || amount < 1 || amount > 10000) return json({ error: 'amount는 1~10000 사이' }, 400);
+    try {
+      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      const count = await grantFreePointsToAll(amount, accessToken);
+      return json({ success: true, count });
+    } catch (e) { return json({ error: e.message }, 500); }
+  }
+
   return json({ error: '알 수 없는 액션' }, 400);
 }
 
@@ -159,6 +233,7 @@ async function getUsers(accessToken) {
       nickname: f.nickname?.stringValue || '',
       university: f.university?.stringValue || '',
       credits: parseInt(f.credits?.integerValue || 0),
+      freePoints: parseInt(f.freePoints?.integerValue || 0),
       totalQuizzes: parseInt(f.totalQuizzes?.integerValue || 0),
       referralCredits: parseInt(f.referralCredits?.integerValue || 0),
       provider: f.provider?.stringValue || '',
@@ -327,6 +402,231 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
   const tokenData = await tokenRes.json();
   if (!tokenData.access_token) throw new Error('Access token 발급 실패');
   return tokenData.access_token;
+}
+
+// ─── Firestore: 댓글 목록 (collectionGroup) ───
+async function getComments(accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'comments', allDescendants: true }],
+        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+        limit: 500,
+      },
+    }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.filter(r => r.document).map(r => {
+    const f = r.document.fields || {};
+    const parts = r.document.name.split('/');
+    const commentId = parts.pop();
+    parts.pop(); // 'comments'
+    const postId = parts.pop();
+    return {
+      commentId, postId,
+      uid: f.uid?.stringValue || '',
+      nickname: f.nickname?.stringValue || '',
+      content: f.content?.stringValue || '',
+      deleted: f.deleted?.booleanValue || false,
+      isAnonymous: f.isAnonymous?.booleanValue || false,
+      likes: parseInt(f.likes?.integerValue || 0),
+      createdAt: f.createdAt?.timestampValue || null,
+    };
+  });
+}
+
+// ─── Firestore: 공유퀴즈 목록 ───
+async function getSharedQuizzes(accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'shared_quizzes' }],
+        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+        limit: 300,
+      },
+    }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.filter(r => r.document).map(r => {
+    const f = r.document.fields || {};
+    return {
+      id: r.document.name.split('/').pop(),
+      title: f.title?.stringValue || '',
+      subject: f.subject?.stringValue || '',
+      uid: f.uid?.stringValue || '',
+      nickname: f.nickname?.stringValue || '',
+      questionCount: parseInt(f.questionCount?.integerValue || 0),
+      viewCount: parseInt(f.viewCount?.integerValue || 0),
+      createdAt: f.createdAt?.timestampValue || null,
+    };
+  });
+}
+
+// ─── Firestore: 게임 목록 ───
+async function getGames(accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'games' }],
+        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+        limit: 200,
+      },
+    }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.filter(r => r.document).map(r => {
+    const f = r.document.fields || {};
+    const p1f = f.player1?.mapValue?.fields;
+    const p2f = f.player2?.mapValue?.fields;
+    return {
+      id: r.document.name.split('/').pop(),
+      status: f.status?.stringValue || '',
+      wager: parseInt(f.wager?.integerValue || 0),
+      title: f.title?.stringValue || '',
+      hasPassword: f.hasPassword?.booleanValue || false,
+      player1: p1f ? { uid: p1f.uid?.stringValue || '', name: p1f.name?.stringValue || '' } : null,
+      player2: p2f ? { uid: p2f.uid?.stringValue || '', name: p2f.name?.stringValue || '' } : null,
+      winner: f.winner?.stringValue || null,
+      p1Choice: f.p1Choice?.stringValue || null,
+      p2Choice: f.p2Choice?.stringValue || null,
+      createdAt: f.createdAt?.timestampValue || null,
+    };
+  });
+}
+
+// ─── Firestore: 유저 퀴즈 히스토리 ───
+async function getUserQuizHistory(uid, accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}/quiz_history?pageSize=20`;
+  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+  if (!res.ok) return [];
+  const data = await res.json();
+  if (!data.documents) return [];
+  return data.documents.map(doc => {
+    const f = doc.fields || {};
+    return {
+      id: doc.name.split('/').pop(),
+      subject: f.subject?.stringValue || '',
+      questionCount: parseInt(f.questionCount?.integerValue || 0),
+      type: f.type?.stringValue || '',
+      createdAt: f.createdAt?.timestampValue || null,
+    };
+  }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+// ─── Firestore: uid로 결제 내역 조회 ───
+async function getPaymentsByUid(uid, accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'payments' }],
+        where: { fieldFilter: { field: { fieldPath: 'uid' }, op: 'EQUAL', value: { stringValue: uid } } },
+        orderBy: [{ field: { fieldPath: 'processedAt' }, direction: 'DESCENDING' }],
+        limit: 50,
+      },
+    }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.filter(r => r.document).map(r => {
+    const f = r.document.fields || {};
+    return {
+      orderId: f.orderId?.stringValue || r.document.name.split('/').pop(),
+      credits: parseInt(f.credits?.integerValue || 0),
+      amount: parseInt(f.amount?.integerValue || 0),
+      processedAt: parseInt(f.processedAt?.integerValue || 0),
+    };
+  });
+}
+
+// ─── Firestore: 전체 공지 메시지 목록 ───
+async function getGlobalMessages(accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: 'global_messages' }],
+        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+        limit: 50,
+      },
+    }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.filter(r => r.document).map(r => {
+    const f = r.document.fields || {};
+    return {
+      id: r.document.name.split('/').pop(),
+      title: f.title?.stringValue || '',
+      body: f.body?.stringValue || '',
+      rewardType: f.rewardType?.stringValue || 'none',
+      rewardAmount: parseInt(f.rewardAmount?.integerValue || 0),
+      createdAt: f.createdAt?.timestampValue || null,
+    };
+  });
+}
+
+// ─── Firestore: 무료 포인트 일괄 지급 ───
+async function grantFreePointsToAll(amount, accessToken) {
+  const users = await getUsers(accessToken);
+  const DOC_BASE = `projects/${PROJECT_ID}/databases/(default)/documents`;
+  const batchUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:batchWrite`;
+
+  const chunks = [];
+  for (let i = 0; i < users.length; i += 400) chunks.push(users.slice(i, i + 400));
+
+  let total = 0;
+  for (const chunk of chunks) {
+    const writes = chunk.map(u => ({
+      update: {
+        name: `${DOC_BASE}/users/${u.uid}`,
+        fields: { freePoints: { integerValue: String((u.freePoints || 0) + amount) } },
+      },
+      updateMask: { fieldPaths: ['freePoints'] },
+    }));
+    const res = await fetch(batchUrl, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes }),
+    });
+    if (res.ok) total += chunk.length;
+  }
+  return total;
+}
+
+// ─── Firestore: 문서 삭제 (범용) ───
+async function deleteFirestoreDoc(path, accessToken) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}`;
+  const res = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } });
+  if (!res.ok && res.status !== 404) throw new Error('삭제 실패');
+}
+
+// ─── Firestore: 필드 업데이트 (범용) ───
+async function patchFirestoreDoc(path, fields, fieldPaths, accessToken) {
+  const maskQuery = fieldPaths.map(f => `updateMask.fieldPaths=${f}`).join('&');
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}?${maskQuery}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) throw new Error('업데이트 실패');
 }
 
 function json(data, status = 200) {

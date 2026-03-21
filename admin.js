@@ -9,16 +9,25 @@ const ADMIN_EMAIL = 'hjh2640730@gmail.com';
 let currentUser = null;
 let allUsers = [];
 let allPosts = [];
+let allPayments = [];
+let allComments = [];
+let allSharedQuizzes = [];
+let allGames = [];
 let editingUid = null;
 let deletingUid = null;
 let deletingPostId = null;
+let genericDeleteCallback = null;
 let activeTab = 'dashboard';
 let dashboardLoaded = false;
 let usersLoaded = false;
 let postsLoaded = false;
+let paymentsLoaded = false;
+let commentsLoaded = false;
+let quizzesLoaded = false;
+let gamesLoaded = false;
 
 // ─── 탭 시스템 ───
-const TABS = ['dashboard', 'users', 'posts'];
+const TABS = ['dashboard', 'users', 'posts', 'payments', 'comments', 'quizzes', 'games', 'messages', 'system'];
 
 function switchTab(tabName) {
   TABS.forEach(t => {
@@ -30,6 +39,12 @@ function switchTab(tabName) {
   if (tabName === 'dashboard' && !dashboardLoaded) loadDashboard();
   if (tabName === 'users' && !usersLoaded) loadUsers();
   if (tabName === 'posts' && !postsLoaded) loadPosts();
+  if (tabName === 'payments' && !paymentsLoaded) loadPayments();
+  if (tabName === 'messages') setupMessages();
+  if (tabName === 'comments' && !commentsLoaded) loadComments();
+  if (tabName === 'quizzes' && !quizzesLoaded) loadSharedQuizzes();
+  if (tabName === 'games' && !gamesLoaded) loadGames();
+  if (tabName === 'system') setupSystem();
 }
 
 async function init() {
@@ -68,30 +83,522 @@ function showState(state) {
   document.getElementById('admin-main').style.display     = state === 'main'    ? ''     : 'none';
 }
 
+// ─── Load Comments ───
+async function loadComments() {
+  commentsLoaded = false;
+  document.getElementById('comments-table-body').innerHTML = '<div class="empty-row">데이터 로딩 중...</div>';
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`/api/admin?token=${idToken}&type=comments`);
+    const data = await res.json();
+    if (!res.ok || data.error) { showToast(data.error || '댓글 로드 실패', 'error'); return; }
+    allComments = data.comments || [];
+    renderComments(allComments);
+    commentsLoaded = true;
+  } catch (e) { showToast('네트워크 오류: ' + e.message, 'error'); }
+}
+
+function renderComments(comments) {
+  const body = document.getElementById('comments-table-body');
+  const showDeleted = document.getElementById('show-deleted-comments')?.checked;
+  const filtered = showDeleted ? comments : comments.filter(c => !c.deleted);
+  document.getElementById('comments-summary').textContent =
+    `총 ${comments.length}개 (삭제됨 ${comments.filter(c=>c.deleted).length}개)`;
+  if (!filtered.length) { body.innerHTML = '<div class="empty-row">댓글이 없습니다.</div>'; return; }
+  body.innerHTML = filtered.map(c => {
+    const rowClass = c.deleted ? 'comments-table-row td-deleted' : 'comments-table-row';
+    const content = escapeHtml(c.content || '').slice(0, 80);
+    const author = c.isAnonymous ? '익명' : (c.nickname || '-');
+    return `<div class="${rowClass}">
+      <div class="td" data-label="내용" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${content}${c.deleted ? ' [삭제됨]' : ''}</div>
+      <div class="td" data-label="작성자">${author}</div>
+      <div class="td" data-label="게시글"><a href="/post.html?id=${c.postId}" target="_blank" style="color:#60a5fa;font-size:11px">${c.postId.slice(-8)}</a></div>
+      <div class="td" data-label="❤️">${c.likes}</div>
+      <div class="td td-date" data-label="날짜">${formatDate(c.createdAt)}</div>
+      <div class="td">${!c.deleted ? `<button class="btn-delete comment-delete-btn" data-postid="${c.postId}" data-commentid="${c.commentId}">삭제</button>` : '-'}</div>
+    </div>`;
+  }).join('');
+  body.querySelectorAll('.comment-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => openGenericDelete(
+      '댓글 삭제', `이 댓글을 삭제하시겠습니까?<br/><br/><span style="font-size:11px;color:var(--text-muted)">${escapeHtml((allComments.find(c=>c.commentId===btn.dataset.commentid)?.content||'').slice(0,60))}</span>`,
+      async () => {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch('/api/admin', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: idToken, action: 'deleteComment', postId: btn.dataset.postid, commentId: btn.dataset.commentid }) });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || '삭제 실패');
+        allComments = allComments.map(c => c.commentId === btn.dataset.commentid ? {...c, deleted: true} : c);
+        renderComments(allComments);
+        showToast('댓글이 삭제됐습니다.', 'success');
+      }
+    ));
+  });
+}
+
+// ─── Load Shared Quizzes ───
+async function loadSharedQuizzes() {
+  quizzesLoaded = false;
+  document.getElementById('quizzes-table-body').innerHTML = '<div class="empty-row">데이터 로딩 중...</div>';
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`/api/admin?token=${idToken}&type=shared_quizzes`);
+    const data = await res.json();
+    if (!res.ok || data.error) { showToast(data.error || '공유퀴즈 로드 실패', 'error'); return; }
+    allSharedQuizzes = data.quizzes || [];
+    renderSharedQuizzes(allSharedQuizzes);
+    quizzesLoaded = true;
+  } catch (e) { showToast('네트워크 오류: ' + e.message, 'error'); }
+}
+
+function renderSharedQuizzes(quizzes) {
+  const body = document.getElementById('quizzes-table-body');
+  document.getElementById('quizzes-summary').textContent = `총 ${quizzes.length}개`;
+  if (!quizzes.length) { body.innerHTML = '<div class="empty-row">공유된 퀴즈가 없습니다.</div>'; return; }
+  body.innerHTML = quizzes.map(q => `
+    <div class="quizzes-table-row">
+      <div class="td td-name" data-label="제목">${escapeHtml(q.title) || '(제목없음)'}</div>
+      <div class="td" data-label="주제">${escapeHtml(q.subject) || '-'}</div>
+      <div class="td" data-label="작성자">${escapeHtml(q.nickname) || '-'}</div>
+      <div class="td" data-label="문제수">${q.questionCount}</div>
+      <div class="td" data-label="조회">${q.viewCount || 0}</div>
+      <div class="td td-date" data-label="날짜">${formatDate(q.createdAt)}</div>
+      <div class="td"><button class="btn-delete quiz-delete-btn" data-id="${q.id}">삭제</button></div>
+    </div>
+  `).join('');
+  body.querySelectorAll('.quiz-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => openGenericDelete(
+      '공유퀴즈 삭제', `이 공유퀴즈를 삭제하시겠습니까?<br/><strong>${escapeHtml(allSharedQuizzes.find(q=>q.id===btn.dataset.id)?.title||'')}</strong>`,
+      async () => {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch('/api/admin', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: idToken, action: 'deleteSharedQuiz', quizId: btn.dataset.id }) });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || '삭제 실패');
+        allSharedQuizzes = allSharedQuizzes.filter(q => q.id !== btn.dataset.id);
+        renderSharedQuizzes(allSharedQuizzes);
+        showToast('공유퀴즈가 삭제됐습니다.', 'success');
+      }
+    ));
+  });
+}
+
+// ─── Load Games ───
+async function loadGames() {
+  gamesLoaded = false;
+  document.getElementById('games-table-body').innerHTML = '<div class="empty-row">데이터 로딩 중...</div>';
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`/api/admin?token=${idToken}&type=games`);
+    const data = await res.json();
+    if (!res.ok || data.error) { showToast(data.error || '게임 로드 실패', 'error'); return; }
+    allGames = data.games || [];
+    renderGames(filterGames());
+    gamesLoaded = true;
+  } catch (e) { showToast('네트워크 오류: ' + e.message, 'error'); }
+}
+
+function filterGames() {
+  const q = (document.getElementById('game-search-input')?.value || '').toLowerCase();
+  const status = document.getElementById('game-status-filter')?.value || '';
+  return allGames.filter(g =>
+    (!status || g.status === status) &&
+    (!q || (g.title||'').toLowerCase().includes(q) ||
+     (g.player1?.name||'').toLowerCase().includes(q) ||
+     (g.player2?.name||'').toLowerCase().includes(q))
+  );
+}
+
+function renderGames(games) {
+  const body = document.getElementById('games-table-body');
+  const counts = { waiting: 0, ready: 0, finished: 0, cancelled: 0 };
+  allGames.forEach(g => { if (counts[g.status] !== undefined) counts[g.status]++; });
+  document.getElementById('games-summary').textContent =
+    `총 ${allGames.length}개 | 대기 ${counts.waiting} · 진행 ${counts.ready} · 완료 ${counts.finished} · 취소 ${counts.cancelled}`;
+  if (!games.length) { body.innerHTML = '<div class="empty-row">게임이 없습니다.</div>'; return; }
+  const statusBadge = s => {
+    const map = { waiting:'대기 중', ready:'진행 중', finished:'완료', cancelled:'취소됨' };
+    return `<span class="badge badge-${s}">${map[s]||s}</span>`;
+  };
+  body.innerHTML = games.map(g => {
+    const result = g.p1Choice && g.p2Choice
+      ? `${g.p1Choice}vs${g.p2Choice}`
+      : '-';
+    const winnerName = g.winner
+      ? (g.winner === g.player1?.uid ? g.player1.name : g.player2?.name) || '?'
+      : (g.status === 'finished' ? '무승부' : '-');
+    const canCancel = g.status === 'waiting' || g.status === 'ready';
+    return `<div class="games-table-row">
+      <div class="td td-name" data-label="방 제목">${escapeHtml(g.title||'(제목없음)')}${g.hasPassword?' 🔒':''}</div>
+      <div class="td" data-label="플레이어1">${escapeHtml(g.player1?.name||'-')}</div>
+      <div class="td" data-label="플레이어2">${escapeHtml(g.player2?.name||'-')}</div>
+      <div class="td" data-label="배팅" style="color:#a78bfa;font-weight:700">${g.wager}P</div>
+      <div class="td" data-label="상태">${statusBadge(g.status)}</div>
+      <div class="td" data-label="결과" style="font-size:12px">${result}<br><span style="color:#a78bfa;font-size:11px">${winnerName}</span></div>
+      <div class="td td-date" data-label="날짜">${formatDate(g.createdAt)}</div>
+      <div class="td">${canCancel ? `<button class="btn-delete game-cancel-btn" data-id="${g.id}">취소</button>` : '-'}</div>
+    </div>`;
+  }).join('');
+  body.querySelectorAll('.game-cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => openGenericDelete(
+      '게임 취소', '이 게임을 강제 취소하시겠습니까?',
+      async () => {
+        const idToken = await currentUser.getIdToken();
+        const res = await fetch('/api/admin', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: idToken, action: 'cancelGame', gameId: btn.dataset.id }) });
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || '취소 실패');
+        const game = allGames.find(g => g.id === btn.dataset.id);
+        if (game) game.status = 'cancelled';
+        renderGames(filterGames());
+        showToast('게임이 취소됐습니다.', 'success');
+      }
+    ));
+  });
+}
+
+// ─── Messages Tab ───
+let messagesReady = false;
+let msgTarget = 'all';
+let msgReward = 'none';
+
+function setupMessages() {
+  if (messagesReady) { loadSentMessages(); return; }
+  messagesReady = true;
+
+  // 받는 사람 토글
+  let selectedUid = '';
+  const picker = document.getElementById('msg-user-picker');
+  const searchInput = document.getElementById('msg-user-search');
+  const dropdown = document.getElementById('msg-user-dropdown');
+  const selectedBox = document.getElementById('msg-user-selected');
+  const selectedLabel = document.getElementById('msg-user-selected-label');
+
+  function renderUserDropdown(query) {
+    const q = query.toLowerCase();
+    const filtered = allUsers.filter(u =>
+      (u.displayName || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.nickname || '').toLowerCase().includes(q)
+    ).slice(0, 30);
+
+    if (!filtered.length) {
+      dropdown.innerHTML = '<div style="padding:12px 14px;font-size:13px;color:var(--text-muted)">검색 결과 없음</div>';
+    } else {
+      dropdown.innerHTML = filtered.map(u => `
+        <div class="msg-user-option" data-uid="${u.uid}" data-name="${escapeHtml(u.displayName||'(이름없음)')} (${escapeHtml(u.email||'')})">
+          <div class="msg-user-option-name">${escapeHtml(u.displayName || '(이름없음)')} ${u.nickname ? `<span style="color:#a78bfa;font-weight:400">(${escapeHtml(u.nickname)})</span>` : ''}</div>
+          <div class="msg-user-option-email">${escapeHtml(u.email || u.uid)}</div>
+        </div>`).join('');
+      dropdown.querySelectorAll('.msg-user-option').forEach(el => {
+        el.addEventListener('click', () => {
+          selectedUid = el.dataset.uid;
+          selectedLabel.textContent = el.dataset.name;
+          selectedBox.style.display = 'flex';
+          searchInput.value = '';
+          dropdown.style.display = 'none';
+          searchInput.placeholder = '다시 검색하려면 입력...';
+        });
+      });
+    }
+    dropdown.style.display = '';
+  }
+
+  searchInput.addEventListener('input', () => {
+    if (selectedUid) { selectedUid = ''; selectedBox.style.display = 'none'; }
+    renderUserDropdown(searchInput.value);
+  });
+  searchInput.addEventListener('focus', () => {
+    if (allUsers.length) renderUserDropdown(searchInput.value);
+  });
+  document.addEventListener('click', (e) => {
+    if (!picker.contains(e.target)) dropdown.style.display = 'none';
+  });
+  document.getElementById('msg-user-clear').addEventListener('click', () => {
+    selectedUid = '';
+    selectedBox.style.display = 'none';
+    searchInput.value = '';
+    searchInput.focus();
+  });
+
+  document.querySelectorAll('.msg-target-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      msgTarget = btn.dataset.target;
+      document.querySelectorAll('.msg-target-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (msgTarget === 'user') {
+        picker.style.display = '';
+        if (!allUsers.length) {
+          searchInput.placeholder = '유저 목록 불러오는 중...';
+          searchInput.disabled = true;
+          await loadUsers();
+          searchInput.disabled = false;
+          searchInput.placeholder = '이름 또는 이메일로 검색...';
+        }
+        searchInput.focus();
+      } else {
+        picker.style.display = 'none';
+        selectedUid = '';
+        selectedBox.style.display = 'none';
+        dropdown.style.display = 'none';
+      }
+    });
+  });
+
+  // 보상 토글
+  document.querySelectorAll('.msg-reward-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      msgReward = btn.dataset.reward;
+      document.querySelectorAll('.msg-reward-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('msg-reward-amount-wrap').style.display = msgReward === 'freePoints' ? 'flex' : 'none';
+    });
+  });
+
+  // 보내기
+  document.getElementById('msg-send-btn').addEventListener('click', async () => {
+    const title = document.getElementById('msg-title').value.trim();
+    const body = document.getElementById('msg-body').value.trim();
+    const rewardAmount = parseInt(document.getElementById('msg-reward-amount').value) || 0;
+
+    if (!title) { showToast('제목을 입력하세요.', 'error'); return; }
+    if (!body) { showToast('내용을 입력하세요.', 'error'); return; }
+
+    let target = msgTarget === 'all' ? 'all' : selectedUid;
+    if (msgTarget === 'user' && !target) { showToast('유저를 선택하세요.', 'error'); return; }
+
+    const targetLabel = target === 'all' ? '전체 유저' : (allUsers.find(u => u.uid === target)?.displayName || '특정 유저');
+    if (!confirm(`"${title}" 메시지를 ${targetLabel}에게 보내시겠습니까?${msgReward === 'freePoints' ? `\n보상: +${rewardAmount}P` : ''}`)) return;
+
+    const btn = document.getElementById('msg-send-btn');
+    btn.disabled = true; btn.textContent = '전송 중...';
+    const result = document.getElementById('msg-result');
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch('/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: idToken, target, title, body, rewardType: msgReward, rewardAmount }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || '전송 실패');
+
+      result.textContent = `✅ 전송 완료 (${targetLabel})`;
+      showToast('메시지 전송 완료!', 'success');
+      document.getElementById('msg-title').value = '';
+      document.getElementById('msg-body').value = '';
+      if (target === 'all') loadSentMessages();
+    } catch (e) {
+      result.textContent = '❌ ' + e.message;
+      showToast(e.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '보내기';
+    }
+  });
+
+  document.getElementById('msgs-refresh-btn').addEventListener('click', loadSentMessages);
+  loadSentMessages();
+}
+
+async function loadSentMessages() {
+  const wrap = document.getElementById('sent-messages-list');
+  wrap.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:12px 0">불러오는 중...</div>';
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`/api/admin?token=${idToken}&type=global_messages`);
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error);
+    const msgs = data.messages || [];
+    if (!msgs.length) {
+      wrap.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:13px;padding:20px 0">보낸 공지가 없습니다.</div>';
+      return;
+    }
+    wrap.innerHTML = msgs.map(m => {
+      const hasReward = m.rewardType === 'freePoints' && m.rewardAmount > 0;
+      return `<div class="sent-msg-item">
+        <div class="sent-msg-title">${escapeHtml(m.title)}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin:4px 0;line-height:1.5">${escapeHtml(m.body).slice(0, 100)}${m.body?.length > 100 ? '...' : ''}</div>
+        <div class="sent-msg-meta">
+          ${hasReward ? `<span style="color:#34d399;font-weight:600">🎁 +${m.rewardAmount}P 보상 포함</span>` : ''}
+          <span>${formatDate(m.createdAt)}</span>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    wrap.innerHTML = `<div style="text-align:center;color:#f87171;font-size:13px;padding:12px 0">${e.message}</div>`;
+  }
+}
+
+// ─── System Tab ───
+let systemReady = false;
+function setupSystem() {
+  if (systemReady) return;
+  systemReady = true;
+
+  // 무료 포인트 일괄 지급
+  document.getElementById('grant-btn').addEventListener('click', async () => {
+    const amount = parseInt(document.getElementById('grant-amount').value);
+    if (!amount || amount < 1) { showToast('지급할 포인트 수를 입력하세요.', 'error'); return; }
+    if (!confirm(`전체 유저에게 ${amount}P를 지급하시겠습니까?`)) return;
+    const btn = document.getElementById('grant-btn');
+    btn.disabled = true; btn.textContent = '지급 중...';
+    const result = document.getElementById('grant-result');
+    result.textContent = '처리 중...';
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch('/api/admin', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: idToken, action: 'grantFreePoints', amount }) });
+      const d = await res.json();
+      if (!res.ok || d.error) throw new Error(d.error);
+      result.textContent = `✅ ${d.count}명에게 ${amount}P 지급 완료`;
+      showToast(`${d.count}명에게 ${amount}P 지급 완료!`, 'success');
+      usersLoaded = false;
+    } catch (e) {
+      result.textContent = '❌ ' + e.message;
+      showToast(e.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '전체 유저에게 지급';
+    }
+  });
+
+  // 유저 CSV 내보내기
+  document.getElementById('export-users-btn').addEventListener('click', async () => {
+    if (!allUsers.length) { await loadUsers(); }
+    const headers = ['uid','이름','닉네임','이메일','전화번호','크레딧','무료포인트','퀴즈수','추천수','로그인','가입일'];
+    const rows = allUsers.map(u => [u.uid, u.displayName, u.nickname, u.email, formatPhone(u.phone), u.credits, u.freePoints, u.totalQuizzes, u.referralCredits, u.provider, formatDate(u.createdAt)]);
+    downloadCSV('gwatop_users.csv', headers, rows);
+    showToast('CSV 다운로드 완료', 'success');
+  });
+
+  // 결제 CSV 내보내기
+  document.getElementById('export-payments-btn').addEventListener('click', async () => {
+    if (!allPayments.length) { await loadPayments(); }
+    const userMap = {};
+    allUsers.forEach(u => { userMap[u.uid] = u; });
+    const headers = ['주문번호','uid','이름','이메일','결제금액','크레딧','결제일시'];
+    const rows = allPayments.map(p => {
+      const u = userMap[p.uid];
+      const d = p.processedAt ? new Date(p.processedAt) : null;
+      return [p.orderId, p.uid, u?.displayName||'', u?.email||'', p.amount, p.credits, d ? d.toISOString() : ''];
+    });
+    downloadCSV('gwatop_payments.csv', headers, rows);
+    showToast('CSV 다운로드 완료', 'success');
+  });
+
+  // 사이트 상태 확인
+  document.getElementById('health-check-btn').addEventListener('click', runHealthCheck);
+
+}
+
+async function runHealthCheck() {
+  const container = document.getElementById('health-items');
+  const checks = [
+    { name: 'Firestore 연결 (유저 API)', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/admin?token=${idToken}`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).users?.length}명 확인`; } },
+    { name: '결제 API', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/payment-history?token=${idToken}&all=1`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).payments?.length}건 확인`; } },
+    { name: '공유퀴즈 Firestore', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/admin?token=${idToken}&type=shared_quizzes`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).quizzes?.length}개 확인`; } },
+    { name: '게임 Firestore', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/admin?token=${idToken}&type=games`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).games?.length}개 확인`; } },
+  ];
+  container.innerHTML = checks.map(c => `<div class="health-item" id="hc-${c.name}"><div class="health-dot health-pending"></div><span>${c.name}</span><span style="margin-left:auto;font-size:12px;color:var(--text-muted)">확인 중...</span></div>`).join('');
+  for (const check of checks) {
+    const el = document.getElementById(`hc-${check.name}`);
+    try {
+      const detail = await check.fn();
+      el.querySelector('.health-dot').className = 'health-dot health-ok';
+      el.querySelector('span:last-child').textContent = '✅ ' + detail;
+    } catch (e) {
+      el.querySelector('.health-dot').className = 'health-dot health-err';
+      el.querySelector('span:last-child').textContent = '❌ ' + e.message;
+    }
+  }
+}
+
+function downloadCSV(filename, headers, rows) {
+  const csvContent = [headers, ...rows].map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+// ─── Load Payments ───
+async function loadPayments() {
+  paymentsLoaded = false;
+  document.getElementById('payments-table-body').innerHTML = '<div class="empty-row">데이터 로딩 중...</div>';
+  try {
+    const idToken = await currentUser.getIdToken();
+    const [paymentsRes, usersRes] = await Promise.all([
+      fetch(`/api/payment-history?token=${idToken}&all=1`),
+      allUsers.length ? Promise.resolve(null) : fetch(`/api/admin?token=${idToken}`),
+    ]);
+    const paymentsData = await paymentsRes.json();
+    if (!paymentsRes.ok || paymentsData.error) { showToast(paymentsData.error || '결제 내역 로드 실패', 'error'); return; }
+    if (usersRes) {
+      const usersData = await usersRes.json();
+      if (usersRes.ok && !usersData.error) allUsers = usersData.users || [];
+    }
+    allPayments = paymentsData.payments || [];
+    renderPayments(allPayments);
+    paymentsLoaded = true;
+  } catch (e) {
+    showToast('네트워크 오류: ' + e.message, 'error');
+  }
+}
+
+// ─── Render Payments ───
+function renderPayments(payments) {
+  const body = document.getElementById('payments-table-body');
+  const summary = document.getElementById('payments-summary');
+
+  const totalAmount = payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const totalCredits = payments.reduce((s, p) => s + (p.credits || 0), 0);
+  summary.textContent = `총 ${payments.length}건 · ${totalAmount.toLocaleString()}원 · ${totalCredits.toLocaleString()}크레딧`;
+
+  if (!payments.length) {
+    body.innerHTML = '<div class="empty-row">결제 내역이 없습니다.</div>';
+    return;
+  }
+
+  // 결제 uid → 유저 이름 매핑
+  const userMap = {};
+  allUsers.forEach(u => { userMap[u.uid] = u; });
+
+  body.innerHTML = payments.map(p => {
+    const u = userMap[p.uid];
+    const userLabel = u ? `${u.displayName || '(이름없음)'}<br><span style="font-size:11px;color:var(--text-muted)">${u.email || p.uid}</span>` : `<span style="font-size:11px;color:var(--text-muted)">${p.uid}</span>`;
+    const date = p.processedAt ? new Date(p.processedAt) : null;
+    const dateStr = date ? `${date.getFullYear()}.${String(date.getMonth()+1).padStart(2,'0')}.${String(date.getDate()).padStart(2,'0')} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}` : '-';
+    const shortOrderId = p.orderId ? p.orderId.slice(-12) : '-';
+    return `<div class="payments-table-row">
+      <div class="td" data-label="주문번호" style="font-size:11px;color:var(--text-muted)">${shortOrderId}</div>
+      <div class="td" data-label="유저">${userLabel}</div>
+      <div class="td" data-label="결제금액" style="font-weight:700;color:#a78bfa">${p.amount ? p.amount.toLocaleString()+'원' : '-'}</div>
+      <div class="td" data-label="충전 크레딧" style="font-weight:700">⚡ ${p.credits}</div>
+      <div class="td td-date" data-label="결제일시">${dateStr}</div>
+    </div>`;
+  }).join('');
+}
+
 // ─── Load Dashboard ───
 async function loadDashboard() {
   dashboardLoaded = false;
   try {
     const idToken = await currentUser.getIdToken();
-    const [usersRes, postsRes] = await Promise.all([
+    const [usersRes, postsRes, paymentsRes, quizzesRes] = await Promise.all([
       fetch(`/api/admin?token=${idToken}`),
       fetch(`/api/admin?token=${idToken}&type=posts`),
+      fetch(`/api/payment-history?token=${idToken}&all=1`),
+      fetch(`/api/admin?token=${idToken}&type=shared_quizzes`),
     ]);
 
     const usersData = await usersRes.json();
     const postsData = await postsRes.json();
+    const paymentsData = await paymentsRes.json();
+    const quizzesData = await quizzesRes.json();
 
-    if (!usersRes.ok || usersData.error) {
-      showToast(usersData.error || '유저 데이터 로드 실패', 'error');
-      return;
-    }
-    if (!postsRes.ok || postsData.error) {
-      showToast(postsData.error || '게시글 데이터 로드 실패', 'error');
-      return;
-    }
+    if (!usersRes.ok || usersData.error) { showToast(usersData.error || '유저 데이터 로드 실패', 'error'); return; }
+    if (!postsRes.ok || postsData.error) { showToast(postsData.error || '게시글 데이터 로드 실패', 'error'); return; }
 
     const users = usersData.users;
     const posts = postsData.posts;
+    const payments = paymentsData.payments || [];
+    const sharedQuizzes = quizzesData.quizzes || [];
 
     // 오늘 신규 가입자
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -101,6 +608,7 @@ async function loadDashboard() {
     }).length;
 
     const totalLikes = posts.reduce((s, p) => s + (p.likes || 0), 0);
+    const totalRevenue = payments.reduce((s, p) => s + (p.amount || 0), 0);
 
     document.getElementById('stat-total-users').textContent = users.length.toLocaleString();
     document.getElementById('stat-today-users').textContent = todayUsers.toLocaleString();
@@ -108,6 +616,12 @@ async function loadDashboard() {
     document.getElementById('stat-total-credits').textContent = users.reduce((s, u) => s + u.credits, 0).toLocaleString();
     document.getElementById('stat-total-posts').textContent = posts.length.toLocaleString();
     document.getElementById('stat-total-likes').textContent = totalLikes.toLocaleString();
+    document.getElementById('stat-total-revenue').textContent = totalRevenue.toLocaleString() + '원';
+    document.getElementById('stat-total-payments').textContent = payments.length.toLocaleString() + '건';
+    // 공유퀴즈 수는 대시보드 카드 없으면 skip
+    if (document.getElementById('stat-shared-quizzes')) {
+      document.getElementById('stat-shared-quizzes').textContent = sharedQuizzes.length.toLocaleString();
+    }
 
     dashboardLoaded = true;
   } catch (e) {
@@ -152,6 +666,7 @@ function renderTable(users) {
       <div class="td" data-label="이메일">${u.email || '-'}</div>
       <div class="td" data-label="전화번호">${formatPhone(u.phone)}</div>
       <div class="td td-credits" data-label="크레딧">${u.credits}</div>
+      <div class="td" data-label="무료P" style="color:#34d399;font-weight:600">${u.freePoints ?? 0}</div>
       <div class="td" data-label="퀴즈 수">${u.totalQuizzes}</div>
       <div class="td" data-label="추천">${u.referralCredits}</div>
       <div class="td" data-label="로그인">${formatProvider(u.provider)}</div>
@@ -256,6 +771,83 @@ function setupEvents() {
     loadPosts();
   });
 
+  // 댓글 검색
+  document.getElementById('comment-search-input').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    renderComments(allComments.filter(c =>
+      (c.content||'').toLowerCase().includes(q) ||
+      (c.nickname||'').toLowerCase().includes(q) ||
+      (c.postId||'').toLowerCase().includes(q)
+    ));
+  });
+  document.getElementById('show-deleted-comments').addEventListener('change', () => renderComments(allComments));
+  document.getElementById('comments-refresh-btn').addEventListener('click', () => { commentsLoaded = false; loadComments(); });
+
+  // 공유퀴즈 검색
+  document.getElementById('quiz-search-input').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    renderSharedQuizzes(allSharedQuizzes.filter(q2 =>
+      (q2.title||'').toLowerCase().includes(q) ||
+      (q2.subject||'').toLowerCase().includes(q) ||
+      (q2.nickname||'').toLowerCase().includes(q)
+    ));
+  });
+  document.getElementById('quizzes-refresh-btn').addEventListener('click', () => { quizzesLoaded = false; loadSharedQuizzes(); });
+
+  // 게임 검색/필터
+  document.getElementById('game-search-input').addEventListener('input', () => renderGames(filterGames()));
+  document.getElementById('game-status-filter').addEventListener('change', () => renderGames(filterGames()));
+  document.getElementById('games-refresh-btn').addEventListener('click', () => { gamesLoaded = false; loadGames(); });
+
+  // 범용 삭제 모달
+  document.getElementById('generic-delete-cancel').addEventListener('click', closeGenericDelete);
+  document.getElementById('generic-delete-modal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('generic-delete-modal')) closeGenericDelete();
+  });
+  document.getElementById('generic-delete-confirm').addEventListener('click', async () => {
+    if (!genericDeleteCallback) return;
+    const btn = document.getElementById('generic-delete-confirm');
+    btn.disabled = true; btn.textContent = '처리 중...';
+    try {
+      await genericDeleteCallback();
+      closeGenericDelete();
+    } catch (e) {
+      showToast(e.message || '처리 실패', 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '삭제';
+    }
+  });
+
+  // 유저 모달 히스토리 탭
+  document.querySelectorAll('.modal-history-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.modal-history-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const ht = tab.dataset.htab;
+      document.getElementById('modal-htab-quizzes').style.display = ht === 'quizzes' ? '' : 'none';
+      document.getElementById('modal-htab-payments').style.display = ht === 'payments' ? '' : 'none';
+    });
+  });
+
+  // 결제 검색
+  document.getElementById('payment-search-input').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    const userMap = {};
+    allUsers.forEach(u => { userMap[u.uid] = u; });
+    const filtered = allPayments.filter(p => {
+      const u = userMap[p.uid];
+      return (p.orderId || '').toLowerCase().includes(q) ||
+        (u?.email || '').toLowerCase().includes(q) ||
+        (u?.displayName || '').toLowerCase().includes(q);
+    });
+    renderPayments(filtered);
+  });
+
+  document.getElementById('payments-refresh-btn').addEventListener('click', () => {
+    paymentsLoaded = false;
+    loadPayments();
+  });
+
   // Edit modal
   document.getElementById('edit-cancel-btn').addEventListener('click', closeEditModal);
   document.getElementById('edit-modal').addEventListener('click', (e) => {
@@ -278,6 +870,24 @@ function setupEvents() {
   document.getElementById('post-delete-confirm-btn').addEventListener('click', confirmPostDelete);
 }
 
+// ─── 범용 삭제 모달 ───
+function openGenericDelete(title, desc, onConfirm) {
+  document.getElementById('generic-delete-title').textContent = title;
+  document.getElementById('generic-delete-desc').innerHTML = desc;
+  document.getElementById('generic-delete-modal').classList.add('visible');
+  genericDeleteCallback = onConfirm;
+}
+
+function closeGenericDelete() {
+  document.getElementById('generic-delete-modal').classList.remove('visible');
+  genericDeleteCallback = null;
+}
+
+// ─── XSS 방지 ───
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ─── Edit Modal ───
 function openEditModal(uid) {
   const user = allUsers.find(u => u.uid === uid);
@@ -292,6 +902,60 @@ function openEditModal(uid) {
   document.getElementById('edit-freepoints-input').value = user.freePoints ?? 0;
   document.getElementById('edit-referral-input').value = user.referralCredits ?? 0;
   document.getElementById('edit-modal').classList.add('visible');
+
+  // 히스토리 탭 초기화
+  document.getElementById('modal-htab-quizzes').innerHTML = '<div class="modal-history-empty">불러오는 중...</div>';
+  document.getElementById('modal-htab-payments').innerHTML = '<div class="modal-history-empty">불러오는 중...</div>';
+  document.querySelectorAll('.modal-history-tab').forEach(t => t.classList.toggle('active', t.dataset.htab === 'quizzes'));
+  document.getElementById('modal-htab-quizzes').style.display = '';
+  document.getElementById('modal-htab-payments').style.display = 'none';
+
+  // 비동기 로드
+  loadUserHistory(uid);
+}
+
+async function loadUserHistory(uid) {
+  try {
+    const idToken = await currentUser.getIdToken();
+    const [quizzesRes, paymentsRes] = await Promise.all([
+      fetch(`/api/admin?token=${idToken}&type=user_quizzes&uid=${uid}`),
+      fetch(`/api/admin?token=${idToken}&type=user_payments&uid=${uid}`),
+    ]);
+    const quizzesData = await quizzesRes.json();
+    const paymentsData = await paymentsRes.json();
+
+    // 퀴즈 히스토리
+    const qWrap = document.getElementById('modal-htab-quizzes');
+    const quizzes = quizzesData.quizzes || [];
+    if (!quizzes.length) {
+      qWrap.innerHTML = '<div class="modal-history-empty">생성한 퀴즈가 없습니다.</div>';
+    } else {
+      qWrap.innerHTML = quizzes.map(q => `
+        <div class="modal-history-item">
+          <span style="color:var(--text-primary)">${escapeHtml(q.subject) || '(주제없음)'}</span>
+          <span style="color:var(--text-muted);font-size:12px">${q.questionCount}문제 · ${formatDate(q.createdAt)}</span>
+        </div>`).join('');
+    }
+
+    // 결제 내역
+    const pWrap = document.getElementById('modal-htab-payments');
+    const payments = paymentsData.payments || [];
+    if (!payments.length) {
+      pWrap.innerHTML = '<div class="modal-history-empty">결제 내역이 없습니다.</div>';
+    } else {
+      pWrap.innerHTML = payments.map(p => {
+        const d = p.processedAt ? new Date(p.processedAt) : null;
+        const dateStr = d ? `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}` : '-';
+        return `<div class="modal-history-item">
+          <span style="color:var(--text-primary)">⚡ ${p.credits}문제</span>
+          <span style="color:#a78bfa;font-weight:700">${p.amount ? p.amount.toLocaleString()+'원' : '-'} · ${dateStr}</span>
+        </div>`;
+      }).join('');
+    }
+  } catch (e) {
+    document.getElementById('modal-htab-quizzes').innerHTML = '<div class="modal-history-empty">불러오기 실패</div>';
+    document.getElementById('modal-htab-payments').innerHTML = '<div class="modal-history-empty">불러오기 실패</div>';
+  }
 }
 
 function closeEditModal() {

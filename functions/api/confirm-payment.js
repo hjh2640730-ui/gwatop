@@ -77,7 +77,7 @@ export async function onRequestPost(context) {
     const accessToken = await getFirebaseAccessToken(clientEmail, privateKey);
 
     // ─── 결제 중복 처리 방지 (orderId 기록) ───
-    const alreadyProcessed = await checkAndRecordPayment(orderId, uid, credits, accessToken);
+    const alreadyProcessed = await checkAndRecordPayment(orderId, uid, credits, amount, accessToken);
     if (alreadyProcessed) {
       return json({ error: '이미 처리된 결제입니다.' }, 409);
     }
@@ -152,7 +152,7 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
 }
 
 // ─── 결제 중복 확인 및 기록 (orderId 기반) ───
-async function checkAndRecordPayment(orderId, uid, credits, accessToken) {
+async function checkAndRecordPayment(orderId, uid, credits, amount, accessToken) {
   const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/payments/${orderId}`;
 
   // 이미 처리된 결제인지 확인
@@ -167,8 +167,10 @@ async function checkAndRecordPayment(orderId, uid, credits, accessToken) {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fields: {
+        orderId: { stringValue: orderId },
         uid: { stringValue: uid },
         credits: { integerValue: String(credits) },
+        amount: { integerValue: String(amount) },
         processedAt: { integerValue: String(Date.now()) }
       }
     }),

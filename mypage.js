@@ -144,6 +144,135 @@ async function renderMyPosts(user) {
   }
 }
 
+// ─── 메시지함 ───
+async function renderInbox(user) {
+  const wrap = document.getElementById('inbox-list');
+  try {
+    // 개인 메시지 + 전체 공지 + claimed 목록 동시 조회
+    const [inboxSnap, globalSnap, claimedSnap] = await Promise.all([
+      getDocs(query(collection(db, 'users', user.uid, 'inbox'), orderBy('createdAt', 'desc'), limit(30))),
+      getDocs(query(collection(db, 'global_messages'), orderBy('createdAt', 'desc'), limit(30))),
+      getDocs(collection(db, 'users', user.uid, 'claimed')),
+    ]);
+
+    const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
+    const messages = [];
+
+    inboxSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'inbox', ...d.data() }));
+    globalSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'global', claimed: claimedIds.has(d.id), ...d.data() }));
+
+    messages.sort((a, b) => {
+      const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+      const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+      return tb - ta;
+    });
+
+    // 수령 가능한 보상 개수로 뱃지 업데이트
+    const pending = messages.filter(m => m.rewardType === 'freePoints' && m.rewardAmount > 0 && !m.claimed).length;
+    const badge = document.getElementById('inbox-badge');
+    if (pending > 0) { badge.textContent = pending; badge.style.display = ''; }
+    else badge.style.display = 'none';
+
+    if (!messages.length) {
+      wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">메시지가 없습니다.</div>';
+      return;
+    }
+
+    wrap.innerHTML = messages.map(m => {
+      const hasReward = m.rewardType === 'freePoints' && m.rewardAmount > 0;
+      const claimed = m.claimed;
+      const isNew = hasReward && !claimed;
+      const ts = m.createdAt?.toDate ? m.createdAt.toDate() : new Date(m.createdAt || 0);
+      const dateStr = `${ts.getFullYear()}.${String(ts.getMonth()+1).padStart(2,'0')}.${String(ts.getDate()).padStart(2,'0')}`;
+      return `<div class="inbox-item${isNew ? ' inbox-item-new' : ''}">
+        <div class="inbox-item-title">
+          ${isNew ? '<span class="inbox-badge-new">NEW</span>' : ''}
+          ${m.title || '(제목없음)'}
+        </div>
+        <div class="inbox-item-body">${m.body || ''}</div>
+        ${hasReward ? `<div class="inbox-reward">
+          ${claimed
+            ? '<span class="inbox-claimed-badge">✅ 수령 완료</span>'
+            : `<button class="btn btn-primary btn-sm inbox-claim-btn" data-id="${m.id}" data-type="${m.messageType}" data-amount="${m.rewardAmount}">🎁 +${m.rewardAmount}P 받기</button>`
+          }
+        </div>` : ''}
+        <div class="inbox-item-date">${dateStr}</div>
+      </div>`;
+    }).join('');
+
+    // 받기 버튼 이벤트
+    wrap.querySelectorAll('.inbox-claim-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = '처리 중...';
+        try {
+          const idToken = await user.getIdToken();
+          const res = await fetch('/api/claim-reward', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messageId: btn.dataset.id, messageType: btn.dataset.type }),
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error || '처리 실패');
+
+          showToast(`🎉 +${data.rewardAmount}P 지급됐습니다!`, 'success');
+
+          // 버튼 → 수령 완료로 교체
+          btn.closest('.inbox-reward').innerHTML = '<span class="inbox-claimed-badge">✅ 수령 완료</span>';
+          btn.closest('.inbox-item').classList.remove('inbox-item-new');
+
+          // freePoints 표시 업데이트
+          const fpEl = document.getElementById('stat-free-points');
+          if (fpEl) fpEl.textContent = data.newFreePoints;
+
+          // 뱃지 감소
+          const b = document.getElementById('inbox-badge');
+          const cur = parseInt(b.textContent) - 1;
+          if (cur <= 0) b.style.display = 'none';
+          else b.textContent = cur;
+        } catch (e) {
+          showToast(e.message || '처리 실패', 'error');
+          btn.disabled = false;
+          btn.textContent = `🎁 +${btn.dataset.amount}P 받기`;
+        }
+      });
+    });
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">불러오기 실패</div>';
+  }
+}
+
+// ─── 결제 내역 ───
+async function renderPaymentHistory(user) {
+  const wrap = document.getElementById('payment-history-list');
+  try {
+    const idToken = await user.getIdToken();
+    const res = await fetch(`/api/payment-history?token=${idToken}`);
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error);
+
+    if (!data.payments?.length) {
+      wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">결제 내역이 없습니다.</div>';
+      return;
+    }
+
+    wrap.innerHTML = data.payments.map(p => {
+      const date = new Date(p.processedAt);
+      const dateStr = `${date.getFullYear()}.${String(date.getMonth()+1).padStart(2,'0')}.${String(date.getDate()).padStart(2,'0')}`;
+      const amountStr = p.amount ? p.amount.toLocaleString() + '원' : '-';
+      return `<div class="payment-item">
+        <div class="payment-item-left">
+          <div class="payment-item-credits">⚡ ${p.credits}문제 충전</div>
+          <div class="payment-item-date">${dateStr}</div>
+        </div>
+        <div class="payment-item-amount">${amountStr}</div>
+      </div>`;
+    }).join('');
+  } catch {
+    wrap.innerHTML = '<div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px 0">불러오기 실패</div>';
+  }
+}
+
 // ─── 북마크 ───
 async function renderBookmarks() {
   const wrap = document.getElementById('bookmarks-list');
@@ -305,8 +434,10 @@ onUserChange(async (user, userData) => {
 
   await Promise.all([
     renderStats(user, userData),
+    renderInbox(user),
     renderMyPosts(user),
     renderBookmarks(),
+    renderPaymentHistory(user),
   ]);
 });
 

@@ -24,6 +24,7 @@ import {
   collection,
   query,
   where,
+  orderBy,
   getDocs,
   limit,
   runTransaction
@@ -271,9 +272,12 @@ export function onUserChange(callback) {
           nickname: userData?.nickname || '',
           credits: userData?.credits ?? 0
         }));
+        injectInboxNav(user);
         callback(user, userData);
       } else {
         localStorage.removeItem(NAV_CACHE_KEY);
+        document.getElementById('nav-inbox-btn')?.remove();
+        document.getElementById('nav-inbox-flyout')?.remove();
         callback(null, null);
       }
     } catch (e) {
@@ -389,6 +393,176 @@ function _updateNavAvatar(photoURL, displayName) {
 }
 
 export { isConfigured, auth, db, app };
+
+// ─── 메시지함 네비 버튼 ───
+function injectInboxNav(user) {
+  if (document.getElementById('nav-inbox-btn')) return;
+  const navLi = document.getElementById('nav-auth-logged-in');
+  if (!navLi) return;
+
+  // 버튼 생성
+  const btn = document.createElement('button');
+  btn.id = 'nav-inbox-btn';
+  btn.className = 'nav-inbox-btn';
+  btn.title = '메시지함';
+  btn.innerHTML = '📬<span class="nav-inbox-badge" id="nav-inbox-badge" style="display:none">0</span>';
+
+  // credits 배지 앞에 삽입
+  const creditsBadge = navLi.querySelector('.nav-plan-badge');
+  creditsBadge ? navLi.insertBefore(btn, creditsBadge) : navLi.prepend(btn);
+
+  // 플라이아웃 생성
+  const flyout = document.createElement('div');
+  flyout.id = 'nav-inbox-flyout';
+  flyout.className = 'nav-inbox-flyout';
+  flyout.innerHTML = '<div class="nav-inbox-head">📬 메시지함</div><div id="nav-inbox-body"><div class="nav-inbox-loading">불러오는 중...</div></div><a href="/mypage.html" class="nav-inbox-footer">전체 보기 →</a>';
+  document.body.appendChild(flyout);
+
+  let flyoutOpen = false;
+  let flyoutLoaded = false;
+
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    flyoutOpen = !flyoutOpen;
+    flyout.classList.toggle('open', flyoutOpen);
+    btn.classList.toggle('active', flyoutOpen);
+
+    // 위치 계산 (fixed)
+    const rect = btn.getBoundingClientRect();
+    flyout.style.top = (rect.bottom + 8) + 'px';
+    flyout.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+
+    if (flyoutOpen && !flyoutLoaded) {
+      flyoutLoaded = true;
+      await renderInboxFlyout(user, document.getElementById('nav-inbox-body'));
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!flyout.contains(e.target) && e.target !== btn) {
+      flyoutOpen = false;
+      flyout.classList.remove('open');
+      btn.classList.remove('active');
+    }
+  });
+  flyout.addEventListener('click', e => e.stopPropagation());
+
+  // 뱃지 카운트 로드
+  loadInboxBadgeCount(user);
+}
+
+async function loadInboxBadgeCount(user) {
+  if (!db) return;
+  try {
+    const [globalSnap, claimedSnap, inboxSnap] = await Promise.all([
+      getDocs(query(collection(db, 'global_messages'), limit(50))),
+      getDocs(collection(db, 'users', user.uid, 'claimed')),
+      getDocs(query(collection(db, 'users', user.uid, 'inbox'), where('claimed', '==', false))),
+    ]);
+    const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
+    const globalPending = globalSnap.docs.filter(d => {
+      const data = d.data();
+      return data.rewardType === 'freePoints' && data.rewardAmount > 0 && !claimedIds.has(d.id);
+    }).length;
+    const inboxPending = inboxSnap.docs.filter(d => {
+      const data = d.data();
+      return data.rewardType === 'freePoints' && data.rewardAmount > 0;
+    }).length;
+    const total = globalPending + inboxPending;
+    const badge = document.getElementById('nav-inbox-badge');
+    if (badge) {
+      badge.textContent = total;
+      badge.style.display = total > 0 ? '' : 'none';
+    }
+  } catch (_) {}
+}
+
+async function renderInboxFlyout(user, wrap) {
+  if (!db) return;
+  try {
+    const [globalSnap, claimedSnap, inboxSnap] = await Promise.all([
+      getDocs(query(collection(db, 'global_messages'), orderBy('createdAt', 'desc'), limit(10))),
+      getDocs(collection(db, 'users', user.uid, 'claimed')),
+      getDocs(query(collection(db, 'users', user.uid, 'inbox'), orderBy('createdAt', 'desc'), limit(10))),
+    ]);
+    const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
+    const messages = [];
+
+    inboxSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'inbox', ...d.data() }));
+    globalSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'global', claimed: claimedIds.has(d.id), ...d.data() }));
+
+    messages.sort((a, b) => {
+      const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+      const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+      return tb - ta;
+    });
+
+    if (!messages.length) {
+      wrap.innerHTML = '<div class="nav-inbox-empty">메시지가 없습니다.</div>';
+      return;
+    }
+
+    wrap.innerHTML = messages.slice(0, 8).map(m => {
+      const hasReward = m.rewardType === 'freePoints' && m.rewardAmount > 0;
+      const claimed = m.claimed;
+      const isNew = hasReward && !claimed;
+      return `<div class="nav-inbox-item${isNew ? ' nav-inbox-item-new' : ''}">
+        <div class="nav-inbox-item-title">${isNew ? '<span class="nav-inbox-dot"></span>' : ''}${esc(m.title || '(제목없음)')}</div>
+        <div class="nav-inbox-item-body">${esc((m.body || '').slice(0, 60))}${(m.body||'').length > 60 ? '...' : ''}</div>
+        ${hasReward ? `<div style="margin-top:6px">${claimed
+          ? '<span class="nav-inbox-claimed">✅ 수령 완료</span>'
+          : `<button class="nav-inbox-claim-btn" data-id="${m.id}" data-type="${m.messageType}" data-amount="${m.rewardAmount}">🎁 +${m.rewardAmount}P 받기</button>`
+        }</div>` : ''}
+      </div>`;
+    }).join('');
+
+    // 받기 버튼
+    wrap.querySelectorAll('.nav-inbox-claim-btn').forEach(claimBtn => {
+      claimBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        claimBtn.disabled = true;
+        claimBtn.textContent = '처리 중...';
+        try {
+          const idToken = await user.getIdToken();
+          const res = await fetch('/api/claim-reward', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messageId: claimBtn.dataset.id, messageType: claimBtn.dataset.type }),
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) throw new Error(data.error);
+          claimBtn.parentElement.innerHTML = '<span class="nav-inbox-claimed">✅ 수령 완료</span>';
+          claimBtn.closest('.nav-inbox-item-new')?.classList.remove('nav-inbox-item-new');
+          // 뱃지 감소
+          const badge = document.getElementById('nav-inbox-badge');
+          if (badge) {
+            const cur = Math.max(0, parseInt(badge.textContent) - 1);
+            badge.textContent = cur;
+            badge.style.display = cur > 0 ? '' : 'none';
+          }
+          // 네비 크레딧 업데이트
+          const navCredits = document.getElementById('nav-credits');
+          if (navCredits && data.newFreePoints !== undefined) {
+            // freePoints는 nav에 표시 안하지만, credits 표시라도 업데이트
+          }
+          // mypage stat 업데이트
+          const fpEl = document.getElementById('stat-free-points');
+          if (fpEl && data.newFreePoints !== undefined) fpEl.textContent = data.newFreePoints;
+        } catch (err) {
+          claimBtn.disabled = false;
+          claimBtn.textContent = `🎁 +${claimBtn.dataset.amount}P 받기`;
+          alert(err.message || '처리 실패');
+        }
+      });
+    });
+  } catch (_) {
+    wrap.innerHTML = '<div class="nav-inbox-empty">불러오기 실패</div>';
+  }
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 // ─── 게임 대기 중 크로스페이지 알림 배지 ───
 (function initGameBadge() {

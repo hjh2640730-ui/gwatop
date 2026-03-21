@@ -58,6 +58,22 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── 메시지함 ──
+    match /global_messages/{msgId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /users/{uid}/inbox/{msgId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /users/{uid}/claimed/{msgId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
     // ── 가위바위보 게임 ──
     match /games/{gameId} {
       // 로그인 유저는 게임 목록 읽기 가능 (방 목록 표시)
