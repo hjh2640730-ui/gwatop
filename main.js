@@ -3,7 +3,7 @@
 // PDF 업로드, 텍스트 추출, 퀴즈 생성, 크레딧 기반 과금
 // ============================================================
 
-import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange, deductCredit, calcCredits } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange, deductCreditMixed, calcCredits } from './auth.js';
 import { saveDocument, savePendingQuiz } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 
@@ -118,9 +118,26 @@ function updateNavUI(user, userData) {
     navUsername.textContent = userData?.nickname || user.displayName || user.email || '사용자';
     const credits = userData?.credits ?? 0;
     document.getElementById('nav-credits').textContent = credits;
+    updateCreditTypeUI(userData);
+    updateCreditCostLabel();
   } else {
     navLoggedOut.style.display = '';
     navLoggedIn.style.display = 'none';
+  }
+}
+
+function updateCreditTypeUI(userData) {
+  const row = document.getElementById('credit-type-row');
+  if (!row) return;
+  const fp = userData?.freePoints ?? 0;
+  if (fp > 0) {
+    row.style.display = '';
+    const badge = document.getElementById('free-points-badge');
+    if (badge) badge.textContent = `(보유: ${fp}P)`;
+  } else {
+    row.style.display = 'none';
+    const normalRadio = document.querySelector('input[name="credit-type"][value="normal"]');
+    if (normalRadio) normalRadio.checked = true;
   }
 }
 
@@ -196,13 +213,29 @@ function setupSlider() {
     updateSliderStyle();
     updateCreditCostLabel();
   });
+  document.addEventListener('change', (e) => {
+    if (e.target?.name === 'credit-type') updateCreditCostLabel();
+  });
 }
 
 function updateCreditCostLabel() {
   const count = parseInt(countSlider?.value || 15);
   const cost = calcCredits(count);
   const label = document.getElementById('credit-cost-label');
-  if (label) label.textContent = `⚡ ${cost}문제 차감`;
+  if (!label) return;
+  const useFree = document.querySelector('input[name="credit-type"]:checked')?.value === 'free';
+  const fp = currentUserData?.freePoints ?? 0;
+  if (useFree && fp > 0) {
+    const freeUsed = Math.min(fp, cost);
+    const creditsUsed = cost - freeUsed;
+    if (creditsUsed > 0) {
+      label.textContent = `🎁 ${freeUsed}P + ⚡ ${creditsUsed}문제 차감`;
+    } else {
+      label.textContent = `🎁 ${freeUsed}P 무료 차감`;
+    }
+  } else {
+    label.textContent = `⚡ ${cost}문제 차감`;
+  }
 }
 
 function updateSliderStyle() {
@@ -236,11 +269,14 @@ async function handleGenerate() {
   const count = parseInt(countSlider?.value || 15);
   const required = calcCredits(count);
   const credits = currentUserData?.credits ?? 0;
-  if (credits < required) {
+  const freePoints = currentUserData?.freePoints ?? 0;
+  const useFree = document.querySelector('input[name="credit-type"]:checked')?.value === 'free';
+  const effectiveFree = useFree ? freePoints : 0;
+  if (credits + effectiveFree < required) {
     openModal(upgradeModal); return;
   }
 
-  await generateQuiz();
+  await generateQuiz(useFree);
 }
 
 // ─── Core: Load PDF Document (공유) ───
@@ -297,7 +333,7 @@ async function renderPagesAsImages(pdf, maxPages = 15) {
 }
 
 // ─── Core: Generate Quiz via API ───
-async function generateQuiz() {
+async function generateQuiz(useFreeFirst = false) {
   const checked = [...document.querySelectorAll('input[name="quiz-type"]:checked')].map(el => el.value);
   const types = checked.length > 0 ? checked : ['mcq'];
   const count = parseInt(countSlider?.value || 15);
@@ -370,12 +406,18 @@ async function generateQuiz() {
       });
     }
 
-    // 3) Deduct credits (문제 수 기반)
+    // 3) Deduct credits (무료P 우선 or 일반 크레딧)
     const deductAmount = calcCredits(count);
-    await deductCredit(currentUser.uid, deductAmount);
+    const ok = await deductCreditMixed(currentUser.uid, deductAmount, useFreeFirst);
+    if (!ok) throw new Error('크레딧 차감에 실패했습니다. 잔액을 확인해주세요.');
     if (currentUserData) {
-      currentUserData.credits = Math.max(0, (currentUserData.credits ?? deductAmount) - deductAmount);
+      const fp = currentUserData.freePoints ?? 0;
+      const freeUsed = useFreeFirst ? Math.min(fp, deductAmount) : 0;
+      const creditsUsed = deductAmount - freeUsed;
+      currentUserData.freePoints = Math.max(0, fp - freeUsed);
+      currentUserData.credits = Math.max(0, (currentUserData.credits ?? 0) - creditsUsed);
       document.getElementById('nav-credits').textContent = currentUserData.credits;
+      updateCreditTypeUI(currentUserData);
     }
 
     // 4) Save document (저장된 문서에서 로드한 경우 기존 docId 재사용)

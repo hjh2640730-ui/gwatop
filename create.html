@@ -132,6 +132,26 @@
             </div>
           </div>
 
+          <div id="credit-type-row" style="display:none">
+            <div class="settings-label">크레딧 사용 방식</div>
+            <div class="type-options">
+              <label class="type-option">
+                <input type="radio" name="credit-type" value="normal" checked />
+                <span class="type-option-label">
+                  <span class="type-icon">⚡</span>
+                  일반 크레딧
+                </span>
+              </label>
+              <label class="type-option">
+                <input type="radio" name="credit-type" value="free" />
+                <span class="type-option-label">
+                  <span class="type-icon">🎁</span>
+                  무료 크레딧 우선 <span id="free-points-badge" style="font-size:10px;color:#4ade80;margin-left:2px"></span>
+                </span>
+              </label>
+            </div>
+          </div>
+
           <button class="btn-generate" id="generate-btn" disabled>
             <span>⚡</span> 퀴즈 생성하기
           </button>

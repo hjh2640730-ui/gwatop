@@ -207,22 +207,39 @@ export function calcCredits(count) {
 
 // ─── Deduct Credits (문제 수 기반 차감) ───
 export async function deductCredit(uid, amount = 1) {
+  return deductCreditMixed(uid, amount, false);
+}
+
+// ─── Deduct Credits (무료P 우선 혼합 차감) ───
+// useFreeFirst: true이면 freePoints 먼저 소진, 부족분은 credits에서 차감
+export async function deductCreditMixed(uid, amount = 1, useFreeFirst = false) {
   if (!isConfigured || !db) return true;
   try {
     const ref = doc(db, 'users', uid);
     await runTransaction(db, async (transaction) => {
       const snap = await transaction.get(ref);
       if (!snap.exists()) throw new Error('사용자 문서 없음');
-      const current = snap.data().credits ?? 0;
-      if (current < amount) throw new Error('크레딧이 부족합니다.');
-      transaction.update(ref, {
-        credits: increment(-amount),
-        totalQuizzes: increment(1)
-      });
+      const data = snap.data();
+      const credits = data.credits ?? 0;
+      const freePoints = data.freePoints ?? 0;
+
+      let freeDeduct = 0;
+      let creditDeduct = amount;
+      if (useFreeFirst && freePoints > 0) {
+        freeDeduct = Math.min(freePoints, amount);
+        creditDeduct = amount - freeDeduct;
+      }
+
+      if (credits < creditDeduct) throw new Error('크레딧이 부족합니다.');
+
+      const updates = { totalQuizzes: increment(1) };
+      if (creditDeduct > 0) updates.credits = increment(-creditDeduct);
+      if (freeDeduct > 0) updates.freePoints = increment(-freeDeduct);
+      transaction.update(ref, updates);
     });
     return true;
   } catch (e) {
-    console.error('deductCredit error:', e);
+    console.error('deductCreditMixed error:', e);
     return false;
   }
 }
