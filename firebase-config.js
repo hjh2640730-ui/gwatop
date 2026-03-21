@@ -11,7 +11,8 @@ const firebaseConfig = {
   storageBucket: "gwatop-8edaf.firebasestorage.app",
   messagingSenderId: "482465884386",
   appId: "1:482465884386:web:cf86579ef85c20382216bb",
-  measurementId: "G-LE2L73BXBL"
+  measurementId: "G-LE2L73BXBL",
+  databaseURL: "https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
 export default firebaseConfig;

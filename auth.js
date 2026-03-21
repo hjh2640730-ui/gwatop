@@ -4,6 +4,7 @@
 // ============================================================
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 import {
   getAuth,
   GoogleAuthProvider,
@@ -37,7 +38,7 @@ const KAKAO_REST_API_KEY = '6750d096b2c523c0a557ee153c62ddbd';
 const NAVER_CLIENT_ID = '7qK5JB94z8TvW5FFOnti';
 
 // ─── Firebase Init ───
-let app, auth, db;
+let app, auth, db, rtdb;
 let isConfigured = false;
 
 try {
@@ -45,6 +46,7 @@ try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+    rtdb = getDatabase(app);
     isConfigured = true;
   }
 } catch (e) {
@@ -433,7 +435,7 @@ function _updateNavAvatar(photoURL, displayName) {
   if (username && displayName) username.textContent = displayName;
 }
 
-export { isConfigured, auth, db, app };
+export { isConfigured, auth, db, rtdb, app };
 
 // ─── 메시지함 네비 버튼 ───
 function injectInboxNav(user) {
@@ -495,15 +497,29 @@ function injectInboxNav(user) {
 async function loadInboxBadgeCount(user) {
   if (!db) return;
   try {
-    const [globalSnap, claimedSnap, inboxSnap] = await Promise.all([
-      getDocs(query(collection(db, 'global_messages'), limit(50))),
+    // global_messages는 5분 캐시 (자주 변경되지 않음)
+    const GM_CACHE_KEY = 'gm_cache';
+    const GM_CACHE_TTL = 5 * 60 * 1000;
+    let globalDocs;
+    try {
+      const cached = JSON.parse(localStorage.getItem(GM_CACHE_KEY) || 'null');
+      if (cached && Date.now() - cached.ts < GM_CACHE_TTL) {
+        globalDocs = cached.docs;
+      }
+    } catch (_) {}
+    if (!globalDocs) {
+      const snap = await getDocs(query(collection(db, 'global_messages'), limit(50)));
+      globalDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      try { localStorage.setItem(GM_CACHE_KEY, JSON.stringify({ ts: Date.now(), docs: globalDocs })); } catch (_) {}
+    }
+
+    const [claimedSnap, inboxSnap] = await Promise.all([
       getDocs(collection(db, 'users', user.uid, 'claimed')),
       getDocs(query(collection(db, 'users', user.uid, 'inbox'), where('claimed', '==', false))),
     ]);
     const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
-    const globalPending = globalSnap.docs.filter(d => {
-      const data = d.data();
-      return data.rewardType === 'freePoints' && data.rewardAmount > 0 && !claimedIds.has(d.id);
+    const globalPending = globalDocs.filter(d => {
+      return d.rewardType === 'freePoints' && d.rewardAmount > 0 && !claimedIds.has(d.id);
     }).length;
     const inboxPending = inboxSnap.docs.filter(d => {
       const data = d.data();

@@ -55,6 +55,7 @@ let selectedWriteCategory = '자유';
 let postRenderCount = 0;
 let authInitialized = false;
 let likedPostIds = new Set();
+let checkedPostIds = new Set(); // 이미 likes 조회 완료된 postId 캐시
 let pageStartCursors = [null];
 let currentPagePosts = [];
 let hasNextPage = false;
@@ -351,11 +352,14 @@ function resetSearchState() {
 // ─── Load Likes ───
 async function loadLikesForPosts(postIds) {
   if (!currentUser || !postIds.length) return;
+  // 이미 조회한 포스트는 스킵 (세션 내 캐시)
+  const uncached = postIds.filter(id => !checkedPostIds.has(id));
+  if (!uncached.length) return;
   try {
-    const snaps = await Promise.all(postIds.map(id => getDoc(doc(db, 'post_likes', `${id}_${currentUser.uid}`))));
+    const snaps = await Promise.all(uncached.map(id => getDoc(doc(db, 'post_likes', `${id}_${currentUser.uid}`))));
     snaps.forEach((snap, i) => {
-      if (snap.exists()) likedPostIds.add(postIds[i]);
-      else likedPostIds.delete(postIds[i]);
+      checkedPostIds.add(uncached[i]);
+      if (snap.exists()) likedPostIds.add(uncached[i]);
     });
   } catch (e) { console.error('loadLikesForPosts:', e); }
 }
@@ -446,10 +450,9 @@ async function loadByCategory(category) {
   try {
     const sortField = currentSort === 'popular' ? 'likes' : 'createdAt';
     const snap = await getDocs(
-      query(collection(db, 'community_posts'), orderBy(sortField, 'desc'), limit(200))
+      query(collection(db, 'community_posts'), where('category', '==', category), orderBy(sortField, 'desc'), limit(50))
     );
     let posts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    posts = posts.filter(p => (p.category || '자유') === category);
     if (showMyUniversityOnly && currentUserData?.university) {
       posts = posts.filter(p => p.university === currentUserData.university);
     }

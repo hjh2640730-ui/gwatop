@@ -4,11 +4,14 @@
 
 import { createHandScene } from './hand3d.js';
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
-import { db } from './auth.js';
+import { db, rtdb } from './auth.js';
 import {
   collection, doc, query, where, limit, onSnapshot,
-  getDocs, addDoc, orderBy, serverTimestamp
+  getDocs, getDoc, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  ref as rtdbRef, onValue, push as rtdbPush, off
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 let currentUser = null;
 let currentUserData = null;
@@ -16,6 +19,7 @@ let activeGameId = null;
 let activeGameListener = null;
 let roomsListener = null;
 let pendingListener = null;
+let pendingPollingId = null;
 let countdownInterval = null;
 let allRoomDocs = [];
 let chatListener = null;
@@ -271,20 +275,32 @@ function checkActiveGame() {
   const stored = getStoredGame();
   if (!stored) return;
   if (pendingListener) { pendingListener(); pendingListener = null; }
-  pendingListener = onSnapshot(doc(db, 'games', stored.gameId), snap => {
-    if (!snap.exists()) { clearStoredGame(); return; }
-    const game = { id: snap.id, ...snap.data() };
-    if (game.status === 'cancelled' || game.status === 'finished') {
-      clearStoredGame();
-      if (pendingListener) { pendingListener(); pendingListener = null; }
-    } else if (game.status === 'ready' || game.status === 'hands_shown') {
-      clearStoredGame();
-      if (pendingListener) { pendingListener(); pendingListener = null; }
-      const isP1 = game.player1?.uid === currentUser?.uid;
-      if (game.status === 'ready') showToast('상대방이 입장했습니다! 게임을 시작하세요 🎮', 'success');
-      openGameModal(stored.gameId, isP1);
-    }
-  });
+  if (pendingPollingId) { clearInterval(pendingPollingId); pendingPollingId = null; }
+
+  const poll = async () => {
+    try {
+      const snap = await getDoc(doc(db, 'games', stored.gameId));
+      if (!snap.exists()) {
+        clearStoredGame();
+        clearInterval(pendingPollingId); pendingPollingId = null;
+        return;
+      }
+      const game = { id: snap.id, ...snap.data() };
+      if (game.status === 'cancelled' || game.status === 'finished') {
+        clearStoredGame();
+        clearInterval(pendingPollingId); pendingPollingId = null;
+      } else if (game.status === 'ready' || game.status === 'hands_shown') {
+        clearStoredGame();
+        clearInterval(pendingPollingId); pendingPollingId = null;
+        const isP1 = game.player1?.uid === currentUser?.uid;
+        if (game.status === 'ready') showToast('상대방이 입장했습니다! 게임을 시작하세요 🎮', 'success');
+        openGameModal(stored.gameId, isP1);
+      }
+    } catch (e) { console.error('checkActiveGame poll:', e); }
+  };
+
+  poll();
+  pendingPollingId = setInterval(poll, 3000);
 }
 
 function getRemainingMin(createdAt) {
@@ -438,7 +454,7 @@ async function cancelRoomById(gameId) {
     body: JSON.stringify({ action: 'cancel', gameId }),
   });
   clearStoredGame();
-  if (pendingListener) { pendingListener(); pendingListener = null; }
+  if (pendingPollingId) { clearInterval(pendingPollingId); pendingPollingId = null; }
   showToast('방이 취소됐습니다', 'success');
 }
 
@@ -472,9 +488,10 @@ function openGameModal(gameId, isP1) {
 
   openChat(gameId);
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
-  activeGameListener = onSnapshot(doc(db, 'games', gameId), snap => {
+  const gameStateRef = rtdbRef(rtdb, `game_realtime/${gameId}`);
+  activeGameListener = onValue(gameStateRef, snap => {
     if (!snap.exists()) return;
-    syncModal({ id: snap.id, ...snap.data() }, isP1);
+    syncModal({ id: gameId, ...snap.val() }, isP1);
   });
 
   // "건승을 빕니다." 인트로 → 2초 후 선택 화면
@@ -761,15 +778,15 @@ async function submitFinal(finalHand) {
 
 // ─── 채팅 ───
 function openChat(gameId) {
-  if (chatListener) { chatListener(); chatListener = null; }
+  if (chatListener) { off(rtdbRef(rtdb, `game_chat/${gameId}`)); chatListener = null; }
   document.getElementById('chat-section').style.display = '';
 
-  const q = query(
-    collection(db, 'games', gameId, 'messages'),
-    orderBy('createdAt', 'asc'),
-    limit(100)
-  );
-  chatListener = onSnapshot(q, snap => renderMessages(snap.docs));
+  const chatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
+  chatListener = onValue(chatRef, snap => {
+    const messages = [];
+    snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
+    renderMessages(messages);
+  });
 
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send-btn');
@@ -779,11 +796,11 @@ function openChat(gameId) {
     if (!text || !currentUser) return;
     input.value = '';
     try {
-      await addDoc(collection(db, 'games', gameId, 'messages'), {
+      await rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`), {
         uid: currentUser.uid,
         name: currentUserData?.nickname || currentUser.displayName || '익명',
         text: text.slice(0, 100),
-        createdAt: serverTimestamp(),
+        createdAt: Date.now(),
       });
     } catch (e) { console.error('chat send error', e); }
   };
@@ -792,15 +809,14 @@ function openChat(gameId) {
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); doSend(); } };
 }
 
-function renderMessages(docs) {
+function renderMessages(messages) {
   const container = document.getElementById('chat-messages');
   if (!container) return;
-  if (!docs.length) {
+  if (!messages.length) {
     container.innerHTML = '<div class="chat-empty">상대방과 채팅해보세요 💬</div>';
     return;
   }
-  container.innerHTML = docs.map(d => {
-    const m = d.data();
+  container.innerHTML = messages.map(m => {
     const isMine = m.uid === currentUser?.uid;
     const name = isMine ? '' : `<span class="chat-msg-name">${escapeHtml(m.name || '익명')}</span>`;
     return `<div class="chat-msg ${isMine ? 'mine' : 'other'}">${name}<div class="chat-bubble">${escapeHtml(m.text)}</div></div>`;
@@ -817,8 +833,14 @@ function closeModal() {
   clearRematchTimeout();
   clearPhaseTimers();
   document.getElementById('game-modal').classList.remove('visible');
-  if (activeGameListener) { activeGameListener(); activeGameListener = null; }
-  if (chatListener) { chatListener(); chatListener = null; }
+  if (activeGameListener) {
+    off(rtdbRef(rtdb, `game_realtime/${activeGameId}`));
+    activeGameListener = null;
+  }
+  if (chatListener) {
+    off(rtdbRef(rtdb, `game_chat/${activeGameId}`));
+    chatListener = null;
+  }
   document.getElementById('chat-section').style.display = 'none';
   if (handScene) { handScene.dispose(); handScene = null; }
   activeGameId = null;

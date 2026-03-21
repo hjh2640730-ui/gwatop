@@ -9,6 +9,7 @@ const PROJECT_ID = 'gwatop-8edaf';
 const FIREBASE_WEB_API_KEY = 'AIzaSyAsxkIpwlBa0rD6FyzsrB0sdlovQoCPtcQ';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const DOC_BASE = `projects/${PROJECT_ID}/databases/(default)/documents`;
+const RTDB_BASE = `https://${PROJECT_ID}-default-rtdb.asia-southeast1.firebasedatabase.app`;
 
 let _cachedToken = null, _tokenExpiry = 0;
 let _publicKeys = null, _publicKeysExpiry = 0;
@@ -65,11 +66,11 @@ async function verifyFirebaseToken(idToken) {
 async function getFirebaseAccessToken(clientEmail, privateKey, kv) {
   const now = Math.floor(Date.now() / 1000);
   if (kv) {
-    const cached = await kv.get('firebase_admin_token', 'json');
+    const cached = await kv.get('firebase_admin_token_v2', 'json');
     if (cached && cached.expiry - now > 300) return cached.token;
   } else if (_cachedToken && _tokenExpiry - now > 300) return _cachedToken;
   const header = { alg: 'RS256', typ: 'JWT' };
-  const payload = { iss: clientEmail, sub: clientEmail, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600, scope: 'https://www.googleapis.com/auth/datastore' };
+  const payload = { iss: clientEmail, sub: clientEmail, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600, scope: 'https://www.googleapis.com/auth/firebase' };
   const encode = obj => btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   const signingInput = `${encode(header)}.${encode(payload)}`;
   const pem = privateKey.replace(/-----BEGIN PRIVATE KEY-----/g, '').replace(/-----END PRIVATE KEY-----/g, '').replace(/\\n/g, '').replace(/\n/g, '').replace(/\r/g, '').replace(/\s/g, '');
@@ -88,7 +89,7 @@ async function getFirebaseAccessToken(clientEmail, privateKey, kv) {
   _cachedToken = tokenData.access_token;
   _tokenExpiry = now + 3600;
   if (kv) {
-    await kv.put('firebase_admin_token', JSON.stringify({ token: tokenData.access_token, expiry: now + 3600 }), { expirationTtl: 3500 });
+    await kv.put('firebase_admin_token_v2', JSON.stringify({ token: tokenData.access_token, expiry: now + 3600 }), { expirationTtl: 3500 });
   }
   return _cachedToken;
 }
@@ -134,6 +135,35 @@ async function fsCommitTx(writes, accessToken, txId) {
   });
   const data = await res.json();
   return { ok: res.ok, data };
+}
+
+// ─── Realtime Database 헬퍼 ───
+async function rtdbSet(gameId, data, accessToken) {
+  try {
+    await fetch(`${RTDB_BASE}/game_realtime/${gameId}.json?access_token=${accessToken}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (_) { /* RTDB sync 실패해도 게임 진행에 영향 없음 */ }
+}
+
+async function rtdbPatch(gameId, data, accessToken) {
+  try {
+    await fetch(`${RTDB_BASE}/game_realtime/${gameId}.json?access_token=${accessToken}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch (_) { /* RTDB sync 실패해도 게임 진행에 영향 없음 */ }
+}
+
+async function rtdbDelete(gameId, accessToken) {
+  try {
+    await fetch(`${RTDB_BASE}/game_realtime/${gameId}.json?access_token=${accessToken}`, {
+      method: 'DELETE',
+    });
+  } catch (_) {}
 }
 
 async function fsCreate(collection, fields, accessToken) {
@@ -288,7 +318,16 @@ export async function onRequestPost(context) {
         updateMask: { fieldPaths: Object.keys(fields) },
       }], accessToken, txId);
 
-      if (ok) return json({ success: true, wager: game.wager });
+      if (ok) {
+        // RTDB에 초기 게임 상태 기록 (클라이언트 onValue 수신용)
+        await rtdbSet(gameId, {
+          status: 'ready', wager: game.wager,
+          player1: game.player1,
+          player2: { uid, name: userData.nickname || user.displayName || '익명', photo: user.photoUrl || '' },
+          p1HandsSubmitted: false, p2HandsSubmitted: false,
+        }, accessToken);
+        return json({ success: true, wager: game.wager });
+      }
       if (data.error?.status === 'ABORTED') continue;
       return json({ error: '입장 실패' }, 500);
     }
@@ -326,7 +365,14 @@ export async function onRequestPost(context) {
         updateMask: { fieldPaths: Object.keys(fields) },
       }], accessToken, txId);
 
-      if (ok) return json({ handsShown: !!bothSubmitted });
+      if (ok) {
+        const rtdbUpdate = isP1
+          ? { p1HandsSubmitted: true, p1LeftHand: leftHand, p1RightHand: rightHand }
+          : { p2HandsSubmitted: true, p2LeftHand: leftHand, p2RightHand: rightHand };
+        if (bothSubmitted) rtdbUpdate.status = 'hands_shown';
+        await rtdbPatch(gameId, rtdbUpdate, accessToken);
+        return json({ handsShown: !!bothSubmitted });
+      }
       if (data.error?.status === 'ABORTED') continue;
       return json({ error: '제출 실패' }, 500);
     }
@@ -371,7 +417,10 @@ export async function onRequestPost(context) {
           { update: { name: `${DOC_BASE}/game_finals/${gameId}`, fields: { [myFinalKey]: v(finalHand) } }, updateMask: { fieldPaths: [myFinalKey] } },
           { update: { name: `${DOC_BASE}/games/${gameId}`,       fields: { [mySubKey]: v(true) }         }, updateMask: { fieldPaths: [mySubKey] } },
         ], accessToken, txId);
-        if (ok) return json({ waiting: true });
+        if (ok) {
+          await rtdbPatch(gameId, { [mySubKey]: true }, accessToken);
+          return json({ waiting: true });
+        }
         if (data.error?.status === 'ABORTED') continue;
         return json({ error: '처리 실패' }, 500);
       }
@@ -396,7 +445,17 @@ export async function onRequestPost(context) {
           { update: { name: `${DOC_BASE}/games/${rematchId}`,    fields: rematchFields                                                                                                                                         }, updateMask: { fieldPaths: Object.keys(rematchFields) } },
           { update: { name: `${DOC_BASE}/games/${gameId}`,       fields: { [mySubKey]: v(true), status: v('finished'), winner: v(null), result: v({ p1FinalHand, p2FinalHand }), drawRematchId: v(rematchId) } }, updateMask: { fieldPaths: [mySubKey, 'status', 'winner', 'result', 'drawRematchId'] } },
         ], accessToken, txId);
-        if (ok) return json({ finished: true, draw: true, drawRematchId: rematchId });
+        if (ok) {
+          await Promise.all([
+            rtdbPatch(gameId, { [mySubKey]: true, status: 'finished', result: { p1FinalHand, p2FinalHand }, drawRematchId: rematchId }, accessToken),
+            rtdbSet(rematchId, {
+              status: 'ready', wager: game.wager,
+              player1: game.player1, player2: game.player2,
+              p1HandsSubmitted: false, p2HandsSubmitted: false,
+            }, accessToken),
+          ]);
+          return json({ finished: true, draw: true, drawRematchId: rematchId });
+        }
         if (data.error?.status === 'ABORTED') continue;
         return json({ error: '게임 처리 실패' }, 500);
       }
@@ -419,7 +478,10 @@ export async function onRequestPost(context) {
         { update: { name: `${DOC_BASE}/users/${game.player1.uid}`,   fields: { freePoints: v(newP1FP) }                                                                               }, updateMask: { fieldPaths: ['freePoints'] } },
         { update: { name: `${DOC_BASE}/users/${game.player2.uid}`,   fields: { freePoints: v(newP2FP) }                                                                               }, updateMask: { fieldPaths: ['freePoints'] } },
       ], accessToken, txId);
-      if (ok) return json({ finished: true, result: { p1FinalHand, p2FinalHand, winner: winnerId, winnerSide, wager: game.wager } });
+      if (ok) {
+        await rtdbPatch(gameId, { [mySubKey]: true, status: 'finished', winner: winnerId, result: { p1FinalHand, p2FinalHand } }, accessToken);
+        return json({ finished: true, result: { p1FinalHand, p2FinalHand, winner: winnerId, winnerSide, wager: game.wager } });
+      }
       if (data.error?.status === 'ABORTED') continue;
       return json({ error: '게임 처리 실패' }, 500);
     }
@@ -445,6 +507,7 @@ export async function onRequestPost(context) {
     await fsPatch(`games/${gameId}`, {
       rematchRequest: v({ fromUid: uid, fromName: userData.nickname || user.displayName || '익명', wager: w, status: 'pending' }),
     }, accessToken);
+    await rtdbPatch(gameId, { rematchRequest: { fromUid: uid, fromName: userData.nickname || user.displayName || '익명', wager: w, status: 'pending' } }, accessToken);
     return json({ success: true });
   }
 
@@ -478,6 +541,15 @@ export async function onRequestPost(context) {
     await fsPatch(`games/${gameId}`, {
       rematchRequest: v({ fromUid: rr.fromUid, fromName: rr.fromName, wager: rr.wager, status: 'accepted', newGameId: newId }),
     }, accessToken);
+    await Promise.all([
+      rtdbPatch(gameId, { rematchRequest: { fromUid: rr.fromUid, fromName: rr.fromName, wager: rr.wager, status: 'accepted', newGameId: newId } }, accessToken),
+      rtdbSet(newId, {
+        status: 'ready', wager: rr.wager,
+        player1: { uid: game.player1.uid, name: game.player1.name, photo: game.player1.photo || '' },
+        player2: { uid: game.player2.uid, name: game.player2.name, photo: game.player2.photo || '' },
+        p1HandsSubmitted: false, p2HandsSubmitted: false,
+      }, accessToken),
+    ]);
 
     const isP1ForAcceptor = game.player1?.uid === uid;
     return json({ success: true, newGameId: newId, isP1: isP1ForAcceptor });
@@ -496,6 +568,7 @@ export async function onRequestPost(context) {
       ? null
       : { fromUid: rr.fromUid, fromName: rr.fromName, wager: rr.wager, status: 'declined' };
     await fsPatch(`games/${gameId}`, { rematchRequest: v(newRR) }, accessToken);
+    await rtdbPatch(gameId, { rematchRequest: newRR }, accessToken);
     return json({ success: true });
   }
 
@@ -538,7 +611,10 @@ export async function onRequestPost(context) {
         { update: { name: `${DOC_BASE}/users/${game.player1.uid}`, fields: { freePoints: v(newP1FP) } }, updateMask: { fieldPaths: ['freePoints'] } },
         { update: { name: `${DOC_BASE}/users/${game.player2.uid}`, fields: { freePoints: v(newP2FP) } }, updateMask: { fieldPaths: ['freePoints'] } },
       ], accessToken, txId);
-      if (ok) return json({ finished: true, timeout: true });
+      if (ok) {
+        await rtdbPatch(gameId, { status: 'finished', winner: winnerId, result: { timeout: true } }, accessToken);
+        return json({ finished: true, timeout: true });
+      }
       if (data.error?.status === 'ABORTED') continue;
       return json({ error: '타임아웃 처리 실패' }, 500);
     }
