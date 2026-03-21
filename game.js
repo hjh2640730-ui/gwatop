@@ -19,6 +19,7 @@ let countdownInterval = null;   // 방 만료 타이머
 let allRoomDocs = [];           // 전체 방 목록 (검색 필터링용)
 let chatListener = null;        // 채팅 onSnapshot 구독
 let pendingJoinGameId = null;   // 비밀번호 입력 대기 중인 방 ID
+let lastGameWager = 1;          // 재대결용 마지막 wager 기억
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
 
@@ -151,6 +152,15 @@ function setupUI() {
   document.getElementById('game-modal')?.addEventListener('click', e => {
     if (e.target !== document.getElementById('game-modal')) return;
     if (document.getElementById('state-result').style.display !== 'none') closeModal();
+  });
+
+  // 재대결 신청
+  document.getElementById('rematch-btn')?.addEventListener('click', async () => {
+    if (!currentUser) { openLoginModal(); return; }
+    const fp = currentUserData?.freePoints ?? 0;
+    if (fp < lastGameWager) { showToast(`무료 포인트 부족 (보유: ${fp}P)`, 'error'); return; }
+    closeModal();
+    await createRoom(lastGameWager);
   });
 
   // 가위바위보 선택
@@ -368,17 +378,22 @@ async function cancelRoomById(gameId) {
 function openGameModal(gameId, isP1) {
   activeGameId = gameId;
   document.getElementById('game-modal').classList.add('visible');
-  showState('choose');
-  document.querySelectorAll('.rps-btn').forEach(b => { b.disabled = false; b.classList.remove('selected'); });
-  document.getElementById('rps-status').textContent = '';
 
+  // 리스너 먼저 연결
   openChat(gameId);
-
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
   activeGameListener = onSnapshot(doc(db, 'games', gameId), snap => {
     if (!snap.exists()) return;
     syncModal({ id: snap.id, ...snap.data() }, isP1);
   });
+
+  // "건승을 빕니다." 인트로 → 2초 후 선택 화면
+  showState('start');
+  setTimeout(() => {
+    showState('choose');
+    document.querySelectorAll('.rps-btn').forEach(b => { b.disabled = false; b.classList.remove('selected'); });
+    document.getElementById('rps-status').textContent = '';
+  }, 2000);
 }
 
 function syncModal(game, isP1) {
@@ -404,6 +419,7 @@ function syncModal(game, isP1) {
 }
 
 function showState(state) {
+  document.getElementById('state-start').style.display  = state === 'start'  ? '' : 'none';
   document.getElementById('state-choose').style.display = state === 'choose' ? '' : 'none';
   document.getElementById('state-result').style.display = state === 'result' ? '' : 'none';
 }
@@ -433,6 +449,7 @@ function showResult(game, isP1) {
     }
   }
 
+  lastGameWager = game.wager || 1;
   clearStoredGame();
   document.getElementById('result-icon').textContent = icon;
   document.getElementById('result-title').textContent = title;
@@ -487,7 +504,8 @@ function openChat(gameId) {
   };
 
   sendBtn.onclick = doSend;
-  input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } };
+  // isComposing 체크로 한글 IME 마지막 글자 중복 전송 방지
+  input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); doSend(); } };
 }
 
 function renderMessages(docs) {
