@@ -97,18 +97,29 @@ export async function ensureUserDoc(user, extra = {}) {
     const snap = await getDoc(ref);
     if (!snap.exists()) {
       // 중복 확인: 전화번호 우선, 없으면 이메일로 체크
-      let freeCredits = 10;
       try {
         if (phone) {
-          const phoneQ = query(collection(db, 'users'), where('phone', '==', phone), limit(1));
-          const phoneSnap = await getDocs(phoneQ);
-          if (!phoneSnap.empty) freeCredits = 0;
+          const phoneSnap = await getDocs(query(collection(db, 'users'), where('phone', '==', phone), limit(1)));
+          if (!phoneSnap.empty) {
+            try { await user.delete(); } catch (_) {}
+            await signOut(auth);
+            const err = new Error('이미 다른 방법으로 가입된 전화번호입니다. 기존 로그인 방법을 사용해주세요.');
+            err.code = 'auth/duplicate-account';
+            throw err;
+          }
         } else if (email) {
-          const emailQ = query(collection(db, 'users'), where('email', '==', email), limit(1));
-          const emailSnap = await getDocs(emailQ);
-          if (!emailSnap.empty) freeCredits = 0;
+          const emailSnap = await getDocs(query(collection(db, 'users'), where('email', '==', email), limit(1)));
+          if (!emailSnap.empty) {
+            try { await user.delete(); } catch (_) {}
+            await signOut(auth);
+            const err = new Error('이미 다른 방법으로 가입된 이메일입니다. 기존 로그인 방법을 사용해주세요.');
+            err.code = 'auth/duplicate-account';
+            throw err;
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        if (e.code === 'auth/duplicate-account') throw e;
+      }
 
       await setDoc(ref, {
         uid: user.uid,
@@ -132,7 +143,7 @@ export async function ensureUserDoc(user, extra = {}) {
     } else {
       const data = snap.data();
       const updates = {};
-      if (data.credits === undefined) updates.credits = 10;
+      if (data.credits === undefined) updates.credits = 30;
       if (data.referralCredits === undefined) updates.referralCredits = 0;
       if (displayName && !data.displayName) updates.displayName = displayName;
       if (email && !data.email) updates.email = email;
@@ -298,6 +309,11 @@ export function onUserChange(callback) {
         callback(null, null);
       }
     } catch (e) {
+      if (e.code === 'auth/duplicate-account') {
+        alert(e.message);
+        callback(null, null);
+        return;
+      }
       console.warn('onUserChange error:', e);
       callback(user || null, null);
     }
@@ -337,7 +353,11 @@ export function signInWithKakao() {
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Kakao sign-in error:', err);
-      alert('카카오 로그인 처리 중 오류가 발생했습니다.');
+      if (err.code === 'auth/duplicate-account') {
+        alert(err.message);
+      } else {
+        alert('카카오 로그인 처리 중 오류가 발생했습니다.');
+      }
     }
   };
   window.addEventListener('message', handleMessage);
@@ -377,7 +397,11 @@ export function signInWithNaver() {
       _updateNavAvatar(e.data.photoURL, e.data.displayName);
     } catch (err) {
       console.error('Naver sign-in error:', err);
-      alert('네이버 로그인 처리 중 오류가 발생했습니다.');
+      if (err.code === 'auth/duplicate-account') {
+        alert(err.message);
+      } else {
+        alert('네이버 로그인 처리 중 오류가 발생했습니다.');
+      }
     }
   };
   window.addEventListener('message', handleMessage);

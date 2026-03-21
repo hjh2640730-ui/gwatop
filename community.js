@@ -118,6 +118,7 @@ async function init() {
   setupUniversityModal();
   setupWriteModal();
   setupLoginModal();
+  setupAttendanceModal();
   setupSearch();
   loadRanking();
   loadAllPosts();
@@ -196,9 +197,12 @@ async function checkAttendance() {
         btn.classList.add('checked');
         btn.textContent = '✅ 출석 완료';
         btn.disabled = false;
-        showToast('+1 무료 포인트 지급! 내일도 출석하세요 🎉', 'success');
-        updateFreePointsDisplay((currentUserData?.freePoints || 0) + 1);
-        if (currentUserData) currentUserData.freePoints = (currentUserData.freePoints || 0) + 1;
+        const newFP = (currentUserData?.freePoints || 0) + 3;
+        updateFreePointsDisplay(newFP);
+        if (currentUserData) currentUserData.freePoints = newFP;
+        const totalEl = document.getElementById('attendance-total-fp');
+        if (totalEl) totalEl.textContent = newFP;
+        document.getElementById('attendance-modal')?.classList.add('visible');
       } else {
         btn.disabled = false;
         btn.textContent = '📅 출석 체크';
@@ -1060,6 +1064,14 @@ function setupLoginModal() {
 }
 function openLoginModal() { document.getElementById('login-modal')?.classList.add('visible'); }
 function closeLoginModal() { document.getElementById('login-modal')?.classList.remove('visible'); }
+
+function setupAttendanceModal() {
+  const close = () => document.getElementById('attendance-modal')?.classList.remove('visible');
+  document.getElementById('attendance-modal-close')?.addEventListener('click', close);
+  document.getElementById('attendance-modal')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('attendance-modal')) close();
+  });
+}
 
 // ─── Utils ───
 function timeAgo(ts) {

@@ -1,28 +1,47 @@
 // ============================================================
-// GWATOP - Game Page (Rock Paper Scissors)
+// GWATOP - 하나빼기 게임
 // ============================================================
 
+import { createHandScene } from './hand3d.js';
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
 import { db } from './auth.js';
 import {
   collection, doc, query, where, limit, onSnapshot,
-  addDoc, orderBy, serverTimestamp
+  getDocs, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 let currentUser = null;
 let currentUserData = null;
-let activeGameId = null;        // 현재 진행 중인 게임 ID
-let activeGameListener = null;  // onSnapshot 구독 해제 함수
-let roomsListener = null;       // 방 목록 구독 해제 함수
-let pendingListener = null;     // 내 방 대기 구독
-let countdownInterval = null;   // 방 만료 타이머
-let allRoomDocs = [];           // 전체 방 목록 (검색 필터링용)
-let chatListener = null;        // 채팅 onSnapshot 구독
-let pendingJoinGameId = null;   // 비밀번호 입력 대기 중인 방 ID
-let resultShown = false;         // 결과 중복 렌더 방지
-let lastIsP1 = false;           // 현재 게임에서 내가 p1인지
+let activeGameId = null;
+let activeGameListener = null;
+let roomsListener = null;
+let pendingListener = null;
+let countdownInterval = null;
+let allRoomDocs = [];
+let chatListener = null;
+let pendingJoinGameId = null;
+let resultShown = false;
+
+// 하나빼기 state
+let selectedLeftHand = null;
+let selectedRightHand = null;
+let introFinished = false;
+let latestGameState = null;    // buffer during intro
+let latestGameIsP1 = false;
+
+// 3D scene
+let handScene = null;
+let phase2HandsShown = false;
+let myHandRemoved = false;
+let oppHandRemoved = false;
+let mySelectionEnabled = false;
+let rematchTimeoutId = null;
+let phase1TimerId = null;
+let phase2TimerId = null;
+let roomsPollingId = null;
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
+const EMOJI = { '가위': '✌️', '바위': '✊', '보': '🖐️' };
 
 // ─── Init ───
 function init() {
@@ -42,7 +61,7 @@ function init() {
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || '';
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
       document.getElementById('my-fp').textContent = (userData?.freePoints ?? 0) + 'P';
-      checkActiveGame(); // 이전에 만든 방이 있는지 복원
+      checkActiveGame();
     } else {
       lo.style.display = '';
       li.style.display = 'none';
@@ -77,18 +96,15 @@ function setupUI() {
   const valEl = document.getElementById('wager-val');
   slider?.addEventListener('input', () => { valEl.textContent = slider.value; });
 
-  // 방 제목 글자수 카운터
   const titleInput = document.getElementById('room-title-input');
   const titleCount = document.getElementById('room-title-count');
   titleInput?.addEventListener('input', () => { titleCount.textContent = titleInput.value.length; });
 
-  // 비밀번호 show/hide
   const pwInput = document.getElementById('room-pw-input');
   document.getElementById('room-pw-toggle')?.addEventListener('click', () => {
     pwInput.type = pwInput.type === 'password' ? 'text' : 'password';
   });
 
-  // 입장 비밀번호 모달
   const joinPwInput = document.getElementById('join-pw-input');
   document.getElementById('join-pw-toggle')?.addEventListener('click', () => {
     joinPwInput.type = joinPwInput.type === 'password' ? 'text' : 'password';
@@ -112,7 +128,6 @@ function setupUI() {
     }
   });
 
-  // 방 검색
   const searchInput = document.getElementById('room-search');
   const searchWrap = document.getElementById('room-search-wrap');
   const searchClear = document.getElementById('room-search-clear');
@@ -129,7 +144,6 @@ function setupUI() {
 
   document.getElementById('create-room-btn')?.addEventListener('click', async () => {
     if (!currentUser) { openLoginModal(); return; }
-    // 이미 내 방이 있으면 중복 생성 방지
     const stored = getStoredGame();
     if (stored) { showToast('이미 대기 중인 방이 있습니다', 'warning'); return; }
     const wager = parseInt(slider.value);
@@ -142,13 +156,12 @@ function setupUI() {
     const password = pwInput?.value.trim() || '';
     await createRoom(wager, title, password);
     btn.disabled = false;
-    btn.textContent = '✊ 방 만들기';
+    btn.textContent = '✌️ 방 만들기';
     if (titleInput) titleInput.value = '';
     if (titleCount) titleCount.textContent = '0';
     if (pwInput) pwInput.value = '';
   });
 
-  // 게임 모달: 결과 닫기
   document.getElementById('result-close-btn')?.addEventListener('click', closeModal);
   document.getElementById('game-modal')?.addEventListener('click', e => {
     if (e.target !== document.getElementById('game-modal')) return;
@@ -171,10 +184,11 @@ function setupUI() {
     const data = await res.json();
     if (data.error) { showToast(data.error, 'error'); return; }
     showRematchSection('pending', wager);
+    startRematchTimeout();
   });
 
-  // 신청 취소
   document.getElementById('rematch-cancel-btn')?.addEventListener('click', async () => {
+    clearRematchTimeout();
     const idToken = await currentUser.getIdToken();
     await fetch('/api/game-rps', {
       method: 'POST',
@@ -184,7 +198,6 @@ function setupUI() {
     showRematchSection('request');
   });
 
-  // 수락
   document.getElementById('rematch-accept-btn')?.addEventListener('click', async () => {
     const idToken = await currentUser.getIdToken();
     const res = await fetch('/api/game-rps', {
@@ -198,7 +211,6 @@ function setupUI() {
     openGameModal(data.newGameId, data.isP1);
   });
 
-  // 거절
   document.getElementById('rematch-decline-btn')?.addEventListener('click', async () => {
     const idToken = await currentUser.getIdToken();
     await fetch('/api/game-rps', {
@@ -209,15 +221,34 @@ function setupUI() {
     showRematchSection('request');
   });
 
-  // 가위바위보 선택
-  document.querySelectorAll('.rps-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!activeGameId || btn.disabled) return;
-      document.querySelectorAll('.rps-btn').forEach(b => { b.disabled = true; b.classList.remove('selected'); });
-      btn.classList.add('selected');
-      submitChoice(btn.dataset.choice);
-    });
+  // Phase 1: 왼손/오른손 선택
+  document.getElementById('left-hand-choices')?.addEventListener('click', e => {
+    const btn = e.target.closest('.hand-btn');
+    if (!btn || btn.disabled) return;
+    document.querySelectorAll('#left-hand-choices .hand-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedLeftHand = btn.dataset.hand;
+    updateSubmitHandsBtn();
   });
+
+  document.getElementById('right-hand-choices')?.addEventListener('click', e => {
+    const btn = e.target.closest('.hand-btn');
+    if (!btn || btn.disabled) return;
+    document.querySelectorAll('#right-hand-choices .hand-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    selectedRightHand = btn.dataset.hand;
+    updateSubmitHandsBtn();
+  });
+
+  document.getElementById('submit-hands-btn')?.addEventListener('click', () => {
+    if (!selectedLeftHand || !selectedRightHand) return;
+    submitHands(selectedLeftHand, selectedRightHand);
+  });
+}
+
+function updateSubmitHandsBtn() {
+  const btn = document.getElementById('submit-hands-btn');
+  if (btn) btn.disabled = !(selectedLeftHand && selectedRightHand);
 }
 
 // ─── localStorage 헬퍼 ───
@@ -246,26 +277,22 @@ function checkActiveGame() {
     if (game.status === 'cancelled' || game.status === 'finished') {
       clearStoredGame();
       if (pendingListener) { pendingListener(); pendingListener = null; }
-    } else if (game.status === 'ready') {
-      // 상대방 입장! 선택 모달 자동 오픈
+    } else if (game.status === 'ready' || game.status === 'hands_shown') {
       clearStoredGame();
       if (pendingListener) { pendingListener(); pendingListener = null; }
       const isP1 = game.player1?.uid === currentUser?.uid;
-      showToast('상대방이 입장했습니다! 게임을 시작하세요 🎮', 'success');
+      if (game.status === 'ready') showToast('상대방이 입장했습니다! 게임을 시작하세요 🎮', 'success');
       openGameModal(stored.gameId, isP1);
     }
-    // 'waiting' 상태면 방 목록에 이미 표시됨 — 아무것도 안 해도 됨
   });
 }
 
-// ─── 방 만료까지 남은 분 계산 ───
 function getRemainingMin(createdAt) {
   if (!createdAt) return 10;
   const t = typeof createdAt === 'string' ? new Date(createdAt) : (createdAt.toDate?.() || new Date());
   return Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - t.getTime())) / 60000));
 }
 
-// ─── 검색 필터 ───
 function filterRooms(query) {
   if (!query) return allRoomDocs;
   const q = query.toLowerCase();
@@ -275,7 +302,6 @@ function filterRooms(query) {
   });
 }
 
-// ─── 방 목록 렌더링 ───
 function renderRooms(docs) {
   const list = document.getElementById('rooms-list');
   if (!list) return;
@@ -319,8 +345,8 @@ function renderRooms(docs) {
 
   list.querySelectorAll('.room-card:not(.mine)').forEach(card => {
     card.addEventListener('click', () => {
-      const doc = allRoomDocs.find(d => d.id === card.dataset.id);
-      if (doc?.data().hasPassword) openJoinPwModal(card.dataset.id);
+      const d = allRoomDocs.find(d => d.id === card.dataset.id);
+      if (d?.data().hasPassword) openJoinPwModal(card.dataset.id);
       else joinRoom(card.dataset.id);
     });
   });
@@ -339,13 +365,19 @@ function renderRooms(docs) {
   }, 60000);
 }
 
-// ─── 방 목록 (실시간) ───
 function loadRooms() {
   if (roomsListener) { roomsListener(); roomsListener = null; }
+  if (roomsPollingId) { clearInterval(roomsPollingId); roomsPollingId = null; }
   if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
 
-  const q = query(collection(db, 'games'), where('status', '==', 'waiting'), limit(30));
-  roomsListener = onSnapshot(q, snap => {
+  fetchRooms();
+  roomsPollingId = setInterval(fetchRooms, 10000);
+}
+
+async function fetchRooms() {
+  try {
+    const q = query(collection(db, 'games'), where('status', '==', 'waiting'), limit(30));
+    const snap = await getDocs(q);
     const now = Date.now();
     allRoomDocs = snap.docs.filter(d => {
       const ts = d.data().createdAt;
@@ -355,10 +387,9 @@ function loadRooms() {
     });
     const searchQuery = document.getElementById('room-search')?.value.trim() || '';
     renderRooms(filterRooms(searchQuery));
-  });
+  } catch { /* 네트워크 오류 시 현재 상태 유지 */ }
 }
 
-// ─── 방 만들기 ───
 async function createRoom(wager, title = '', password = '') {
   const idToken = await currentUser.getIdToken();
   const res = await fetch('/api/game-rps', {
@@ -368,16 +399,11 @@ async function createRoom(wager, title = '', password = '') {
   });
   const data = await res.json();
   if (data.error) { showToast(data.error, 'error'); return; }
-
-  // 모달 없이 방 목록에 표시 + localStorage에 기억
   storeGame(data.gameId, currentUser.uid);
   showToast('방이 생성됐습니다! 상대방을 기다리는 중...', 'success');
-
-  // 상대 입장 감지 리스너 시작
   checkActiveGame();
 }
 
-// ─── 비밀번호 모달 ───
 function openJoinPwModal(gameId) {
   pendingJoinGameId = gameId;
   const input = document.getElementById('join-pw-input');
@@ -390,7 +416,6 @@ function closeJoinPwModal() {
   pendingJoinGameId = null;
 }
 
-// ─── 방 입장 ───
 async function joinRoom(gameId, password = '') {
   if (!currentUser) { openLoginModal(); return; }
   const idToken = await currentUser.getIdToken();
@@ -401,12 +426,10 @@ async function joinRoom(gameId, password = '') {
   });
   const data = await res.json();
   if (data.error) { showToast(data.error, 'error'); return; }
-  // player2도 나갔다 와도 복원할 수 있도록 저장
   storeGame(gameId, currentUser.uid);
   openGameModal(gameId, false);
 }
 
-// ─── 방 취소 (목록에서) ───
 async function cancelRoomById(gameId) {
   const idToken = await currentUser.getIdToken();
   await fetch('/api/game-rps', {
@@ -419,14 +442,34 @@ async function cancelRoomById(gameId) {
   showToast('방이 취소됐습니다', 'success');
 }
 
-// ─── 게임 모달 오픈 (선택 단계) ───
+// ─── 게임 모달 오픈 ───
 function openGameModal(gameId, isP1) {
+  // 게임 중에는 방 목록 폴링 불필요
+  if (roomsPollingId) { clearInterval(roomsPollingId); roomsPollingId = null; }
   activeGameId = gameId;
   resultShown = false;
-  lastIsP1 = isP1;
+  introFinished = false;
+  latestGameState = null;
+  latestGameIsP1 = isP1;
+
+  // Reset selections and 3D state
+  selectedLeftHand = null;
+  selectedRightHand = null;
+  phase2HandsShown = false;
+  myHandRemoved = false;
+  oppHandRemoved = false;
+  mySelectionEnabled = false;
+  clearPhaseTimers();
+  document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => {
+    b.classList.remove('selected');
+    b.disabled = false;
+  });
+  document.getElementById('submit-hands-btn').disabled = true;
+  document.getElementById('rps-status').textContent = '';
+  document.getElementById('rps-status-final').textContent = '';
+
   document.getElementById('game-modal').classList.add('visible');
 
-  // 리스너 먼저 연결
   openChat(gameId);
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
   activeGameListener = onSnapshot(doc(db, 'games', gameId), snap => {
@@ -437,54 +480,106 @@ function openGameModal(gameId, isP1) {
   // "건승을 빕니다." 인트로 → 2초 후 선택 화면
   showState('start');
   setTimeout(() => {
+    introFinished = true;
     showState('choose');
-    document.querySelectorAll('.rps-btn').forEach(b => { b.disabled = false; b.classList.remove('selected'); });
-    document.getElementById('rps-status').textContent = '';
+    showPhase('hands');
+    if (latestGameState) {
+      syncModal(latestGameState, latestGameIsP1);
+      latestGameState = null;
+    }
   }, 2000);
 }
 
 function syncModal(game, isP1) {
+  if (!introFinished) {
+    latestGameState = game;
+    latestGameIsP1 = isP1;
+    return;
+  }
+
   document.getElementById('c-wager').textContent = game.wager;
 
   if (game.status === 'ready') {
     document.getElementById('chat-section').style.display = '';
-    // 나를 항상 오른쪽에 배치
+
+    // VS display
     const me = isP1 ? (game.player1 || {}) : (game.player2 || {});
     const opp = isP1 ? (game.player2 || {}) : (game.player1 || {});
     document.getElementById('vs-display').innerHTML = `
       <div class="rps-player">
-        <img class="rps-player-avatar" src="${opp.photo || ''}" onerror="this.src='/favicon.svg'" />
         <span class="rps-player-name">${opp.name || '익명'}</span>
       </div>
       <span class="rps-vs-text">VS</span>
       <div class="rps-player">
-        <img class="rps-player-avatar" src="${me.photo || ''}" onerror="this.src='/favicon.svg'" />
         <span class="rps-player-name" style="font-weight:800;color:var(--text-primary)">${me.name || '익명'} <span style="font-size:9px;color:#34d399">나</span></span>
       </div>`;
-  }
-  // 상대방 선택 여부 표시
-  if (game.status === 'ready') {
-    const oppSubmitted = isP1 ? game.p2Submitted : game.p1Submitted;
-    const mySubmitted  = isP1 ? game.p1Submitted : game.p2Submitted;
+
+    showPhase('hands');
+
+    // Opponent submission status
+    const oppSubmitted = isP1 ? game.p2HandsSubmitted : game.p1HandsSubmitted;
+    const mySubmitted  = isP1 ? game.p1HandsSubmitted : game.p2HandsSubmitted;
     const statusEl = document.getElementById('rps-status');
-    if (oppSubmitted && !mySubmitted) {
-      statusEl.textContent = '상대방이 선택했습니다! 빨리 선택하세요 ⚡';
+
+    if (!phase1TimerId) startPhase1Timer();
+
+    if (mySubmitted) {
+      // Disable hand buttons after submission
+      document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => b.disabled = true);
+      document.getElementById('submit-hands-btn').disabled = true;
+      if (oppSubmitted) {
+        statusEl.textContent = '둘 다 제출 완료! 결과 집계 중...';
+        statusEl.style.color = '';
+      } else {
+        statusEl.textContent = '양손 제출 완료! 상대방 기다리는 중...';
+        statusEl.style.color = '';
+      }
+    } else if (oppSubmitted) {
+      statusEl.textContent = '상대방이 양손을 제출했습니다! 빨리 선택하세요 ⚡';
       statusEl.style.color = '#f59e0b';
-    } else if (oppSubmitted && mySubmitted) {
-      statusEl.textContent = '둘 다 선택 완료! 결과 집계 중...';
-      statusEl.style.color = '';
-    } else if (!oppSubmitted && mySubmitted) {
-      statusEl.textContent = '선택 완료! 상대방 기다리는 중...';
-      statusEl.style.color = '';
     }
+  }
+
+  if (game.status === 'hands_shown') {
+    stopPhase1Timer();
+    document.getElementById('chat-section').style.display = '';
+    showPhase('final');
+    renderPhase2(game, isP1);
   }
 
   if (game.status === 'finished') {
     if (!resultShown) {
       resultShown = true;
-      showResult(game, isP1);
+      stopPhase2Timer();
+
+      const result   = game.result || {};
+      const oppHands = isP1
+        ? { left: game.p2LeftHand, right: game.p2RightHand }
+        : { left: game.p1LeftHand, right: game.p1RightHand };
+      const oppFinalHand = isP1 ? result.p2FinalHand : result.p1FinalHand;
+
+      // 상대방 카드 제거 (드라마틱 reveal)
+      if (oppFinalHand && handScene && !oppHandRemoved) {
+        oppHandRemoved = true;
+        const removeSide = oppFinalHand === oppHands.left ? 'right' : 'left';
+        handScene.removeHand('opp', removeSide);
+      }
+
+      const delay = (oppFinalHand && handScene) ? 900 : 0;
+      setTimeout(() => {
+        if (game.drawRematchId) {
+          clearStoredGame();
+          storeGame(game.drawRematchId, currentUser.uid);
+          showState('draw');
+          const drawEmoji = document.getElementById('draw-emoji');
+          if (drawEmoji) drawEmoji.style.animation = 'drawShake 0.6s ease-in-out 0.3s both';
+          setTimeout(() => openGameModal(game.drawRematchId, isP1), 2500);
+          return;
+        }
+        showResult(game, isP1);
+      }, delay);
     }
-    // 재대결 신청 상태 실시간 반영
+    // 재대결 신청 상태 반영
     const rr = game.rematchRequest;
     if (!rr) return;
     if (rr.status === 'pending') {
@@ -496,14 +591,75 @@ function syncModal(game, isP1) {
           `${rr.fromName || '상대방'}이 재대결을 신청했습니다! (${rr.wager}P)`;
       }
     } else if (rr.status === 'accepted' && rr.newGameId && rr.fromUid === currentUser?.uid) {
-      // 신청자: 수락됐으면 새 게임으로 이동
+      clearRematchTimeout();
       closeModal();
       openGameModal(rr.newGameId, game.player1?.uid === currentUser.uid);
     } else if (rr.status === 'declined' && rr.fromUid === currentUser?.uid) {
+      clearRematchTimeout();
       showRematchSection('request');
       showToast('상대방이 재대결을 거절했습니다', 'warning');
     }
   }
+}
+
+function renderPhase2(game, isP1) {
+  const me = isP1
+    ? { left: game.p1LeftHand, right: game.p1RightHand }
+    : { left: game.p2LeftHand, right: game.p2RightHand };
+  const opp = isP1
+    ? { left: game.p2LeftHand, right: game.p2RightHand }
+    : { left: game.p1LeftHand, right: game.p1RightHand };
+  const myFinalSubmitted  = isP1 ? game.p1FinalSubmitted : game.p2FinalSubmitted;
+  const oppFinalSubmitted = isP1 ? game.p2FinalSubmitted : game.p1FinalSubmitted;
+  const myFinalHand  = isP1 ? game.p1FinalHand : game.p2FinalHand;
+  const oppFinalHand = isP1 ? game.p2FinalHand : game.p1FinalHand;
+
+  // ── 3D 씬 초기화 (처음 한 번만) ──
+  if (!phase2HandsShown) {
+    phase2HandsShown = true;
+    const canvas = document.getElementById('hand-3d-canvas');
+    if (canvas) {
+      if (handScene) { handScene.dispose(); handScene = null; }
+      handScene = createHandScene(canvas);
+      handScene.showHands(me, opp);
+    }
+  }
+
+  // ── 3D 카드 선택 활성화 (처음 한 번만) ──
+  if (!myFinalSubmitted && !mySelectionEnabled && handScene) {
+    mySelectionEnabled = true;
+    handScene.enableSelection(side => {
+      stopPhase2Timer();
+      myHandRemoved = true;
+      submitFinal(side === 'left' ? me.left : me.right);
+    });
+    if (!phase2TimerId) startPhase2Timer(handScene);
+  } else if (myFinalSubmitted && !myHandRemoved && myFinalHand) {
+    // 이미 제출됐는데 3D 제거가 안 됐다면 (새로고침 복원 시)
+    myHandRemoved = true;
+    const removeSide = myFinalHand === me.left ? 'right' : 'left';
+    setTimeout(() => handScene?.removeHand('my', removeSide), 400);
+  }
+
+  // ── 상태 텍스트 ──
+  const statusEl = document.getElementById('rps-status-final');
+  if (myFinalSubmitted && oppFinalSubmitted) {
+    statusEl.textContent = '둘 다 선택 완료! 결과 집계 중...';
+    statusEl.style.color = '';
+  } else if (myFinalSubmitted) {
+    statusEl.textContent = '최종 선택 완료! 상대방 기다리는 중...';
+    statusEl.style.color = '';
+  } else if (oppFinalSubmitted) {
+    statusEl.textContent = '상대방이 선택했습니다! 빨리 선택하세요 ⚡';
+    statusEl.style.color = '#f59e0b';
+  } else {
+    statusEl.textContent = '카드를 눌러 낼 손을 선택하세요';
+  }
+}
+
+function showPhase(phase) {
+  document.getElementById('phase-hands').style.display = phase === 'hands' ? '' : 'none';
+  document.getElementById('phase-final').style.display  = phase === 'final'  ? '' : 'none';
 }
 
 function showRematchSection(section, wager) {
@@ -517,6 +673,7 @@ function showRematchSection(section, wager) {
 
 function showState(state) {
   document.getElementById('state-start').style.display  = state === 'start'  ? '' : 'none';
+  document.getElementById('state-draw').style.display   = state === 'draw'   ? '' : 'none';
   document.getElementById('state-choose').style.display = state === 'choose' ? '' : 'none';
   document.getElementById('state-result').style.display = state === 'result' ? '' : 'none';
 }
@@ -525,53 +682,84 @@ function showResult(game, isP1) {
   const result = game.result || {};
   const myUid = currentUser?.uid;
   const amIP1 = isP1 ?? (game.player1?.uid === myUid);
-  const myChoice = amIP1 ? result.p1Choice : result.p2Choice;
-  const oppChoice = amIP1 ? result.p2Choice : result.p1Choice;
-  const emojiMap = { '가위': '✌️', '바위': '✊', '보': '🖐️' };
+  const myChoice  = amIP1 ? result.p1FinalHand : result.p2FinalHand;
+  const oppChoice = amIP1 ? result.p2FinalHand : result.p1FinalHand;
 
   let icon, title, pts, cls;
   if (!game.winner) {
     icon = '🤝'; title = '비겼습니다!'; pts = '±0P'; cls = 'draw';
   } else if (game.winner === myUid) {
-    icon = '🏆'; title = '승리!'; pts = `+${game.wager}P`; cls = 'win';
+    icon = '🏆'; title = result.timeout ? '상대방 시간 초과!' : '승리!'; pts = `+${game.wager}P`; cls = 'win';
     if (currentUserData) {
       currentUserData.freePoints = (currentUserData.freePoints || 0) + game.wager;
       document.getElementById('my-fp').textContent = currentUserData.freePoints + 'P';
     }
   } else {
-    icon = '😢'; title = '패배...'; pts = `-${game.wager}P`; cls = 'lose';
+    icon = '😢'; title = result.timeout ? '시간 초과 패배...' : '패배...'; pts = `-${game.wager}P`; cls = 'lose';
     if (currentUserData) {
       currentUserData.freePoints = Math.max(0, (currentUserData.freePoints || 0) - game.wager);
       document.getElementById('my-fp').textContent = currentUserData.freePoints + 'P';
     }
   }
 
-  lastGameWager = game.wager || 1;
   clearStoredGame();
   document.getElementById('result-icon').textContent = icon;
   document.getElementById('result-title').textContent = title;
   document.getElementById('result-choices').innerHTML = `
-    <div class="rps-result-side"><span class="rps-result-emoji">${emojiMap[myChoice] || '?'}</span><span class="rps-result-label">나</span></div>
+    <div class="rps-result-side"><span class="rps-result-emoji">${EMOJI[myChoice] || '?'}</span><span class="rps-result-label">나</span></div>
     <span class="rps-result-vs-txt">VS</span>
-    <div class="rps-result-side"><span class="rps-result-emoji">${emojiMap[oppChoice] || '?'}</span><span class="rps-result-label">상대</span></div>`;
+    <div class="rps-result-side"><span class="rps-result-emoji">${EMOJI[oppChoice] || '?'}</span><span class="rps-result-label">상대</span></div>`;
   document.getElementById('result-points').textContent = pts;
   document.getElementById('result-points').className = `rps-point-change ${cls}`;
+  showRematchSection('request');
   showState('result');
 }
 
-// ─── 선택 제출 ───
-async function submitChoice(choice) {
+// ─── Phase 1 제출 ───
+async function submitHands(leftHand, rightHand) {
+  const btn = document.getElementById('submit-hands-btn');
+  btn.disabled = true;
+  document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => b.disabled = true);
   const idToken = await currentUser.getIdToken();
   const res = await fetch('/api/game-rps', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'submit', gameId: activeGameId, choice }),
+    body: JSON.stringify({ action: 'submit_hands', gameId: activeGameId, leftHand, rightHand }),
   });
   const data = await res.json();
-  if (data.error) showToast(data.error, 'error');
+  if (data.error) {
+    showToast(data.error, 'error');
+    btn.disabled = false;
+    document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => b.disabled = false);
+  }
 }
 
-// ─── 채팅 오픈 ───
+// ─── 시간 초과 패배 ───
+async function submitTimeout() {
+  if (!activeGameId || !currentUser) return;
+  const idToken = await currentUser.getIdToken();
+  await fetch('/api/game-rps', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'timeout', gameId: activeGameId }),
+  });
+}
+
+// ─── Phase 2 제출 ───
+async function submitFinal(finalHand) {
+  const idToken = await currentUser.getIdToken();
+  const res = await fetch('/api/game-rps', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'submit_final', gameId: activeGameId, finalHand }),
+  });
+  const data = await res.json();
+  if (data.error) {
+    showToast(data.error, 'error');
+  }
+}
+
+// ─── 채팅 ───
 function openChat(gameId) {
   if (chatListener) { chatListener(); chatListener = null; }
   document.getElementById('chat-section').style.display = '';
@@ -601,7 +789,6 @@ function openChat(gameId) {
   };
 
   sendBtn.onclick = doSend;
-  // isComposing 체크로 한글 IME 마지막 글자 중복 전송 방지
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); doSend(); } };
 }
 
@@ -627,18 +814,117 @@ function escapeHtml(str) {
 
 // ─── 모달 닫기 ───
 function closeModal() {
+  clearRematchTimeout();
+  clearPhaseTimers();
   document.getElementById('game-modal').classList.remove('visible');
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
   if (chatListener) { chatListener(); chatListener = null; }
   document.getElementById('chat-section').style.display = 'none';
+  if (handScene) { handScene.dispose(); handScene = null; }
   activeGameId = null;
+  // 모달 닫히면 방 목록 폴링 재개
+  if (!roomsPollingId) {
+    fetchRooms();
+    roomsPollingId = setInterval(fetchRooms, 10000);
+  }
 }
 
-// ─── Login Modal ───
+function startPhase1Timer() {
+  let timeLeft = 30;
+  const timerEl = document.getElementById('phase1-timer');
+  const timerVal = document.getElementById('phase1-timer-val');
+  if (timerEl) timerEl.style.display = '';
+  function paint() {
+    if (!timerVal) return;
+    timerVal.textContent = timeLeft;
+    timerVal.style.color = timeLeft <= 10 ? '#ef4444' : timeLeft <= 15 ? '#f59e0b' : '#34d399';
+  }
+  paint();
+  phase1TimerId = setInterval(async () => {
+    timeLeft--;
+    paint();
+    if (timeLeft <= 0) {
+      stopPhase1Timer();
+      document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => b.disabled = true);
+      document.getElementById('submit-hands-btn').disabled = true;
+      showToast('시간 초과! 자동 패배 처리됩니다 ⏱', 'warning');
+      submitTimeout();
+    }
+  }, 1000);
+}
+
+function stopPhase1Timer() {
+  if (!phase1TimerId) return;
+  clearInterval(phase1TimerId);
+  phase1TimerId = null;
+  const timerEl = document.getElementById('phase1-timer');
+  if (timerEl) timerEl.style.display = 'none';
+}
+
+function startPhase2Timer(scene) {
+  let timeLeft = 20;
+  const timerEl = document.getElementById('phase2-timer');
+  const timerVal = document.getElementById('phase2-timer-val');
+  if (timerEl) timerEl.style.display = '';
+  function paint() {
+    if (!timerVal) return;
+    timerVal.textContent = timeLeft;
+    timerVal.style.color = timeLeft <= 5 ? '#ef4444' : timeLeft <= 10 ? '#f59e0b' : '#34d399';
+  }
+  paint();
+  phase2TimerId = setInterval(() => {
+    timeLeft--;
+    paint();
+    if (timeLeft <= 0) {
+      stopPhase2Timer();
+      if (!myHandRemoved) {
+        myHandRemoved = true;
+        if (scene) scene.disableSelection();
+        showToast('시간 초과! 자동 패배 처리됩니다 ⏱', 'warning');
+        submitTimeout();
+      }
+    }
+  }, 1000);
+}
+
+function stopPhase2Timer() {
+  if (!phase2TimerId) return;
+  clearInterval(phase2TimerId);
+  phase2TimerId = null;
+  const timerEl = document.getElementById('phase2-timer');
+  if (timerEl) timerEl.style.display = 'none';
+}
+
+function clearPhaseTimers() {
+  stopPhase1Timer();
+  stopPhase2Timer();
+}
+
+function startRematchTimeout() {
+  clearRematchTimeout();
+  rematchTimeoutId = setTimeout(async () => {
+    rematchTimeoutId = null;
+    if (!activeGameId || !currentUser) return;
+    try {
+      const idToken = await currentUser.getIdToken();
+      await fetch('/api/game-rps', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rematch_decline', gameId: activeGameId }),
+      });
+    } catch (e) { /* ignore */ }
+    showRematchSection('request');
+    showToast('상대방이 응답하지 않았습니다. 상대방이 나간 것 같아요.', 'warning');
+  }, 45000);
+}
+
+function clearRematchTimeout() {
+  if (rematchTimeoutId) { clearTimeout(rematchTimeoutId); rematchTimeoutId = null; }
+}
+
 function openLoginModal() { document.getElementById('login-modal').classList.add('visible'); }
 function closeLoginModal() { document.getElementById('login-modal').classList.remove('visible'); }
 
-// ─── Toast ───
 function showToast(msg, type = 'success') {
   const c = document.getElementById('toast-container');
   if (!c) return;

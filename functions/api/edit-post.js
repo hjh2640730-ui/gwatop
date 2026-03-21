@@ -13,6 +13,20 @@ const ALGOLIA_INDEX = 'posts';
 const VALID_CATEGORIES = ['자유', '질문', '정보', '유머', '거래'];
 
 let _cachedToken = null, _tokenExpiry = 0;
+let _publicKeys = null, _publicKeysExpiry = 0;
+
+async function getFirebasePublicKeys() {
+  const now = Date.now();
+  if (_publicKeys && _publicKeysExpiry > now) return _publicKeys;
+  const res = await fetch('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com');
+  if (!res.ok) throw new Error('공개키 조회 실패');
+  const data = await res.json();
+  const maxAgeMatch = (res.headers.get('Cache-Control') || '').match(/max-age=(\d+)/);
+  const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]) * 1000 : 3600000;
+  _publicKeys = data.keys;
+  _publicKeysExpiry = now + Math.min(maxAge, 3600000);
+  return _publicKeys;
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -27,18 +41,35 @@ export async function onRequestOptions() {
 
 async function verifyFirebaseToken(idToken) {
   try {
-    const res = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_WEB_API_KEY}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
-    );
-    if (!res.ok) return null;
-    return (await res.json()).users?.[0] || null;
+    const parts = idToken.split('.');
+    if (parts.length !== 3) return null;
+    const decode = b64 => JSON.parse(new TextDecoder().decode(
+      Uint8Array.from(atob(b64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+    ));
+    const header = decode(parts[0]);
+    const payload = decode(parts[1]);
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp < now) return null;
+    if (payload.aud !== PROJECT_ID) return null;
+    if (payload.iss !== `https://securetoken.google.com/${PROJECT_ID}`) return null;
+    if (!payload.sub) return null;
+    const keys = await getFirebasePublicKeys();
+    const jwk = keys.find(k => k.kid === header.kid);
+    if (!jwk) return null;
+    const cryptoKey = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    const sig = Uint8Array.from(atob(parts[2].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cryptoKey, sig, new TextEncoder().encode(`${parts[0]}.${parts[1]}`));
+    if (!valid) return null;
+    return { localId: payload.sub, email: payload.email, displayName: payload.name };
   } catch { return null; }
 }
 
-async function getFirebaseAccessToken(clientEmail, privateKey) {
+async function getFirebaseAccessToken(clientEmail, privateKey, kv) {
   const now = Math.floor(Date.now() / 1000);
-  if (_cachedToken && _tokenExpiry - now > 300) return _cachedToken;
+  if (kv) {
+    const cached = await kv.get('firebase_admin_token', 'json');
+    if (cached && cached.expiry - now > 300) return cached.token;
+  } else if (_cachedToken && _tokenExpiry - now > 300) return _cachedToken;
   const header = { alg: 'RS256', typ: 'JWT' };
   const payload = { iss: clientEmail, sub: clientEmail, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600, scope: 'https://www.googleapis.com/auth/datastore' };
   const encode = obj => btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -58,6 +89,9 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
   if (!tokenData.access_token) throw new Error('토큰 발급 실패');
   _cachedToken = tokenData.access_token;
   _tokenExpiry = now + 3600;
+  if (kv) {
+    await kv.put('firebase_admin_token', JSON.stringify({ token: tokenData.access_token, expiry: now + 3600 }), { expirationTtl: 3500 });
+  }
   return _cachedToken;
 }
 
@@ -80,7 +114,7 @@ export async function onRequestPost(context) {
   try {
     [user, accessToken] = await Promise.all([
       verifyFirebaseToken(idToken),
-      getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY),
+      getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY, env.GWATOP_CACHE),
     ]);
   } catch { return json({ error: '서버 인증 실패' }, 500); }
   if (!user) return json({ error: '유효하지 않은 토큰' }, 401);

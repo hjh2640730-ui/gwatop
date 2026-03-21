@@ -1,0 +1,8 @@
+name = "gwatop"
+pages_build_output_dir = "."
+compatibility_date = "2024-09-02"
+
+[[kv_namespaces]]
+binding = "GWATOP_CACHE"
+id = "b8c6d3fb508d413290dff4076443416c"
+preview_id = "2a70f1bf7c6f43718bceabd409b27d96"

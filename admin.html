@@ -247,6 +247,7 @@
       <button class="admin-tab" data-tab="games">✊ 게임</button>
       <button class="admin-tab" data-tab="messages">✉️ 메시지</button>
       <button class="admin-tab" data-tab="system">🛠️ 시스템</button>
+      <button class="admin-tab" data-tab="monitor">📡 실시간 모니터</button>
     </div>
 
     <!-- 탭 1: 대시보드 -->
@@ -522,6 +523,140 @@
         </div>
       </div>
 
+    </div>
+
+    <!-- 탭: 실시간 모니터 -->
+    <div id="tab-monitor" class="tab-pane" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:18px;font-weight:800;margin-bottom:4px">실시간 시스템 모니터</div>
+          <div id="monitor-last-updated" style="font-size:12px;color:var(--text-muted)">마지막 갱신: -</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted)">
+            <div id="monitor-auto-dot" style="width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399"></div>
+            <span id="monitor-auto-label">15초마다 자동 갱신</span>
+          </div>
+          <button class="btn btn-glass" id="monitor-refresh-btn">🔄 지금 갱신</button>
+          <button class="btn btn-glass" id="monitor-auto-btn">⏸ 자동 갱신 끄기</button>
+        </div>
+      </div>
+
+      <!-- 경고 영역 -->
+      <div id="monitor-warnings" style="margin-bottom:20px"></div>
+
+      <!-- 지표 카드 -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:28px">
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:36px;font-weight:900;color:#a78bfa" id="mon-active-games">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">진행 중 게임</div>
+          <div id="mon-active-games-bar" style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div id="mon-active-games-fill" style="height:100%;border-radius:2px;background:#a78bfa;width:0%;transition:width 0.5s"></div></div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:36px;font-weight:900;color:#60a5fa" id="mon-waiting-rooms">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">대기 중 방</div>
+          <div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div id="mon-waiting-rooms-fill" style="height:100%;border-radius:2px;background:#60a5fa;width:0%;transition:width 0.5s"></div></div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:36px;font-weight:900;color:#34d399" id="mon-today-games">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">오늘 게임 수</div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:36px;font-weight:900;color:#fbbf24" id="mon-today-users">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">오늘 신규 유저</div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:28px;font-weight:900" id="mon-daily-reads">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">예상 일일 Firestore 읽기</div>
+          <div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div id="mon-reads-fill" style="height:100%;border-radius:2px;background:#34d399;width:0%;transition:width 0.5s"></div></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">무료 한도: 50,000회/일</div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:28px;font-weight:900;color:#f87171" id="mon-daily-writes">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">예상 일일 Firestore 쓰기</div>
+          <div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div id="mon-writes-fill" style="height:100%;border-radius:2px;background:#f87171;width:0%;transition:width 0.5s"></div></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">무료 한도: 20,000회/일</div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:36px;font-weight:900;color:#e879f9" id="mon-total-posts">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">전체 게시글 수</div>
+          <div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div id="mon-posts-fill" style="height:100%;border-radius:2px;background:#e879f9;width:0%;transition:width 0.5s"></div></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Algolia 무료 한도: 10,000개</div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:36px;font-weight:900;color:#fb923c" id="mon-today-quizzes">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">오늘 퀴즈 생성</div>
+          <div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div id="mon-quizzes-fill" style="height:100%;border-radius:2px;background:#fb923c;width:0%;transition:width 0.5s"></div></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Gemini Tier1 한도: 360개/분</div>
+        </div>
+        <div class="system-card" style="text-align:center;padding:24px 16px">
+          <div style="font-size:28px;font-weight:900;color:#38bdf8" id="mon-daily-kv">-</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-top:4px">예상 일일 KV 읽기</div>
+          <div style="margin-top:12px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div id="mon-kv-fill" style="height:100%;border-radius:2px;background:#38bdf8;width:0%;transition:width 0.5s"></div></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px">무료 한도: 100,000회/일</div>
+        </div>
+      </div>
+
+      <!-- 한도 현황 -->
+      <div class="system-card">
+        <div class="system-card-title">서비스 한도 현황</div>
+        <div style="display:flex;flex-direction:column;gap:16px;margin-top:12px">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>Firestore 읽기 — 무료 한도 50,000/일</span>
+              <span id="mon-reads-label">-</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.05);overflow:hidden">
+              <div id="mon-reads-bar" style="height:100%;border-radius:4px;background:#34d399;width:0%;transition:width 0.5s"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>Firestore 쓰기 — 무료 한도 20,000/일</span>
+              <span id="mon-writes-label">-</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.05);overflow:hidden">
+              <div id="mon-writes-bar" style="height:100%;border-radius:4px;background:#f87171;width:0%;transition:width 0.5s"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>동시 게임 — 위험 기준 300판</span>
+              <span id="mon-games-label">-</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.05);overflow:hidden">
+              <div id="mon-games-bar" style="height:100%;border-radius:4px;background:#a78bfa;width:0%;transition:width 0.5s"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>대기방 — 정상 기준 30개 이하</span>
+              <span id="mon-rooms-label">-</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.05);overflow:hidden">
+              <div id="mon-rooms-bar" style="height:100%;border-radius:4px;background:#60a5fa;width:0%;transition:width 0.5s"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>게시글 수 (Algolia) — 무료 한도 10,000개</span>
+              <span id="mon-posts-label">-</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.05);overflow:hidden">
+              <div id="mon-posts-bar" style="height:100%;border-radius:4px;background:#e879f9;width:0%;transition:width 0.5s"></div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+              <span>KV 읽기 — 무료 한도 100,000/일</span>
+              <span id="mon-kv-label">-</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:rgba(255,255,255,0.05);overflow:hidden">
+              <div id="mon-kv-bar" style="height:100%;border-radius:4px;background:#38bdf8;width:0%;transition:width 0.5s"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 탭 3: 놀이터 관리 -->

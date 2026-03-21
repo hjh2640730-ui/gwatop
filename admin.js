@@ -27,7 +27,7 @@ let quizzesLoaded = false;
 let gamesLoaded = false;
 
 // ─── 탭 시스템 ───
-const TABS = ['dashboard', 'users', 'posts', 'payments', 'comments', 'quizzes', 'games', 'messages', 'system'];
+const TABS = ['dashboard', 'users', 'posts', 'payments', 'comments', 'quizzes', 'games', 'messages', 'system', 'monitor'];
 
 function switchTab(tabName) {
   TABS.forEach(t => {
@@ -35,6 +35,9 @@ function switchTab(tabName) {
     document.querySelector(`[data-tab="${t}"]`).classList.toggle('active', t === tabName);
   });
   activeTab = tabName;
+
+  // 모니터 탭 이탈 시 폴링 중단
+  if (tabName !== 'monitor') stopMonitorPolling();
 
   if (tabName === 'dashboard' && !dashboardLoaded) loadDashboard();
   if (tabName === 'users' && !usersLoaded) loadUsers();
@@ -45,6 +48,7 @@ function switchTab(tabName) {
   if (tabName === 'quizzes' && !quizzesLoaded) loadSharedQuizzes();
   if (tabName === 'games' && !gamesLoaded) loadGames();
   if (tabName === 'system') setupSystem();
+  if (tabName === 'monitor') setupMonitor();
 }
 
 async function init() {
@@ -1141,6 +1145,130 @@ function showToast(msg, type = 'success') {
   toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${msg}</span>`;
   container.appendChild(toast);
   setTimeout(() => { toast.classList.add('removing'); setTimeout(() => toast.remove(), 300); }, 3500);
+}
+
+// ─── Monitor Tab ───
+let monitorReady = false;
+let monitorIntervalId = null;
+let monitorAutoOn = true;
+
+function setupMonitor() {
+  if (!monitorReady) {
+    monitorReady = true;
+    document.getElementById('monitor-refresh-btn').addEventListener('click', () => fetchMonitor());
+    document.getElementById('monitor-auto-btn').addEventListener('click', () => {
+      monitorAutoOn = !monitorAutoOn;
+      document.getElementById('monitor-auto-btn').textContent = monitorAutoOn ? '⏸ 자동 갱신 끄기' : '▶ 자동 갱신 켜기';
+      document.getElementById('monitor-auto-label').textContent = monitorAutoOn ? '15초마다 자동 갱신' : '자동 갱신 꺼짐';
+      document.getElementById('monitor-auto-dot').style.background = monitorAutoOn ? '#34d399' : '#6b7280';
+      document.getElementById('monitor-auto-dot').style.boxShadow = monitorAutoOn ? '0 0 6px #34d399' : 'none';
+      if (monitorAutoOn) startMonitorPolling();
+      else stopMonitorPolling();
+    });
+  }
+  fetchMonitor();
+  startMonitorPolling();
+}
+
+function startMonitorPolling() {
+  stopMonitorPolling();
+  if (!monitorAutoOn) return;
+  monitorIntervalId = setInterval(() => {
+    if (activeTab === 'monitor') fetchMonitor();
+  }, 15000);
+}
+
+function stopMonitorPolling() {
+  if (monitorIntervalId) { clearInterval(monitorIntervalId); monitorIntervalId = null; }
+}
+
+async function fetchMonitor() {
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`/api/monitor?token=${idToken}`);
+    const data = await res.json();
+    if (!res.ok || data.error) { showToast(data.error || '모니터 조회 실패', 'error'); return; }
+    renderMonitor(data);
+  } catch (e) { showToast('모니터 조회 실패: ' + e.message, 'error'); }
+}
+
+function barColor(ratio) {
+  return ratio > 80 ? '#ef4444' : ratio > 60 ? '#f59e0b' : null;
+}
+
+function setBar(id, ratio, defaultColor) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.width = Math.min(ratio, 100) + '%';
+  el.style.background = barColor(ratio) || defaultColor;
+}
+
+function renderMonitor(data) {
+  const now = new Date();
+  document.getElementById('monitor-last-updated').textContent =
+    `마지막 갱신: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+
+  // 숫자 카드
+  document.getElementById('mon-active-games').textContent = data.activeGames;
+  document.getElementById('mon-waiting-rooms').textContent = data.waitingRooms;
+  document.getElementById('mon-today-games').textContent = data.todayGames;
+  document.getElementById('mon-today-users').textContent = data.todayUsers;
+  document.getElementById('mon-daily-reads').textContent = (data.estimatedDailyReads || 0).toLocaleString();
+  document.getElementById('mon-daily-writes').textContent = (data.estimatedDailyWrites || 0).toLocaleString();
+  document.getElementById('mon-total-posts').textContent = data.totalPosts;
+  document.getElementById('mon-today-quizzes').textContent = data.todayQuizzes;
+  document.getElementById('mon-daily-kv').textContent = (data.estimatedDailyKvReads || 0).toLocaleString();
+
+  // 비율 계산
+  const readsRatio  = Math.min((data.estimatedDailyReads  / 50000) * 100, 100);
+  const writesRatio = Math.min((data.estimatedDailyWrites / 20000) * 100, 100);
+  const gamesRatio  = Math.min((data.activeGames          / 300)   * 100, 100);
+  const roomsRatio  = Math.min((data.waitingRooms         / 30)    * 100, 100);
+  const postsRatio  = Math.min((data.totalPosts           / 10000) * 100, 100);
+  const kvRatio     = Math.min((data.estimatedDailyKvReads/ 100000)* 100, 100);
+  const quizzesRatio= Math.min((data.todayQuizzes         / 300)   * 100, 100);
+
+  // 카드 내 작은 바
+  setBar('mon-reads-fill',   readsRatio,   '#34d399');
+  setBar('mon-writes-fill',  writesRatio,  '#f87171');
+  setBar('mon-active-games-fill', gamesRatio, '#a78bfa');
+  setBar('mon-waiting-rooms-fill', roomsRatio, '#60a5fa');
+  setBar('mon-posts-fill',   postsRatio,   '#e879f9');
+  setBar('mon-quizzes-fill', quizzesRatio, '#fb923c');
+  setBar('mon-kv-fill',      kvRatio,      '#38bdf8');
+
+  // 한도 현황 바
+  setBar('mon-reads-bar',  readsRatio,  '#34d399');
+  setBar('mon-writes-bar', writesRatio, '#f87171');
+  setBar('mon-games-bar',  gamesRatio,  '#a78bfa');
+  setBar('mon-rooms-bar',  roomsRatio,  '#60a5fa');
+  setBar('mon-posts-bar',  postsRatio,  '#e879f9');
+  setBar('mon-kv-bar',     kvRatio,     '#38bdf8');
+
+  // 라벨
+  document.getElementById('mon-reads-label').textContent  = `${(data.estimatedDailyReads||0).toLocaleString()} / 50,000 (${readsRatio.toFixed(1)}%)`;
+  document.getElementById('mon-writes-label').textContent = `${(data.estimatedDailyWrites||0).toLocaleString()} / 20,000 (${writesRatio.toFixed(1)}%)`;
+  document.getElementById('mon-games-label').textContent  = `${data.activeGames} / 300 (${gamesRatio.toFixed(1)}%)`;
+  document.getElementById('mon-rooms-label').textContent  = `${data.waitingRooms} / 30`;
+  document.getElementById('mon-posts-label').textContent  = `${data.totalPosts} / 10,000 (${postsRatio.toFixed(1)}%)`;
+  document.getElementById('mon-kv-label').textContent     = `${(data.estimatedDailyKvReads||0).toLocaleString()} / 100,000 (${kvRatio.toFixed(1)}%)`;
+
+  // 경고 (조치 방법 포함)
+  const warningsEl = document.getElementById('monitor-warnings');
+  if (!data.warnings || data.warnings.length === 0) {
+    warningsEl.innerHTML = '<div style="padding:12px 16px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:10px;font-size:13px;color:#34d399;margin-bottom:16px">✅ 모든 지표 정상</div>';
+  } else {
+    warningsEl.innerHTML = data.warnings.map(w => {
+      const isCritical = w.level === 'critical';
+      const bg    = isCritical ? 'rgba(239,68,68,0.08)'  : 'rgba(245,158,11,0.08)';
+      const border= isCritical ? 'rgba(239,68,68,0.3)'   : 'rgba(245,158,11,0.3)';
+      const color = isCritical ? '#f87171'                : '#fbbf24';
+      return `<div style="padding:14px 16px;background:${bg};border:1px solid ${border};border-radius:10px;margin-bottom:8px">
+        <div style="font-size:13px;color:${color};font-weight:600;margin-bottom:6px">${isCritical ? '🚨' : '⚠️'} ${w.message}</div>
+        <div style="font-size:12px;color:var(--text-secondary);line-height:1.5">👉 ${w.action}</div>
+      </div>`;
+    }).join('');
+  }
 }
 
 init();

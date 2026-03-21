@@ -674,8 +674,8 @@
         <div class="game-entry-left">
           <span class="game-entry-icon">✊</span>
           <div>
-            <div class="game-entry-title">가위바위보 배팅 게임</div>
-            <div class="game-entry-desc">무료 포인트로 즐기는 1:1 배팅 게임 · 최대 10P</div>
+            <div class="game-entry-title">가위바위보 하나빼기!</div>
+            <div class="game-entry-desc">내 무료 포인트를 걸고 1:1 승부 · 양손을 내고 하나를 빼는 전략 대결</div>
           </div>
         </div>
         <span class="game-entry-arrow">›</span>
@@ -781,7 +781,7 @@
     <div class="modal">
       <div class="modal-icon">👋</div>
       <h2 class="modal-title">로그인하기</h2>
-      <p class="modal-desc">소셜 계정으로 간편하게 시작하세요.<br />신규 가입 시 10문제 무료!</p>
+      <p class="modal-desc">소셜 계정으로 간편하게 시작하세요.<br />신규 가입 시 30문제 무료!</p>
       <div class="social-login-btns">
         <button class="btn btn-google btn-full" id="modal-login-google">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
@@ -798,6 +798,18 @@
       </div>
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:12px;line-height:1.6">계속 진행하면 <a href="/terms.html" target="_blank" style="color:var(--text-muted);text-decoration:underline">이용약관</a> 및 <a href="/privacy.html" target="_blank" style="color:var(--text-muted);text-decoration:underline">개인정보처리방침</a>에 동의하는 것으로 간주됩니다.</p>
       <button class="btn btn-ghost btn-full" id="modal-close-btn" style="margin-top:4px">취소</button>
+    </div>
+  </div>
+
+  <!-- 출석 완료 팝업 -->
+  <div class="modal-overlay" id="attendance-modal">
+    <div class="modal" style="max-width:300px;text-align:center">
+      <div style="font-size:56px;margin-bottom:8px">🎉</div>
+      <h2 class="modal-title">출석 완료!</h2>
+      <p class="modal-desc" style="margin-bottom:4px">무료 포인트가 지급됐어요</p>
+      <div style="font-size:32px;font-weight:900;color:#34d399;margin:12px 0">+3P</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">보유 포인트: <strong id="attendance-total-fp" style="color:var(--text-primary)">-</strong>P</p>
+      <button class="btn btn-primary btn-full" id="attendance-modal-close">확인</button>
     </div>
   </div>
 

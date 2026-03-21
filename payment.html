@@ -93,15 +93,29 @@
         <div class="credits-info-count"><span id="current-credits">0</span>문제</div>
       </div>
 
+      <!-- 프로모션 배너 -->
+      <div style="max-width:860px;margin:0 auto 28px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(245,158,11,0.12));border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-xl);padding:20px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div style="font-size:32px">🎉</div>
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:800;color:#f87171;margin-bottom:4px">기간 한정 50% 할인 프로모션</div>
+          <div style="font-size:13px;color:var(--text-secondary)">지금 충전하면 모든 패키지 50% 할인 · 한정 기간만 적용됩니다</div>
+        </div>
+        <div id="promo-countdown" style="font-size:13px;font-weight:700;color:#fbbf24;white-space:nowrap"></div>
+      </div>
+
       <!-- 패키지 선택 -->
       <div class="packages-grid" id="packages-grid">
-        <div class="package-card" data-package="starter" data-credits="100" data-price="1900">
+        <div class="package-card" data-package="starter" data-credits="100" data-price="950">
           <div class="package-emoji">🌱</div>
           <div class="package-name">스타터</div>
           <div class="package-credits">100</div>
           <div class="package-credits-label">문제</div>
-          <div class="package-price">₩1,900</div>
-          <div class="package-unit-price">문제당 ₩19</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+            <div style="font-size:14px;color:var(--text-muted);text-decoration:line-through">₩1,900</div>
+            <div style="font-size:11px;font-weight:700;background:#ef4444;color:white;padding:2px 6px;border-radius:4px">-50%</div>
+          </div>
+          <div class="package-price" style="color:#f87171">₩950</div>
+          <div class="package-unit-price">문제당 ₩9.5</div>
           <ul class="package-features">
             <li>✅ 문제 100개 생성</li>
             <li>✅ 모든 문제 유형</li>
@@ -109,13 +123,17 @@
           </ul>
         </div>
 
-        <div class="package-card" data-package="standard" data-credits="300" data-price="3900">
+        <div class="package-card" data-package="standard" data-credits="300" data-price="1950">
           <div class="package-emoji">⚡</div>
           <div class="package-name">스탠다드</div>
           <div class="package-credits">300</div>
           <div class="package-credits-label">문제</div>
-          <div class="package-price">₩3,900</div>
-          <div class="package-unit-price">문제당 ₩13 · 32% 할인</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+            <div style="font-size:14px;color:var(--text-muted);text-decoration:line-through">₩3,900</div>
+            <div style="font-size:11px;font-weight:700;background:#ef4444;color:white;padding:2px 6px;border-radius:4px">-50%</div>
+          </div>
+          <div class="package-price" style="color:#f87171">₩1,950</div>
+          <div class="package-unit-price">문제당 ₩6.5</div>
           <ul class="package-features">
             <li>✅ 문제 300개 생성</li>
             <li>✅ 모든 문제 유형</li>
@@ -123,14 +141,18 @@
           </ul>
         </div>
 
-        <div class="package-card popular" data-package="premium" data-credits="1000" data-price="9900">
+        <div class="package-card popular" data-package="premium" data-credits="1000" data-price="4950">
           <div class="popular-badge">🔥 최대 혜택</div>
           <div class="package-emoji">👑</div>
           <div class="package-name">프리미엄</div>
           <div class="package-credits">1,000</div>
           <div class="package-credits-label">문제</div>
-          <div class="package-price">₩9,900</div>
-          <div class="package-unit-price">문제당 ₩9.9 · 48% 할인</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+            <div style="font-size:14px;color:var(--text-muted);text-decoration:line-through">₩9,900</div>
+            <div style="font-size:11px;font-weight:700;background:#ef4444;color:white;padding:2px 6px;border-radius:4px">-50%</div>
+          </div>
+          <div class="package-price" style="color:#f87171">₩4,950</div>
+          <div class="package-unit-price">문제당 ₩4.95</div>
           <ul class="package-features">
             <li>✅ 문제 1,000개 생성</li>
             <li>✅ 모든 문제 유형</li>
@@ -182,7 +204,7 @@
     <div class="modal">
       <div class="modal-icon">👋</div>
       <h2 class="modal-title">로그인하기</h2>
-      <p class="modal-desc">소셜 계정으로 간편하게 시작하세요.<br />신규 가입 시 10문제 무료!</p>
+      <p class="modal-desc">소셜 계정으로 간편하게 시작하세요.<br />신규 가입 시 30문제 무료!</p>
       <div class="social-login-btns">
         <button class="btn btn-google btn-full" id="modal-login-google">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style="flex-shrink:0"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/><path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
@@ -204,6 +226,23 @@
 
   <script src="https://js.tosspayments.com/v2/standard"></script>
   <script type="module" src="/payment.js"></script>
+  <script>
+    // 프로모션 종료: 2026-04-20 23:59:59 KST
+    const PROMO_END = new Date('2026-04-20T23:59:59+09:00');
+    function updateCountdown() {
+      const el = document.getElementById('promo-countdown');
+      if (!el) return;
+      const diff = PROMO_END - Date.now();
+      if (diff <= 0) { el.textContent = '프로모션 종료'; return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      el.textContent = `종료까지 ${d}일 ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+  </script>
   <script type="module">
     import { signInWithGoogle, signInWithKakao, signInWithNaver } from '/auth.js';
     const close = () => document.getElementById('login-modal')?.classList.remove('visible');
