@@ -8,6 +8,7 @@
 const ADMIN_EMAIL = 'hjh2640730@gmail.com';
 const PROJECT_ID = 'gwatop-8edaf';
 const FIREBASE_WEB_API_KEY = 'AIzaSyAsxkIpwlBa0rD6FyzsrB0sdlovQoCPtcQ';
+const RTDB_BASE = `https://${PROJECT_ID}-default-rtdb.asia-southeast1.firebasedatabase.app`;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -472,38 +473,67 @@ async function getComments(accessToken) {
 
 // ─── Firestore: 게임 목록 ───
 async function getGames(accessToken) {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'games' }],
-        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
-        limit: 200,
-      },
+  // Firestore + RTDB 병합 (RTDB 상태가 최신)
+  const [fsRes, rtdbRes] = await Promise.all([
+    fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'games' }],
+          orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
+          limit: 200,
+        },
+      }),
     }),
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.filter(r => r.document).map(r => {
+    fetch(`${RTDB_BASE}/game_realtime.json?auth=${accessToken}&orderBy="$key"&limitToLast=200`).catch(() => null),
+  ]);
+
+  // RTDB 데이터 맵
+  const rtdbMap = {};
+  if (rtdbRes?.ok) {
+    const rtdbData = await rtdbRes.json();
+    if (rtdbData) Object.entries(rtdbData).forEach(([id, val]) => { rtdbMap[id] = val; });
+  }
+
+  if (!fsRes.ok) return [];
+  const data = await fsRes.json();
+  const games = data.filter(r => r.document).map(r => {
     const f = r.document.fields || {};
+    const id = r.document.name.split('/').pop();
     const p1f = f.player1?.mapValue?.fields;
     const p2f = f.player2?.mapValue?.fields;
+    const rtdb = rtdbMap[id];
     return {
-      id: r.document.name.split('/').pop(),
-      status: f.status?.stringValue || '',
+      id,
+      status: rtdb?.status || f.status?.stringValue || '',
       wager: parseInt(f.wager?.integerValue || 0),
       title: f.title?.stringValue || '',
       hasPassword: f.hasPassword?.booleanValue || false,
-      player1: p1f ? { uid: p1f.uid?.stringValue || '', name: p1f.name?.stringValue || '' } : null,
-      player2: p2f ? { uid: p2f.uid?.stringValue || '', name: p2f.name?.stringValue || '' } : null,
+      player1: rtdb?.player1 || (p1f ? { uid: p1f.uid?.stringValue || '', name: p1f.name?.stringValue || '' } : null),
+      player2: rtdb?.player2 || (p2f ? { uid: p2f.uid?.stringValue || '', name: p2f.name?.stringValue || '' } : null),
       winner: f.winner?.stringValue || null,
       p1Choice: f.p1Choice?.stringValue || null,
       p2Choice: f.p2Choice?.stringValue || null,
       createdAt: f.createdAt?.timestampValue || null,
     };
   });
+
+  // RTDB에만 있는 방 (Firestore에 아직 없는 경우) 추가
+  const fsIds = new Set(games.map(g => g.id));
+  Object.entries(rtdbMap).forEach(([id, val]) => {
+    if (!fsIds.has(id) && val.status && val.status !== 'finished' && val.status !== 'cancelled') {
+      games.push({
+        id, status: val.status, wager: val.wager || 0,
+        title: val.title || '', hasPassword: val.hasPassword || false,
+        player1: val.player1 || null, player2: val.player2 || null,
+        winner: null, p1Choice: null, p2Choice: null,
+        createdAt: val.createdAt ? new Date(val.createdAt).toISOString() : null,
+      });
+    }
+  });
+
+  return games;
 }
 
 // ─── Firestore: 유저 퀴즈 히스토리 ───
