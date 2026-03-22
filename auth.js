@@ -568,7 +568,10 @@ async function loadInboxBadgeCount(user) {
     } catch (_) {}
     if (!globalDocs) {
       const snap = await getDocs(query(collection(db, 'global_messages'), limit(50)));
-      globalDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      globalDocs = snap.docs.map(d => {
+        const data = d.data();
+        return { id: d.id, ...data, _createdAtMs: data.createdAt?.toDate ? data.createdAt.toDate().getTime() : 0 };
+      });
       try { localStorage.setItem(GM_CACHE_KEY, JSON.stringify({ ts: Date.now(), docs: globalDocs })); } catch (_) {}
     }
 
@@ -579,7 +582,7 @@ async function loadInboxBadgeCount(user) {
     const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
     const userCreated = user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
     const globalPending = globalDocs.filter(d => {
-      const msgTime = d.createdAt?.toDate ? d.createdAt.toDate().getTime() : (d.createdAt?.seconds ? d.createdAt.seconds * 1000 : new Date(d.createdAt || 0).getTime());
+      const msgTime = d._createdAtMs || 0;
       return d.rewardType === 'freePoints' && d.rewardAmount > 0 && !claimedIds.has(d.id) && msgTime >= userCreated;
     }).length;
     const inboxPending = inboxSnap.docs.filter(d => {
