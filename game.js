@@ -295,30 +295,24 @@ function checkActiveGame() {
   if (pendingListener) { pendingListener(); pendingListener = null; }
   if (pendingPollingId) { clearInterval(pendingPollingId); pendingPollingId = null; }
 
-  const poll = async () => {
-    try {
-      const snap = await getDoc(doc(db, 'games', stored.gameId));
-      if (!snap.exists()) {
-        clearStoredGame();
-        clearInterval(pendingPollingId); pendingPollingId = null;
-        return;
-      }
-      const game = { id: snap.id, ...snap.data() };
-      if (game.status === 'cancelled' || game.status === 'finished') {
-        clearStoredGame();
-        clearInterval(pendingPollingId); pendingPollingId = null;
-      } else if (game.status === 'ready' || game.status === 'hands_shown') {
-        clearStoredGame();
-        clearInterval(pendingPollingId); pendingPollingId = null;
-        const isP1 = game.player1?.uid === currentUser?.uid;
-        if (game.status === 'ready') showToast('상대방이 입장했습니다! 게임을 시작하세요 🎮', 'success');
-        openGameModal(stored.gameId, isP1);
-      }
-    } catch (e) { console.error('checkActiveGame poll:', e); }
-  };
-
-  poll();
-  pendingPollingId = setInterval(poll, 3000);
+  pendingListener = onSnapshot(doc(db, 'games', stored.gameId), snap => {
+    if (!snap.exists()) {
+      clearStoredGame();
+      if (pendingListener) { pendingListener(); pendingListener = null; }
+      return;
+    }
+    const game = { id: snap.id, ...snap.data() };
+    if (game.status === 'cancelled' || game.status === 'finished') {
+      clearStoredGame();
+      if (pendingListener) { pendingListener(); pendingListener = null; }
+    } else if (game.status === 'ready' || game.status === 'hands_shown') {
+      clearStoredGame();
+      if (pendingListener) { pendingListener(); pendingListener = null; }
+      const isP1 = game.player1?.uid === currentUser?.uid;
+      if (game.status === 'ready') showToast('상대방이 입장했습니다! 게임을 시작하세요 🎮', 'success');
+      openGameModal(stored.gameId, isP1);
+    }
+  }, e => { console.error('checkActiveGame onSnapshot:', e); });
 }
 
 function getRemainingMin(createdAt) {
@@ -496,7 +490,7 @@ async function cancelRoomById(gameId) {
     body: JSON.stringify({ action: 'cancel', gameId }),
   });
   clearStoredGame();
-  if (pendingPollingId) { clearInterval(pendingPollingId); pendingPollingId = null; }
+  if (pendingListener) { pendingListener(); pendingListener = null; }
   showToast('방이 취소됐습니다', 'success');
 }
 
