@@ -3,7 +3,7 @@
 // ============================================================
 
 import { createHandScene } from './hand3d.js';
-import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange, ensureUserDoc } from './auth.js';
 import { db, rtdb } from './auth.js';
 import {
   collection, doc, query, where, limit, onSnapshot,
@@ -345,16 +345,18 @@ function renderRooms(docs) {
     const g = d.data();
     const isMine = currentUser && g.player1?.uid === currentUser.uid;
     const lockBadge = g.hasPassword ? ' <span class="room-lock-badge">🔒 비공개</span>' : '';
+    const safeTitle = escapeHtml(g.title);
+    const safeName = escapeHtml(g.player1?.name || '익명');
     const titleHtml = g.title
-      ? `<div class="room-title-on-card">${g.title}${lockBadge}</div><div class="room-host-name">${g.player1?.name || '익명'}</div>`
-      : `<div class="room-title-on-card">${g.player1?.name || '익명'}의 방${lockBadge}</div>`;
+      ? `<div class="room-title-on-card">${safeTitle}${lockBadge}</div><div class="room-host-name">${safeName}</div>`
+      : `<div class="room-title-on-card">${safeName}의 방${lockBadge}</div>`;
     if (isMine) {
       const remaining = getRemainingMin(g.createdAt);
       return `<div class="room-card mine">
         <div class="room-card-left">
           <div>
             <div style="display:flex;align-items:center;gap:6px">
-              ${g.title ? `<span class="room-name" style="color:var(--text-primary)">${g.title}</span>` : '<span class="room-name" style="color:var(--text-primary)">내 방</span>'}
+              ${g.title ? `<span class="room-name" style="color:var(--text-primary)">${safeTitle}</span>` : '<span class="room-name" style="color:var(--text-primary)">내 방</span>'}
               <span class="room-mine-badge">대기 중</span>
             </div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px">상대방 기다리는 중 · <span class="room-expire-min">${remaining}</span>분 후 만료</div>
@@ -423,12 +425,23 @@ async function fetchRooms() {
 
 async function createRoom(wager, title = '', password = '') {
   const idToken = await currentUser.getIdToken();
-  const res = await fetch('/api/game-rps', {
+  let res = await fetch('/api/game-rps', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'create', wager, title, password }),
   });
-  const data = await res.json();
+  let data = await res.json();
+  // Firestore 문서 없음 → 재생성 후 1회 재시도
+  if (res.status === 404 && data.error?.includes('계정 정보')) {
+    try { await ensureUserDoc(currentUser, { provider: currentUser.providerData?.[0]?.providerId?.replace('.com','') || '' }); } catch (_) {}
+    const idToken2 = await currentUser.getIdToken(true);
+    res = await fetch('/api/game-rps', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken2}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create', wager, title, password }),
+    });
+    data = await res.json();
+  }
   if (data.error) { showToast(data.error, 'error'); return; }
   storeGame(data.gameId, currentUser.uid);
   showToast('방이 생성됐습니다! 상대방을 기다리는 중...', 'success');
@@ -450,12 +463,23 @@ function closeJoinPwModal() {
 async function joinRoom(gameId, password = '') {
   if (!currentUser) { openLoginModal(); return; }
   const idToken = await currentUser.getIdToken();
-  const res = await fetch('/api/game-rps', {
+  let res = await fetch('/api/game-rps', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'join', gameId, password }),
   });
-  const data = await res.json();
+  let data = await res.json();
+  // Firestore 문서 없음 → 재생성 후 1회 재시도
+  if (res.status === 404 && data.error?.includes('계정 정보')) {
+    try { await ensureUserDoc(currentUser, { provider: currentUser.providerData?.[0]?.providerId?.replace('.com','') || '' }); } catch (_) {}
+    const idToken2 = await currentUser.getIdToken(true);
+    res = await fetch('/api/game-rps', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken2}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'join', gameId, password }),
+    });
+    data = await res.json();
+  }
   if (data.error) { showToast(data.error, 'error'); return; }
   storeGame(gameId, currentUser.uid);
   openGameModal(gameId, false);
@@ -503,10 +527,10 @@ function openGameModal(gameId, isP1) {
 
   openChat(gameId);
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
-  const gameStateRef = rtdbRef(rtdb, `game_realtime/${gameId}`);
-  activeGameListener = onValue(gameStateRef, snap => {
+  const gameRef = doc(db, 'games', gameId);
+  activeGameListener = onSnapshot(gameRef, snap => {
     if (!snap.exists()) return;
-    syncModal({ id: gameId, ...snap.val() }, isP1);
+    syncModal({ id: gameId, ...snap.data() }, isP1);
   });
 
   // "건승을 빕니다." 인트로 → 2초 후 선택 화면
@@ -801,6 +825,10 @@ function openChat(gameId) {
     const messages = [];
     snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
     renderMessages(messages);
+  }, err => {
+    console.error('chat onValue error:', err);
+    const container = document.getElementById('chat-messages');
+    if (container) container.innerHTML = '<div class="chat-empty">채팅을 사용할 수 없습니다 (서버 오류)</div>';
   });
 
   const input = document.getElementById('chat-input');
@@ -817,7 +845,7 @@ function openChat(gameId) {
         text: text.slice(0, 100),
         createdAt: Date.now(),
       });
-    } catch (e) { console.error('chat send error', e); }
+    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
   };
 
   sendBtn.onclick = doSend;
@@ -849,7 +877,7 @@ function closeModal() {
   clearPhaseTimers();
   document.getElementById('game-modal').classList.remove('visible');
   if (activeGameListener) {
-    off(rtdbRef(rtdb, `game_realtime/${activeGameId}`));
+    activeGameListener();
     activeGameListener = null;
   }
   if (chatListener) {

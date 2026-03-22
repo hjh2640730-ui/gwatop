@@ -66,11 +66,11 @@ async function verifyFirebaseToken(idToken) {
 async function getFirebaseAccessToken(clientEmail, privateKey, kv) {
   const now = Math.floor(Date.now() / 1000);
   if (kv) {
-    const cached = await kv.get('firebase_admin_token_v2', 'json');
+    const cached = await kv.get('firebase_admin_token_v3', 'json');
     if (cached && cached.expiry - now > 300) return cached.token;
   } else if (_cachedToken && _tokenExpiry - now > 300) return _cachedToken;
   const header = { alg: 'RS256', typ: 'JWT' };
-  const payload = { iss: clientEmail, sub: clientEmail, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600, scope: 'https://www.googleapis.com/auth/firebase' };
+  const payload = { iss: clientEmail, sub: clientEmail, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600, scope: 'https://www.googleapis.com/auth/cloud-platform' };
   const encode = obj => btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   const signingInput = `${encode(header)}.${encode(payload)}`;
   const pem = privateKey.replace(/-----BEGIN PRIVATE KEY-----/g, '').replace(/-----END PRIVATE KEY-----/g, '').replace(/\\n/g, '').replace(/\n/g, '').replace(/\r/g, '').replace(/\s/g, '');
@@ -89,14 +89,20 @@ async function getFirebaseAccessToken(clientEmail, privateKey, kv) {
   _cachedToken = tokenData.access_token;
   _tokenExpiry = now + 3600;
   if (kv) {
-    await kv.put('firebase_admin_token_v2', JSON.stringify({ token: tokenData.access_token, expiry: now + 3600 }), { expirationTtl: 3500 });
+    await kv.put('firebase_admin_token_v3', JSON.stringify({ token: tokenData.access_token, expiry: now + 3600 }), { expirationTtl: 3500 });
   }
   return _cachedToken;
 }
 
 async function fsGet(path, accessToken) {
   const res = await fetch(`${FIRESTORE_BASE}/${path}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    if (res.status !== 404) {
+      const errText = await res.text().catch(() => '');
+      console.error(`fsGet ${path} failed: ${res.status}`, errText);
+    }
+    return null;
+  }
   return res.json();
 }
 
@@ -140,22 +146,24 @@ async function fsCommitTx(writes, accessToken, txId) {
 // ─── Realtime Database 헬퍼 ───
 async function rtdbSet(gameId, data, accessToken) {
   try {
-    await fetch(`${RTDB_BASE}/game_realtime/${gameId}.json?access_token=${accessToken}`, {
+    const res = await fetch(`${RTDB_BASE}/game_realtime/${gameId}.json?access_token=${accessToken}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-  } catch (_) { /* RTDB sync 실패해도 게임 진행에 영향 없음 */ }
+    if (!res.ok) console.error(`rtdbSet ${gameId} failed: ${res.status}`, await res.text().catch(() => ''));
+  } catch (e) { console.error(`rtdbSet ${gameId} exception:`, e?.message || e); }
 }
 
 async function rtdbPatch(gameId, data, accessToken) {
   try {
-    await fetch(`${RTDB_BASE}/game_realtime/${gameId}.json?access_token=${accessToken}`, {
+    const res = await fetch(`${RTDB_BASE}/game_realtime/${gameId}.json?access_token=${accessToken}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-  } catch (_) { /* RTDB sync 실패해도 게임 진행에 영향 없음 */ }
+    if (!res.ok) console.error(`rtdbPatch ${gameId} failed: ${res.status}`, await res.text().catch(() => ''));
+  } catch (e) { console.error(`rtdbPatch ${gameId} exception:`, e?.message || e); }
 }
 
 async function rtdbDelete(gameId, accessToken) {
@@ -199,6 +207,36 @@ function fromFs(fields) {
     else if ('mapValue' in val) r[k] = fromFs(val.mapValue?.fields);
   }
   return r;
+}
+
+// 유저 문서가 없으면 기본값으로 자동 생성 (삭제된 계정 재가입 복구용)
+async function getOrCreateUserDoc(uid, user, accessToken) {
+  const existing = await fsGet(`users/${uid}`, accessToken);
+  if (existing) return existing;
+
+  const DOC_NAME = `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+  const fields = {
+    uid: { stringValue: uid },
+    email: { stringValue: user.email || '' },
+    displayName: { stringValue: user.displayName || '' },
+    photoURL: { stringValue: user.photoUrl || '' },
+    phone: { stringValue: '' },
+    credits: { integerValue: '30' },
+    freePoints: { integerValue: '0' },
+    referralCredits: { integerValue: '0' },
+    totalQuizzes: { integerValue: '0' },
+    createdAt: { timestampValue: new Date().toISOString() },
+  };
+  const commitRes = await fetch(`${FIRESTORE_BASE}:commit`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ writes: [{ update: { name: DOC_NAME, fields } }] }),
+  });
+  if (!commitRes.ok) {
+    console.error('getOrCreateUserDoc commit failed:', commitRes.status, await commitRes.text().catch(() => ''));
+    return null;
+  }
+  return fsGet(`users/${uid}`, accessToken);
 }
 
 async function hashPassword(pwd) {
@@ -267,8 +305,8 @@ export async function onRequestPost(context) {
     const roomPw = (password || '').trim().slice(0, 20);
     const passwordHash = roomPw ? await hashPassword(roomPw) : '';
 
-    const userDoc = await fsGet(`users/${uid}`, accessToken);
-    if (!userDoc) return json({ error: '유저 정보 없음' }, 404);
+    const userDoc = await getOrCreateUserDoc(uid, user, accessToken);
+    if (!userDoc) return json({ error: '계정 정보를 초기화할 수 없습니다. 잠시 후 다시 시도해주세요.' }, 500);
     const userData = fromFs(userDoc.fields);
     if ((userData.freePoints || 0) < w) return json({ error: '무료 포인트가 부족합니다' }, 400);
 
@@ -286,8 +324,8 @@ export async function onRequestPost(context) {
   // ─── JOIN ───
   if (action === 'join') {
     if (!gameId) return json({ error: 'gameId 필요' }, 400);
-    const userDoc = await fsGet(`users/${uid}`, accessToken);
-    if (!userDoc) return json({ error: '유저 정보 없음' }, 404);
+    const userDoc = await getOrCreateUserDoc(uid, user, accessToken);
+    if (!userDoc) return json({ error: '계정 정보를 초기화할 수 없습니다. 잠시 후 다시 시도해주세요.' }, 500);
     const userData = fromFs(userDoc.fields);
 
     // 비밀번호 사전 검증 (트랜잭션 밖에서 해시 계산)
@@ -498,11 +536,12 @@ export async function onRequestPost(context) {
       fsGet(`users/${uid}`, accessToken),
     ]);
     if (!gameDoc) return json({ error: '게임방 없음' }, 404);
+    if (!userDoc) return json({ error: '계정 정보를 찾을 수 없습니다. 다시 로그인해주세요.' }, 404);
     const game = fromFs(gameDoc.fields);
     if (game.status !== 'finished') return json({ error: '종료된 게임만 재대결 가능' }, 400);
     if (game.player1?.uid !== uid && game.player2?.uid !== uid) return json({ error: '게임 참가자 아님' }, 403);
     if (game.rematchRequest?.status === 'pending') return json({ error: '이미 재대결 신청 중' }, 400);
-    const userData = fromFs(userDoc?.fields);
+    const userData = fromFs(userDoc.fields);
     if ((userData.freePoints || 0) < w) return json({ error: '무료 포인트 부족' }, 400);
     await fsPatch(`games/${gameId}`, {
       rematchRequest: v({ fromUid: uid, fromName: userData.nickname || user.displayName || '익명', wager: w, status: 'pending' }),
@@ -519,14 +558,16 @@ export async function onRequestPost(context) {
       fsGet(`users/${uid}`, accessToken),
     ]);
     if (!gameDoc) return json({ error: '게임방 없음' }, 404);
+    if (!userDoc) return json({ error: '계정 정보를 찾을 수 없습니다. 다시 로그인해주세요.' }, 404);
     const game = fromFs(gameDoc.fields);
     const rr = game.rematchRequest;
     if (!rr || rr.status !== 'pending') return json({ error: '유효한 재대결 신청 없음' }, 400);
     if (rr.fromUid === uid) return json({ error: '자신의 신청은 수락 불가' }, 403);
-    const userData = fromFs(userDoc?.fields);
+    const userData = fromFs(userDoc.fields);
     if ((userData.freePoints || 0) < rr.wager) return json({ error: '무료 포인트 부족' }, 400);
     const requesterDoc = await fsGet(`users/${rr.fromUid}`, accessToken);
-    const requesterData = fromFs(requesterDoc?.fields);
+    if (!requesterDoc) return json({ error: '신청자 계정 정보를 찾을 수 없습니다.' }, 404);
+    const requesterData = fromFs(requesterDoc.fields);
     if ((requesterData.freePoints || 0) < rr.wager) return json({ error: '신청자 포인트 부족' }, 400);
 
     const fields = newGameFields(rr.wager,
