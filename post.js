@@ -143,7 +143,6 @@ function renderPost() {
         <div class="post-avatar" style="background:${avatarColor}">${escapeHtml(avatarChar)}</div>
         <div>
           <span class="post-author-name">${escapeHtml(displayName)}</span>
-          <span class="post-uni-badge">${escapeHtml(postData.university || '')}</span>
         </div>
       </div>
       <span class="post-time">${timeAgo(postData.createdAt)}${editedBadge}</span>
@@ -514,7 +513,6 @@ function buildCommentEl(comment, isReply) {
         <div class="comment-meta">
           <span class="comment-author">${escapeHtml(name)}</span>
           ${isAuthor ? '<span class="author-badge">작성자</span>' : ''}
-          <span class="comment-uni">${escapeHtml(comment.university || '')}</span>
           <span class="comment-time">${timeAgo(comment.createdAt)}</span>
           ${isMine ? `<button class="comment-delete-btn" data-id="${comment.id}">삭제</button>` : ''}
         </div>

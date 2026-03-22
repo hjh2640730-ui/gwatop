@@ -731,7 +731,7 @@ function renderPostCard(post) {
         <div class="post-avatar" style="background:${avatarColor}">${escapeHtml(avatarChar)}</div>
         <div>
           <span class="post-author-name">${escapeHtml(displayName)}</span>
-          <span class="post-uni-badge">${escapeHtml(post.university || '')}</span>
+          ${showMyUniversityOnly ? `<span class="post-uni-badge">${escapeHtml(post.university || '')}</span>` : ''}
         </div>
       </div>
       <span class="post-time">${timeAgo(post.createdAt)}</span>
