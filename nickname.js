@@ -3,7 +3,7 @@
 // 첫 로그인 시 닉네임 설정
 // ============================================================
 
-import { checkNicknameAvailable, setNickname } from './auth.js';
+import { checkNicknameAvailable, setNickname, applyAvatar } from './auth.js';
 
 const MODAL_ID = 'nickname-modal';
 const ICON_OPTIONS = [
@@ -161,6 +161,7 @@ export function checkAndShowNicknameModal(user, userData) {
       // nav 즉시 업데이트
       const navUsername = document.getElementById('nav-username');
       if (navUsername) navUsername.textContent = nickname;
+      applyAvatar(document.getElementById('nav-avatar'), user, { icon: selectedIcon });
       window.dispatchEvent(new CustomEvent('nickname-set', { detail: { nickname, icon: selectedIcon } }));
     } catch (e) {
       msg.textContent = '오류가 발생했습니다. 다시 시도해주세요.';
