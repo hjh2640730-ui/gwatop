@@ -25,7 +25,7 @@
         <li><a href="/community.html">게시판</a></li>
       </ul>
       <div class="nav-right">
-        <a href="/game.html" class="nav-playground-btn" title="놀이터 🎮">🎮</a>
+        <a href="/game.html" class="nav-playground-btn" onclick="showPlaygroundModal(event)" title="놀이터 🎮">🎮</a>
         <div id="nav-auth-logged-out" style="display:none">
           <button class="btn btn-primary btn-sm" id="nav-login-btn">로그인</button>
         </div>
@@ -197,7 +197,7 @@
     <div class="modal" style="max-width:360px">
       <div class="modal-icon">🎮</div>
       <h2 class="modal-title">공부 안 하니?</h2>
-      <p class="modal-desc">지금 게시판으로 도망가려고요? 👀</p>
+      <p class="modal-desc">지금 놀이터로 도망가려고요? 👀</p>
       <div class="modal-actions" style="margin-top:28px;gap:10px;display:flex">
         <button class="btn btn-glass btn-lg" id="pg-cancel-btn" style="flex:1">아니, 공부할게</button>
         <button class="btn btn-primary btn-lg" id="pg-confirm-btn" style="flex:1">응, 놀러 갈게 🎉</button>
@@ -210,7 +210,7 @@
       const modal = document.getElementById('playground-modal');
       modal.classList.add('visible');
       document.getElementById('pg-cancel-btn').onclick = () => modal.classList.remove('visible');
-      document.getElementById('pg-confirm-btn').onclick = () => { window.location.href = '/community.html'; };
+      document.getElementById('pg-confirm-btn').onclick = () => { window.location.href = '/game.html'; };
       modal.onclick = (ev) => { if (ev.target === modal) modal.classList.remove('visible'); };
     }
   </script>

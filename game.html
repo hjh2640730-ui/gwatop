@@ -10,6 +10,15 @@
   <style>
     .game-page { max-width: 480px; margin: 0 auto; padding: calc(var(--nav-height) + 32px) 16px calc(72px + env(safe-area-inset-bottom, 0px) + 16px); }
 
+    /* Game Entry Card */
+    .game-entry-card { display:flex; align-items:center; justify-content:space-between; background:var(--glass-bg); border:1px solid rgba(52,211,153,0.25); border-radius:var(--radius-lg); padding:16px 20px; text-decoration:none; transition:all var(--transition); }
+    .game-entry-card:hover { background:rgba(16,185,129,0.06); border-color:rgba(52,211,153,0.5); }
+    .game-entry-left { display:flex; align-items:center; gap:14px; }
+    .game-entry-icon { font-size:28px; line-height:1; }
+    .game-entry-title { font-size:14px; font-weight:800; color:var(--text-primary); margin-bottom:3px; }
+    .game-entry-desc { font-size:12px; color:var(--text-muted); }
+    .game-entry-arrow { font-size:22px; color:#34d399; font-weight:900; }
+
     /* Header */
     .game-header { margin-bottom: 24px; }
     .game-header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
@@ -212,11 +221,29 @@
 
     <div class="game-header">
       <div class="game-header-top">
-        <h1 class="game-title">✌️ 하나빼기</h1>
+        <h1 class="game-title">🎮 놀이터</h1>
         <a href="/" class="btn btn-ghost btn-sm">← 홈</a>
       </div>
-      <p class="game-desc">무료 포인트로 즐기는 1:1 배팅 게임 · 출석체크로 포인트를 획득하세요</p>
+      <p class="game-desc">무료 포인트로 즐기는 미니게임</p>
     </div>
+
+    <!-- 게임 목록 -->
+    <div id="game-lobby">
+      <div class="game-entry-card" id="enter-hanappegi" style="cursor:pointer;margin-bottom:16px">
+        <div class="game-entry-left">
+          <span class="game-entry-icon">✊</span>
+          <div>
+            <div class="game-entry-title">가위바위보 하나빼기!</div>
+            <div class="game-entry-desc">내 무료 포인트를 걸고 1:1 승부 · 양손을 내고 하나를 빼는 전략 대결</div>
+          </div>
+        </div>
+        <span class="game-entry-arrow">›</span>
+      </div>
+      <div style="text-align:center;color:var(--text-muted);font-size:13px;padding:20px 0">더 많은 게임이 곧 추가됩니다! 🚀</div>
+    </div>
+
+    <!-- 하나빼기 게임 영역 (기본 숨김) -->
+    <div id="hanappegi-content" style="display:none">
 
     <!-- Free Points Bar -->
     <div class="game-fp-bar" id="game-fp-bar">
@@ -256,6 +283,8 @@
     <div class="rooms-wrap" id="rooms-list">
       <div class="room-empty">불러오는 중...</div>
     </div>
+
+    </div><!-- /hanappegi-content -->
 
   </main>
 

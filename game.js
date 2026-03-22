@@ -61,6 +61,7 @@ const EMOJI = { '가위': '✌️', '바위': '✊', '보': '🖐️' };
 function init() {
   setupNav();
   setupUI();
+  setupLobby();
 
   onUserChange((user, userData) => {
     currentUser = user;
@@ -94,6 +95,13 @@ function init() {
 }
 
 // ─── Nav ───
+function setupLobby() {
+  document.getElementById('enter-hanappegi')?.addEventListener('click', () => {
+    document.getElementById('game-lobby').style.display = 'none';
+    document.getElementById('hanappegi-content').style.display = '';
+  });
+}
+
 function setupNav() {
   document.getElementById('nav-login-btn')?.addEventListener('click', openLoginModal);
   document.getElementById('nav-logout-btn')?.addEventListener('click', () => logOut());
