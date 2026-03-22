@@ -323,9 +323,12 @@ export function onUserChange(callback) {
           icon: userData?.icon || '',
           credits: userData?.credits ?? 0
         }));
+        const ca = userData?.createdAt;
+        currentUserCreatedAt = ca?.toDate ? ca.toDate().getTime() : ca?.seconds ? ca.seconds * 1000 : (ca ? new Date(ca).getTime() : 0);
         injectInboxNav(user);
         callback(user, userData);
       } else {
+        currentUserCreatedAt = 0;
         localStorage.removeItem(NAV_CACHE_KEY);
         document.getElementById('nav-inbox-btn')?.remove();
         document.getElementById('nav-inbox-flyout')?.remove();
@@ -495,6 +498,7 @@ export function applyAvatar(imgEl, user, userData) {
 
 // ─── 메시지함 네비 버튼 ───
 let _inboxClickHandler = null;
+let currentUserCreatedAt = 0;
 function injectInboxNav(user) {
   if (document.getElementById('nav-inbox-btn')) return;
   const navLi = document.getElementById('nav-auth-logged-in');
@@ -580,7 +584,7 @@ async function loadInboxBadgeCount(user) {
       getDocs(query(collection(db, 'users', user.uid, 'inbox'), where('claimed', '==', false))),
     ]);
     const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
-    const userCreated = user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
+    const userCreated = currentUserCreatedAt || (user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0);
     const globalPending = globalDocs.filter(d => {
       const msgTime = d._createdAtMs || 0;
       return d.rewardType === 'freePoints' && d.rewardAmount > 0 && !claimedIds.has(d.id) && msgTime >= userCreated;
@@ -607,7 +611,7 @@ async function renderInboxFlyout(user, wrap) {
       getDocs(query(collection(db, 'users', user.uid, 'inbox'), orderBy('createdAt', 'desc'), limit(10))),
     ]);
     const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
-    const userCreated = user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
+    const userCreated = currentUserCreatedAt || (user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0);
     const messages = [];
 
     inboxSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'inbox', ...d.data() }));

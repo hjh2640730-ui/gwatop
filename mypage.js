@@ -171,7 +171,8 @@ async function renderInbox(user) {
     ]);
 
     const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
-    const userCreated = user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
+    const ca = currentUserData?.createdAt;
+    const userCreated = ca?.toDate ? ca.toDate().getTime() : ca?.seconds ? ca.seconds * 1000 : (user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0);
     const messages = [];
 
     inboxSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'inbox', ...d.data() }));

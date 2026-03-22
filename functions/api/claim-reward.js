@@ -56,15 +56,6 @@ export async function onRequestPost(context) {
   if (!rewardAmount) return json({ error: '보상 금액이 없습니다' }, 400);
   const msgUpdateTime = msgDoc.updateTime; // for precondition on inbox messages
 
-  // 1.5 전체 메시지: 유저 가입일 이전 메시지는 수령 불가
-  if (messageType === 'global') {
-    const msgCreatedAt = f.createdAt?.timestampValue ? new Date(f.createdAt.timestampValue).getTime() : 0;
-    const userCreatedAt = user.createdAt ? parseInt(user.createdAt) : 0;
-    if (msgCreatedAt && userCreatedAt && msgCreatedAt < userCreatedAt) {
-      return json({ error: '가입 이전에 발송된 메시지입니다' }, 403);
-    }
-  }
-
   // 2. 중복 수령 확인
   if (messageType === 'global') {
     const claimedRes = await fetch(`${BASE}/users/${uid}/claimed/${messageId}`, {
@@ -79,6 +70,16 @@ export async function onRequestPost(context) {
   const userRes = await fetch(`${BASE}/users/${uid}`, { headers: { 'Authorization': `Bearer ${accessToken}` } });
   if (!userRes.ok) return json({ error: '유저 정보 없음' }, 404);
   const userDoc = await userRes.json();
+
+  // 3.5 전체 메시지: Firestore 유저 가입일 이전 메시지는 수령 불가
+  if (messageType === 'global') {
+    const msgCreatedAt = f.createdAt?.timestampValue ? new Date(f.createdAt.timestampValue).getTime() : 0;
+    const userCa = userDoc.fields?.createdAt?.timestampValue;
+    const userCreatedAt = userCa ? new Date(userCa).getTime() : 0;
+    if (msgCreatedAt && userCreatedAt && msgCreatedAt < userCreatedAt) {
+      return json({ error: '가입 이전에 발송된 메시지입니다' }, 403);
+    }
+  }
   const currentFP = parseInt(userDoc.fields?.freePoints?.integerValue || 0);
   const newFP = currentFP + rewardAmount;
 
