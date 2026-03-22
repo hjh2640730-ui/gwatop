@@ -10,7 +10,7 @@ import {
   getDocs, getDoc, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
-  ref as rtdbRef, onValue, push as rtdbPush, set as rtdbSet,
+  ref as rtdbRef, onValue,
   query as rtdbQuery, orderByChild, equalTo
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
@@ -25,6 +25,8 @@ let countdownInterval = null;
 let allRoomDocs = [];
 let chatListener = null;
 let chatHostUid = null;
+let chatServerMsgs = [];
+let chatPendingMsgs = new Map();
 let pendingJoinGameId = null;
 let resultShown = false;
 
@@ -830,8 +832,12 @@ async function submitFinal(finalHand) {
 }
 
 // ─── 채팅 ───
+const RTDB_CHAT_URL = 'https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat';
+
 function openChat(gameId) {
   if (chatListener) { chatListener(); chatListener = null; }
+  chatServerMsgs = [];
+  chatPendingMsgs = new Map();
   document.getElementById('chat-section').style.display = '';
 
   const input = document.getElementById('chat-input');
@@ -847,20 +853,22 @@ function openChat(gameId) {
       text: text.slice(0, 100),
       createdAt: Date.now(),
     };
-    // SDK push로 키 생성 + 로컬 즉시 표시, REST로 서버 확실히 저장 (같은 키)
-    const newRef = rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`));
-    const newKey = newRef.key;
-    // SDK 쓰기 (로컬 즉시 반영, 실패해도 무시)
-    rtdbSet(newRef, msgData).catch(() => {});
-    // REST 쓰기 (서버 확실히 저장)
+    // 임시 키 생성 후 로컬 즉시 표시
+    const tempKey = `_p${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    chatPendingMsgs.set(tempKey, msgData);
+    renderChatMerged();
+    // REST로 서버에 저장
     try {
       const idToken = await currentUser.getIdToken();
-      const res = await fetch(
-        `https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat/${gameId}/${newKey}.json?auth=${idToken}`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData) }
-      );
+      const res = await fetch(`${RTDB_CHAT_URL}/${gameId}.json?auth=${idToken}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData),
+      });
       if (!res.ok) throw new Error(`REST ${res.status}`);
-    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
+    } catch (e) {
+      console.error('chat send error', e);
+      showToast('채팅 전송 실패', 'error');
+    }
+    chatPendingMsgs.delete(tempKey);
   };
 
   sendBtn.onclick = () => doSend();
@@ -868,13 +876,26 @@ function openChat(gameId) {
 
   const rtdbChatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
   chatListener = onValue(rtdbChatRef, snap => {
-    const messages = [];
-    snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
-    renderMessages(messages);
+    chatServerMsgs = [];
+    snap.forEach(child => chatServerMsgs.push({ id: child.key, ...child.val() }));
+    // 서버에 도착한 pending 메시지 제거
+    for (const [key, pd] of chatPendingMsgs) {
+      if (chatServerMsgs.some(s => s.uid === pd.uid && s.createdAt === pd.createdAt)) {
+        chatPendingMsgs.delete(key);
+      }
+    }
+    renderChatMerged();
   }, err => {
     console.error('RTDB chat error:', err.code);
     showToast('채팅 연결에 문제가 발생했습니다. 새로고침해주세요.', 'error');
   });
+}
+
+function renderChatMerged() {
+  const all = [...chatServerMsgs];
+  chatPendingMsgs.forEach((data, id) => all.push({ id, ...data }));
+  all.sort((a, b) => a.createdAt - b.createdAt);
+  renderMessages(all);
 }
 
 function renderMessages(messages) {
