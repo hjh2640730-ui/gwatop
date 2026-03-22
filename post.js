@@ -121,8 +121,9 @@ async function loadPost() {
 function renderPost() {
   const postView = document.getElementById('post-view');
   const displayName = postData.isAnonymous ? '익명' : (postData.nickname || '알 수 없음');
-  const avatarColor = postData.isAnonymous ? '#374151' : getAvatarColor(postData.uid || displayName);
-  const avatarChar = postData.isAnonymous ? '?' : displayName[0];
+  const hasIcon = !postData.isAnonymous && postData.icon;
+  const avatarColor = postData.isAnonymous ? '#374151' : (hasIcon ? 'transparent' : getAvatarColor(postData.uid || displayName));
+  const avatarChar = postData.isAnonymous ? '?' : (hasIcon ? postData.icon : displayName[0]);
   // 이미지 (다중 지원)
   const images = Array.isArray(postData.imageUrls) && postData.imageUrls.length
     ? postData.imageUrls

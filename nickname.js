@@ -45,7 +45,8 @@ function injectModal() {
 }
 
 export function checkAndShowNicknameModal(user, userData) {
-  if (!user || userData?.nickname) return; // 이미 닉네임 있으면 스킵
+  if (!user) return;
+  if (userData?.nickname && userData?.icon) return; // 닉네임+아이콘 둘 다 있으면 스킵
   injectModal();
 
   const modal = document.getElementById(MODAL_ID);
@@ -58,13 +59,17 @@ export function checkAndShowNicknameModal(user, userData) {
   // 이미 열려있으면 스킵
   if (modal.classList.contains('visible')) return;
 
-  // 초기화
-  let selectedIcon = ICON_OPTIONS[0];
-  input.value = '';
-  msg.textContent = '';
-  msg.style.color = '';
-  btn.disabled = true;
+  // 초기화 (기존 유저는 닉네임 프리필)
+  const hasNickname = !!userData?.nickname;
+  let selectedIcon = userData?.icon || ICON_OPTIONS[0];
+  input.value = hasNickname ? userData.nickname : '';
+  msg.textContent = hasNickname ? '아이콘을 선택해주세요!' : '';
+  msg.style.color = hasNickname ? '#60a5fa' : '';
+  btn.disabled = !hasNickname;
   previewIcon.textContent = selectedIcon;
+  iconGrid.querySelectorAll('.nick-icon-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.icon === selectedIcon);
+  });
 
   // 아이콘 선택
   iconGrid.addEventListener('click', (e) => {

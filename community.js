@@ -706,8 +706,9 @@ function renderPostCard(post) {
   const isLiked = currentUser && likedPostIds.has(post.id);
   const isMine = currentUser?.uid === post.uid;
   const displayName = post.isAnonymous ? '익명' : (post.nickname || '알 수 없음');
-  const avatarColor = post.isAnonymous ? '#374151' : getAvatarColor(post.uid || displayName);
-  const avatarChar = post.isAnonymous ? '?' : displayName[0];
+  const hasIcon = !post.isAnonymous && post.icon;
+  const avatarColor = post.isAnonymous ? '#374151' : (hasIcon ? 'transparent' : getAvatarColor(post.uid || displayName));
+  const avatarChar = post.isAnonymous ? '?' : (hasIcon ? post.icon : displayName[0]);
   const likeCount = post.likes || 0;
   const bookmarked = isBookmarked(post.id);
 

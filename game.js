@@ -924,6 +924,7 @@ async function openChat(gameId) {
     const msgData = {
       uid: currentUser.uid,
       name: currentUserData?.nickname || currentUser.displayName || '익명',
+      icon: currentUserData?.icon || '',
       text: text.slice(0, 100),
       createdAt: Date.now(),
     };
@@ -1033,9 +1034,10 @@ function renderMessages(messages) {
     const isMine = m.uid === currentUser?.uid;
     const isHost = m.uid === chatHostUid;
     const hostBadge = isHost ? '<span class="chat-host-badge">👑</span>' : '';
+    const icon = m.icon ? `<span style="margin-right:2px">${m.icon}</span>` : '';
     const nameTag = isMine
-      ? (isHost ? `<span class="chat-msg-name">${hostBadge}나</span>` : '')
-      : `<span class="chat-msg-name">${hostBadge}${escapeHtml(m.name || '익명')}</span>`;
+      ? (isHost ? `<span class="chat-msg-name">${hostBadge}${icon}나</span>` : (m.icon ? `<span class="chat-msg-name">${icon}나</span>` : ''))
+      : `<span class="chat-msg-name">${hostBadge}${icon}${escapeHtml(m.name || '익명')}</span>`;
     return `<div class="chat-msg ${isMine ? 'mine' : 'other'}">${nameTag}<div class="chat-bubble">${escapeHtml(m.text)}</div></div>`;
   }).join('');
   container.scrollTop = container.scrollHeight;
