@@ -4,7 +4,7 @@
 // ============================================================
 
 import { onUserChange, applyAvatar } from './auth.js';
-import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore, scrapQuestion, unscrapQuestion } from './db.js';
+import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore, scrapQuestion, unscrapQuestion, getAllScraps } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 import { marked } from 'https://esm.sh/marked@11';
 
@@ -79,6 +79,17 @@ async function init() {
   showArea('quiz');
   renderQuestion(0);
   setupControls();
+
+  // 기존 스크랩 매칭 (중복 스크랩 방지)
+  if (data.uid) {
+    try {
+      const scraps = await getAllScraps(data.uid);
+      questions.forEach((q, idx) => {
+        const match = scraps.find(s => s.question === q.question);
+        if (match) scrappedMap.set(idx, match.id);
+      });
+    } catch {}
+  }
 }
 
 // ─── Nav ───
