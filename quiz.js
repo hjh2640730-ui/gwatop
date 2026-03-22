@@ -159,6 +159,8 @@ function renderQuestion(idx) {
   submitBtn.disabled = true;
   correctAnswerBox.classList.remove('visible');
   explanationBox.classList.remove('visible');
+  const scrapBtn = document.getElementById('scrap-btn');
+  if (scrapBtn) scrapBtn.style.display = 'none';
 
   // Type badge
   const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
