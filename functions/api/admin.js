@@ -279,14 +279,28 @@ async function getPosts(accessToken) {
     });
 }
 
-// ─── Firestore: 유저 삭제 ───
+// ─── Firestore: 유저 삭제 + Firebase Auth 계정 삭제 ───
 async function deleteUserDoc(uid, accessToken) {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
-  const res = await fetch(url, {
+  // 1) Firestore 문서 삭제
+  const fsUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+  const fsRes = await fetch(fsUrl, {
     method: 'DELETE',
     headers: { 'Authorization': `Bearer ${accessToken}` },
   });
-  if (!res.ok && res.status !== 404) throw new Error('유저 삭제 실패');
+  if (!fsRes.ok && fsRes.status !== 404) throw new Error('유저 Firestore 삭제 실패');
+
+  // 2) Firebase Auth 계정 삭제 (Identity Toolkit Admin API)
+  const authUrl = `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT_ID}/accounts/${uid}:delete`;
+  const authRes = await fetch(authUrl, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  });
+  // 404 = 이미 없는 계정, 무시
+  if (!authRes.ok && authRes.status !== 404) {
+    console.error('Auth 계정 삭제 실패:', authRes.status, await authRes.text().catch(() => ''));
+    // Auth 삭제 실패는 경고만 (Firestore 삭제는 완료됐으므로)
+  }
 }
 
 // ─── Firestore: 게시글 삭제 + 크레딧 회수 ───
@@ -372,7 +386,7 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
     iss: clientEmail, sub: clientEmail,
     aud: 'https://oauth2.googleapis.com/token',
     iat: now, exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/cloud-platform',
   };
   const encode = (obj) =>
     btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');

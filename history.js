@@ -42,6 +42,7 @@ function setupNav() {
     const lo = document.getElementById('nav-auth-logged-out');
     const li = document.getElementById('nav-auth-logged-in');
     if (user) {
+      const prevUid = currentUid;
       currentUid = user.uid;
       lo.style.display = 'none';
       li.style.display = 'flex';
@@ -49,7 +50,7 @@ function setupNav() {
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
       const creditsEl = document.getElementById('nav-credits');
       if (creditsEl) creditsEl.textContent = userData?.credits ?? 0;
-      loadAll(currentUid);
+      if (prevUid !== currentUid) loadAll(currentUid);
       checkAndShowNicknameModal(user, userData);
     } else {
       lo.style.display = '';

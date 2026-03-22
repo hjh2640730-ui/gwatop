@@ -178,37 +178,33 @@ async function checkAndRecordPayment(orderId, uid, credits, amount, accessToken)
   return false; // 새로운 결제
 }
 
-// ─── Firestore REST API: 크레딧 증가 ───
+// ─── Firestore REST API: 크레딧 증가 (atomic increment) ───
 async function addCreditsToFirestore(uid, credits, accessToken) {
-  const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+  const commitUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:commit`;
+  const docPath = `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
 
-  // 현재 크레딧 조회
-  const getRes = await fetch(baseUrl, {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
-
-  let currentCredits = 0;
-  if (getRes.ok) {
-    const doc = await getRes.json();
-    currentCredits = parseInt(doc.fields?.credits?.integerValue || 0);
-  }
-
-  // 크레딧 업데이트
-  const patchRes = await fetch(`${baseUrl}?updateMask.fieldPaths=credits`, {
-    method: 'PATCH',
+  // fieldTransforms increment는 문서가 없으면 0부터 시작하므로 read 불필요
+  const commitRes = await fetch(commitUrl, {
+    method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      fields: {
-        credits: { integerValue: String(currentCredits + credits) }
-      }
+      writes: [{
+        transform: {
+          document: docPath,
+          fieldTransforms: [{
+            fieldPath: 'credits',
+            increment: { integerValue: String(credits) }
+          }]
+        }
+      }]
     }),
   });
 
-  if (!patchRes.ok) {
-    const err = await patchRes.text();
+  if (!commitRes.ok) {
+    const err = await commitRes.text();
     throw new Error(`Firestore 업데이트 실패: ${err}`);
   }
 }

@@ -52,6 +52,10 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 86400)}일 전`;
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 // ─── 프로필 렌더 ───
 function renderProfile(user, userData) {
   const name = userData?.nickname || user.displayName || '이름 없음';
@@ -127,7 +131,7 @@ async function renderMyPosts(user) {
       const comments = p.commentCount || 0;
       const ago = timeAgo(p.createdAt);
       return `<div class="post-item" onclick="location.href='/post.html?id=${d.id}'">
-        <div class="post-item-title">${title}</div>
+        <div class="post-item-title">${escapeHtml(title)}</div>
         <div class="post-item-meta">
           <span>❤️ ${likes}</span>
           <span>💬 ${comments}</span>
@@ -187,9 +191,9 @@ async function renderInbox(user) {
       return `<div class="inbox-item${isNew ? ' inbox-item-new' : ''}">
         <div class="inbox-item-title">
           ${isNew ? '<span class="inbox-badge-new">NEW</span>' : ''}
-          ${m.title || '(제목없음)'}
+          ${escapeHtml(m.title || '(제목없음)')}
         </div>
-        <div class="inbox-item-body">${m.body || ''}</div>
+        <div class="inbox-item-body">${escapeHtml(m.body || '')}</div>
         ${hasReward ? `<div class="inbox-reward">
           ${claimed
             ? '<span class="inbox-claimed-badge">✅ 수령 완료</span>'
@@ -299,9 +303,9 @@ async function renderBookmarks() {
       const likes = p.likes || 0;
       const comments = p.commentCount || 0;
       const ago = timeAgo(p.createdAt);
-      const cat = p.category ? `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);margin-right:6px">${p.category}</span>` : '';
+      const cat = p.category ? `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);margin-right:6px">${escapeHtml(p.category)}</span>` : '';
       return `<div class="post-item" onclick="location.href='/post.html?id=${d.id}'">
-        <div class="post-item-title">${cat}${title}</div>
+        <div class="post-item-title">${cat}${escapeHtml(title)}</div>
         <div class="post-item-meta">
           <span>❤️ ${likes}</span>
           <span>💬 ${comments}</span>

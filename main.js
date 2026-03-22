@@ -129,6 +129,9 @@ function updateCreditTypeUI(userData) {
   const row = document.getElementById('credit-type-row');
   if (!row) return;
   const fp = userData?.freePoints ?? 0;
+  const nc = userData?.credits ?? 0;
+  const normalBadge = document.getElementById('normal-credits-badge');
+  if (normalBadge) normalBadge.textContent = `(보유: ${nc}P)`;
   if (fp > 0) {
     row.style.display = '';
     const badge = document.getElementById('free-points-badge');

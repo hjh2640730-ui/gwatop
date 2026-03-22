@@ -665,10 +665,10 @@ function renderTable(users) {
 
   body.innerHTML = users.map(u => `
     <div class="table-row" data-uid="${u.uid}">
-      <div class="td td-name" data-label="이름">${u.displayName || '(이름 없음)'}</div>
-      <div class="td" data-label="닉네임" style="color:#a78bfa;font-weight:600">${u.nickname || '-'}</div>
-      <div class="td" data-label="이메일">${u.email || '-'}</div>
-      <div class="td" data-label="전화번호">${formatPhone(u.phone)}</div>
+      <div class="td td-name" data-label="이름">${escapeHtml(u.displayName || '(이름 없음)')}</div>
+      <div class="td" data-label="닉네임" style="color:#a78bfa;font-weight:600">${escapeHtml(u.nickname || '-')}</div>
+      <div class="td" data-label="이메일">${escapeHtml(u.email || '-')}</div>
+      <div class="td" data-label="전화번호">${escapeHtml(formatPhone(u.phone))}</div>
       <div class="td td-credits" data-label="크레딧">${u.credits}</div>
       <div class="td" data-label="무료P" style="color:#34d399;font-weight:600">${u.freePoints ?? 0}</div>
       <div class="td" data-label="퀴즈 수">${u.totalQuizzes}</div>
@@ -721,11 +721,11 @@ function renderPosts(posts) {
   body.innerHTML = posts.map(p => `
     <div class="posts-table-row" data-id="${p.id}">
       <div class="td" style="padding-right:12px;">
-        <div class="td-title">${p.title || '제목없음'}</div>
-        <div class="td-preview">${p.content || ''}</div>
+        <div class="td-title">${escapeHtml(p.title || '제목없음')}</div>
+        <div class="td-preview">${escapeHtml(p.content || '')}</div>
       </div>
-      <div class="td" data-label="작성자">${p.isAnonymous ? '익명' : (p.nickname || '-')}</div>
-      <div class="td" data-label="대학교">${p.university || '-'}</div>
+      <div class="td" data-label="작성자">${p.isAnonymous ? '익명' : escapeHtml(p.nickname || '-')}</div>
+      <div class="td" data-label="대학교">${escapeHtml(p.university || '-')}</div>
       <div class="td" data-label="좋아요">❤️ ${p.likes}</div>
       <div class="td" data-label="댓글">💬 ${p.commentCount}</div>
       <div class="td td-date" data-label="날짜">${formatDate(p.createdAt)}</div>
@@ -1029,7 +1029,7 @@ function openDeleteModal(uid) {
   deletingUid = uid;
   const name = user.displayName || '(이름 없음)';
   const email = user.email || '-';
-  document.getElementById('delete-desc').innerHTML = `<strong>${name}</strong> (${email})<br/>이 유저를 삭제하시겠습니까?<br/><span style="color:#f87171;font-size:13px">이 작업은 되돌릴 수 없습니다.</span>`;
+  document.getElementById('delete-desc').innerHTML = `<strong>${escapeHtml(name)}</strong> (${escapeHtml(email)})<br/>이 유저를 삭제하시겠습니까?<br/><span style="color:#f87171;font-size:13px">이 작업은 되돌릴 수 없습니다.</span>`;
   document.getElementById('delete-modal').classList.add('visible');
 }
 
@@ -1076,7 +1076,7 @@ function openPostDeleteModal(postId) {
   const post = allPosts.find(p => p.id === postId);
   deletingPostId = postId;
   const title = post?.title || '제목없음';
-  document.getElementById('post-delete-desc').innerHTML = `<strong>${title}</strong><br/>이 게시글을 삭제하시겠습니까?<br/><span style="color:#f87171;font-size:13px">이 작업은 되돌릴 수 없습니다.</span>`;
+  document.getElementById('post-delete-desc').innerHTML = `<strong>${escapeHtml(title)}</strong><br/>이 게시글을 삭제하시겠습니까?<br/><span style="color:#f87171;font-size:13px">이 작업은 되돌릴 수 없습니다.</span>`;
   document.getElementById('post-delete-modal').classList.add('visible');
 }
 

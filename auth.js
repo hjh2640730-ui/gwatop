@@ -58,20 +58,28 @@ const refParam = new URLSearchParams(window.location.search).get('ref');
 if (refParam) localStorage.setItem('gwatop_ref', refParam);
 
 // ─── Google Sign-In ───
+let _popupPending = false;
 export async function signInWithGoogle() {
   if (!isConfigured) {
     alert('Firebase가 설정되지 않았습니다.');
     return;
   }
+  if (_popupPending) return;
+  _popupPending = true;
   try {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     await signInWithPopup(auth, provider);
     // ensureUserDoc은 onAuthStateChanged에서만 호출 (중복 방지)
   } catch (e) {
-    if (e.code === 'auth/popup-closed-by-user') return;
+    if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+      _popupPending = false;
+      return;
+    }
     console.error('Sign in error:', e);
     alert('로그인 오류: ' + e.message);
+  } finally {
+    _popupPending = false;
   }
 }
 
@@ -94,10 +102,12 @@ export async function ensureUserDoc(user, extra = {}) {
   const displayName = user.displayName || extra.displayName || '';
   const photoURL = user.photoURL || extra.photoURL || '';
   const phone = extra.phone || '';
+  let isCreatingNewUser = false;
   try {
     const ref = doc(db, 'users', user.uid);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
+      isCreatingNewUser = true;
       // 중복 확인: 전화번호 우선, 없으면 이메일로 체크
       if (phone) {
         const phoneSnap = await getDocs(query(collection(db, 'users'), where('phone', '==', phone), limit(1)));
@@ -126,11 +136,13 @@ export async function ensureUserDoc(user, extra = {}) {
         photoURL,
         phone,
         credits: 30,
+        freePoints: 0,
         referralCredits: 0,
         totalQuizzes: 0,
         ...(extra.provider ? { provider: extra.provider } : {}),
         createdAt: serverTimestamp()
       });
+      isCreatingNewUser = false;
 
       // 추천인 처리
       const refUid = localStorage.getItem('gwatop_ref');
@@ -152,8 +164,8 @@ export async function ensureUserDoc(user, extra = {}) {
     }
   } catch (e) {
     console.warn('ensureUserDoc error:', e);
-    // 권한 오류 발생 시 로그인 상태를 유지하면 닉네임 모달에 갇히므로 강제 로그아웃
-    if (e.code === 'permission-denied' || e.code === 'auth/duplicate-account') {
+    // 신규 유저 문서 생성 실패 또는 권한 오류 시 → 로그아웃 후 재시도 유도
+    if (isCreatingNewUser || e.code === 'permission-denied' || e.code === 'auth/duplicate-account') {
       try { await signOut(auth); } catch (_) {}
       throw e;
     }
@@ -330,8 +342,11 @@ export function onUserChange(callback) {
 }
 
 // ─── Kakao Sign-In ───
+let _kakaoHandler = null;
 export function signInWithKakao() {
   if (!isConfigured) { alert('Firebase가 설정되지 않았습니다.'); return; }
+
+  if (_kakaoHandler) { window.removeEventListener('message', _kakaoHandler); _kakaoHandler = null; }
 
   const redirectUri = `${window.location.origin}/kakao-callback.html`;
   const authUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_REST_API_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
@@ -342,6 +357,7 @@ export function signInWithKakao() {
   const handleMessage = async (e) => {
     if (e.origin !== window.location.origin || !e.data?.kakaoCustomToken) return;
     window.removeEventListener('message', handleMessage);
+    _kakaoHandler = null;
     try {
       const credential = await signInWithCustomToken(auth, e.data.kakaoCustomToken);
       if (e.data.displayName || e.data.photoURL) {
@@ -368,13 +384,17 @@ export function signInWithKakao() {
       }
     }
   };
+  _kakaoHandler = handleMessage;
   window.addEventListener('message', handleMessage);
 }
 
 // ─── Naver Sign-In ───
+let _naverHandler = null;
 export function signInWithNaver() {
   if (!isConfigured) { alert('Firebase가 설정되지 않았습니다.'); return; }
   if (!NAVER_CLIENT_ID) { alert('네이버 클라이언트 ID가 설정되지 않았습니다.\nauth.js의 NAVER_CLIENT_ID를 설정해주세요.'); return; }
+
+  if (_naverHandler) { window.removeEventListener('message', _naverHandler); _naverHandler = null; }
 
   const redirectUri = encodeURIComponent(`${window.location.origin}/naver-callback.html`);
   const authUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${redirectUri}&state=gwatop`;
@@ -385,6 +405,7 @@ export function signInWithNaver() {
   const handleMessage = async (e) => {
     if (e.origin !== window.location.origin || !e.data?.naverCustomToken) return;
     window.removeEventListener('message', handleMessage);
+    _naverHandler = null;
     console.log('[Naver] received:', { email: e.data.email, phone: e.data.phone, displayName: e.data.displayName });
     try {
       const credential = await signInWithCustomToken(auth, e.data.naverCustomToken);
@@ -412,6 +433,7 @@ export function signInWithNaver() {
       }
     }
   };
+  _naverHandler = handleMessage;
   window.addEventListener('message', handleMessage);
 }
 
@@ -444,6 +466,7 @@ function _updateNavAvatar(photoURL, displayName) {
 export { isConfigured, auth, db, rtdb, app };
 
 // ─── 메시지함 네비 버튼 ───
+let _inboxClickHandler = null;
 function injectInboxNav(user) {
   if (document.getElementById('nav-inbox-btn')) return;
   const navLi = document.getElementById('nav-auth-logged-in');
@@ -487,13 +510,15 @@ function injectInboxNav(user) {
     }
   });
 
-  document.addEventListener('click', (e) => {
+  if (_inboxClickHandler) document.removeEventListener('click', _inboxClickHandler);
+  _inboxClickHandler = (e) => {
     if (!flyout.contains(e.target) && e.target !== btn) {
       flyoutOpen = false;
       flyout.classList.remove('open');
       btn.classList.remove('active');
     }
-  });
+  };
+  document.addEventListener('click', _inboxClickHandler);
   flyout.addEventListener('click', e => e.stopPropagation());
 
   // 뱃지 카운트 로드

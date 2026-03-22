@@ -54,6 +54,7 @@ export async function onRequestPost(context) {
   if (f.rewardType?.stringValue !== 'freePoints') return json({ error: '보상이 없는 메시지입니다' }, 400);
   const rewardAmount = parseInt(f.rewardAmount?.integerValue || 0);
   if (!rewardAmount) return json({ error: '보상 금액이 없습니다' }, 400);
+  const msgUpdateTime = msgDoc.updateTime; // for precondition on inbox messages
 
   // 2. 중복 수령 확인
   if (messageType === 'global') {
@@ -86,11 +87,13 @@ export async function onRequestPost(context) {
         name: `${DOC_BASE}/users/${uid}/claimed/${messageId}`,
         fields: { claimedAt: { timestampValue: new Date().toISOString() } },
       },
+      currentDocument: { exists: false }, // precondition: reject if already claimed
     });
   } else {
     writes.push({
       update: { name: `${DOC_BASE}/users/${uid}/inbox/${messageId}`, fields: { claimed: { booleanValue: true } } },
       updateMask: { fieldPaths: ['claimed'] },
+      currentDocument: { updateTime: msgUpdateTime }, // precondition: reject if doc changed since read
     });
   }
 
@@ -99,7 +102,11 @@ export async function onRequestPost(context) {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ writes }),
   });
-  if (!batchRes.ok) return json({ error: '처리 실패' }, 500);
+  if (!batchRes.ok) {
+    const status = batchRes.status;
+    if (status === 400 || status === 409) return json({ error: '이미 수령한 보상입니다' }, 409);
+    return json({ error: '처리 실패' }, 500);
+  }
 
   return json({ success: true, rewardAmount, newFreePoints: newFP });
 }

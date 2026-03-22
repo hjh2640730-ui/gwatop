@@ -76,11 +76,11 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
 }
 
 // Firestore 컬렉션 쿼리 (uid 필터)
-async function queryDocs(collectionPath, uid, accessToken, pageToken = null) {
+async function queryDocs(collectionPath, uid, accessToken, { allDescendants = false } = {}) {
   const url = `${FIRESTORE_BASE}:runQuery`;
   const body = {
     structuredQuery: {
-      from: [{ collectionId: collectionPath }],
+      from: [{ collectionId: collectionPath, allDescendants }],
       where: {
         fieldFilter: {
           field: { fieldPath: 'uid' },
@@ -183,7 +183,7 @@ export async function onRequestPost(context) {
     }
 
     // 3. 다른 게시글에 내가 쓴 댓글 삭제 (uid 기준 collectionGroup 쿼리)
-    const myComments = await queryDocs('comments', uid, accessToken);
+    const myComments = await queryDocs('comments', uid, accessToken, { allDescendants: true });
     for (const comment of myComments) {
       await deleteDocument(comment.name, accessToken);
     }
