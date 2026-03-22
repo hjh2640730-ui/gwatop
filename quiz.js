@@ -334,11 +334,10 @@ function setupControls() {
   // PDF 다운로드 버튼
   document.getElementById('download-pdf-btn')?.addEventListener('click', downloadPDF);
 
-  // 스크랩 버튼
-  document.getElementById('scrap-btn')?.addEventListener('click', (e) => {
+  // 스크랩 버튼 (pointerdown만 사용 — 키보드 Enter 트리거 차단)
+  document.getElementById('scrap-btn')?.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     toggleScrap();
-    e.target.blur();
   });
 
   // Keyboard shortcuts
