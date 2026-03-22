@@ -72,7 +72,9 @@
 
       <!-- Quizzes Tab -->
       <div id="tab-quizzes-content">
+        <div id="quizzes-action-bar" class="scrap-action-bar" style="display:none"></div>
         <div class="history-grid" id="quizzes-grid"></div>
+        <div id="quizzes-pager" class="pager"></div>
         <div class="history-empty" id="quizzes-empty" style="display:none">
           <div class="history-empty-icon">📝</div>
           <h2 class="history-empty-title">아직 퀴즈 기록이 없습니다</h2>
@@ -83,7 +85,9 @@
 
       <!-- Documents Tab -->
       <div id="tab-documents-content" style="display:none">
+        <div id="documents-action-bar" class="scrap-action-bar" style="display:none"></div>
         <div class="history-grid" id="documents-grid"></div>
+        <div id="documents-pager" class="pager"></div>
         <div class="history-empty" id="documents-empty" style="display:none">
           <div class="history-empty-icon">📄</div>
           <h2 class="history-empty-title">저장된 문서가 없습니다</h2>
@@ -94,9 +98,10 @@
 
       <!-- Scrap Tab -->
       <div id="tab-scrap-content" style="display:none">
+        <div id="scrap-action-bar" class="scrap-action-bar" style="display:none"></div>
         <div id="scrap-filter-bar" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;"></div>
         <div id="scrap-list"></div>
-        <div id="scrap-action-bar" class="scrap-action-bar" style="display:none"></div>
+        <div id="scrap-pager" class="pager"></div>
         <div id="scrap-empty-msg" style="display:none" class="history-empty">
           <div class="history-empty-icon">🔖</div>
           <h2 class="history-empty-title">스크랩한 문제가 없습니다</h2>

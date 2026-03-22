@@ -634,8 +634,13 @@ body {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  margin-top: 8px;
+  margin-bottom: 12px;
 }
+.pager { display:flex; justify-content:center; align-items:center; gap:4px; margin-top:16px; flex-wrap:wrap; }
+.pager-btn { min-width:36px; height:36px; border-radius:var(--radius-md); border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-secondary); font-family:var(--font); font-size:13px; font-weight:600; cursor:pointer; transition:all var(--transition); }
+.pager-btn:hover { border-color:rgba(124,58,237,0.4); color:var(--text-primary); }
+.pager-btn.active { background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(37,99,235,0.2)); border-color:rgba(124,58,237,0.5); color:var(--text-primary); }
+.pager-btn:disabled { opacity:0.4; cursor:default; }
 .scrap-action-bar.has-selection {
   background: rgba(245,158,11,0.06);
   border-color: rgba(245,158,11,0.25);

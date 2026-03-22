@@ -26,6 +26,10 @@ let selectedQuizIds = new Set();
 let selectedDocIds = new Set();
 let quizSelectMode = false;
 let docSelectMode = false;
+let quizPage = 1;
+let docPage = 1;
+let scrapPage = 1;
+const PAGE_SIZE = 12;
 
 // ─── Init ───
 async function init() {
@@ -124,12 +128,18 @@ function renderQuizGrid() {
     grid.style.display = 'none';
     empty.style.display = '';
     if (actionBar) actionBar.style.display = 'none';
+    renderPager('quizzes-pager', 0, 1, () => {});
     return;
   }
 
+  const totalPages = Math.ceil(allQuizzes.length / PAGE_SIZE);
+  if (quizPage > totalPages) quizPage = totalPages;
+  const paged = allQuizzes.slice((quizPage - 1) * PAGE_SIZE, quizPage * PAGE_SIZE);
+
   grid.style.display = '';
   empty.style.display = 'none';
-  grid.innerHTML = allQuizzes.map(q => renderQuizCard(q)).join('');
+  grid.innerHTML = paged.map(q => renderQuizCard(q)).join('');
+  renderPager('quizzes-pager', allQuizzes.length, quizPage, p => { quizPage = p; renderQuizGrid(); });
 
   if (quizSelectMode) {
     grid.querySelectorAll('.history-card').forEach(card => {
@@ -159,13 +169,8 @@ function renderQuizGrid() {
 }
 
 function renderQuizActionBar() {
-  let bar = document.getElementById('quizzes-action-bar');
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'quizzes-action-bar';
-    bar.className = 'scrap-action-bar';
-    document.getElementById('tab-quizzes-content').appendChild(bar);
-  }
+  const bar = document.getElementById('quizzes-action-bar');
+  if (!bar) return;
 
   if (allQuizzes.length === 0) { bar.style.display = 'none'; return; }
   bar.style.display = '';
@@ -270,12 +275,18 @@ function renderDocGrid() {
     grid.style.display = 'none';
     empty.style.display = '';
     if (actionBar) actionBar.style.display = 'none';
+    renderPager('documents-pager', 0, 1, () => {});
     return;
   }
 
+  const totalPages = Math.ceil(allDocuments.length / PAGE_SIZE);
+  if (docPage > totalPages) docPage = totalPages;
+  const paged = allDocuments.slice((docPage - 1) * PAGE_SIZE, docPage * PAGE_SIZE);
+
   grid.style.display = '';
   empty.style.display = 'none';
-  grid.innerHTML = allDocuments.map(d => renderDocCard(d)).join('');
+  grid.innerHTML = paged.map(d => renderDocCard(d)).join('');
+  renderPager('documents-pager', allDocuments.length, docPage, p => { docPage = p; renderDocGrid(); });
 
   if (docSelectMode) {
     grid.querySelectorAll('.history-card').forEach(card => {
@@ -303,13 +314,8 @@ function renderDocGrid() {
 }
 
 function renderDocActionBar() {
-  let bar = document.getElementById('documents-action-bar');
-  if (!bar) {
-    bar = document.createElement('div');
-    bar.id = 'documents-action-bar';
-    bar.className = 'scrap-action-bar';
-    document.getElementById('tab-documents-content').appendChild(bar);
-  }
+  const bar = document.getElementById('documents-action-bar');
+  if (!bar) return;
 
   if (allDocuments.length === 0) { bar.style.display = 'none'; return; }
   bar.style.display = '';
@@ -420,6 +426,7 @@ function renderScrapFilter() {
   bar.querySelectorAll('[data-filter]').forEach(btn => {
     btn.addEventListener('click', () => {
       scrapFilter = btn.dataset.filter;
+      scrapPage = 1;
       renderScrapFilter();
       renderScrapList();
     });
@@ -448,9 +455,12 @@ function renderScrapGrid() {
   const list = document.getElementById('scrap-list');
   if (!list) return;
   const filtered = getScrapFiltered();
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  if (scrapPage > totalPages) scrapPage = Math.max(1, totalPages);
+  const paged = filtered.slice((scrapPage - 1) * PAGE_SIZE, scrapPage * PAGE_SIZE);
   const typeLabels = { mcq: '객관식', short: '주관식', ox: 'OX' };
 
-  list.innerHTML = `<div class="scrap-sq-grid">${filtered.map(s => {
+  list.innerHTML = `<div class="scrap-sq-grid">${paged.map(s => {
     const stem = stripMarkdown(s.question);
     const isSelected = selectedScrapIds.has(s.id);
     return `
@@ -485,6 +495,7 @@ function renderScrapGrid() {
       if (s) openScrapViewModal(s);
     });
   });
+  renderPager('scrap-pager', filtered.length, scrapPage, p => { scrapPage = p; renderScrapGrid(); renderScrapActionBar(); });
 }
 
 function renderScrapActionBar() {
@@ -752,6 +763,29 @@ function confirmDelete(type, id, desc) {
 }
 
 // ─── Toast ───
+// ─── 페이지네이션 ───
+function renderPager(containerId, totalItems, currentPage, onPageChange) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+  let html = `<button class="pager-btn" ${currentPage <= 1 ? 'disabled' : ''} data-p="${currentPage - 1}">‹</button>`;
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  if (start > 1) html += `<button class="pager-btn" data-p="1">1</button>${start > 2 ? '<span style="color:var(--text-muted)">…</span>' : ''}`;
+  for (let i = start; i <= end; i++) {
+    html += `<button class="pager-btn${i === currentPage ? ' active' : ''}" data-p="${i}">${i}</button>`;
+  }
+  if (end < totalPages) html += `${end < totalPages - 1 ? '<span style="color:var(--text-muted)">…</span>' : ''}<button class="pager-btn" data-p="${totalPages}">${totalPages}</button>`;
+  html += `<button class="pager-btn" ${currentPage >= totalPages ? 'disabled' : ''} data-p="${currentPage + 1}">›</button>`;
+
+  el.innerHTML = html;
+  el.querySelectorAll('.pager-btn:not(:disabled)').forEach(btn => {
+    btn.addEventListener('click', () => onPageChange(Number(btn.dataset.p)));
+  });
+}
+
 function showToast(msg, type = 'success') {
   const container = document.getElementById('toast-container');
   if (!container) return;
