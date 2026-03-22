@@ -61,7 +61,7 @@ export async function onRequestGet(context) {
     }
 
     if (type === 'games') {
-      const games = await getGames(accessToken);
+      const games = await getGames(accessToken, token);
       return json({ games });
     }
 
@@ -472,7 +472,7 @@ async function getComments(accessToken) {
 }
 
 // ─── Firestore: 게임 목록 ───
-async function getGames(accessToken) {
+async function getGames(accessToken, idToken) {
   // Firestore + RTDB 병합 (RTDB 상태가 최신)
   const [fsRes, rtdbRes] = await Promise.all([
     fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`, {
@@ -486,7 +486,7 @@ async function getGames(accessToken) {
         },
       }),
     }),
-    fetch(`${RTDB_BASE}/game_realtime.json?auth=${accessToken}&orderBy="$key"&limitToLast=200`).catch(() => null),
+    fetch(`${RTDB_BASE}/game_realtime.json?auth=${idToken}`).catch(() => null),
   ]);
 
   // RTDB 데이터 맵
