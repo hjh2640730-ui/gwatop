@@ -97,7 +97,7 @@ function toggleBookmark(postId, title) {
 // ─── Share ───
 async function handleShare(postId, title) {
   const url = `${location.origin}/post.html?id=${postId}`;
-  const text = title || '놀이터 게시글';
+  const text = title || '게시판 게시글';
   if (navigator.share) {
     try {
       await navigator.share({ title: text, url });

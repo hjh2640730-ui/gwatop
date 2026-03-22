@@ -107,7 +107,7 @@ async function loadPost() {
     }
     postData = { id: snap.id, ...snap.data() };
     // 동적 타이틀
-    if (postData.title) document.title = `${postData.title} - GWATOP 놀이터`;
+    if (postData.title) document.title = `${postData.title} - GWATOP 게시판`;
     await checkPostLiked();
     renderPost();
     loadComments();
@@ -265,7 +265,7 @@ function renderPostFooter() {
 // ─── Share ───
 async function handleShare() {
   const url = `${location.origin}/post.html?id=${postId}`;
-  const title = postData?.title || '놀이터 게시글';
+  const title = postData?.title || '게시판 게시글';
   if (navigator.share) {
     try { await navigator.share({ title, url }); return; } catch { /* 취소 시 fallback */ }
   }
