@@ -10,7 +10,7 @@ import {
   getDocs, getDoc, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
-  ref as rtdbRef, onValue,
+  ref as rtdbRef, onValue, push as rtdbPush, set as rtdbSet,
   query as rtdbQuery, orderByChild, equalTo
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
@@ -854,7 +854,12 @@ function openChat(gameId) {
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData) }
       );
       if (!res.ok) throw new Error(`REST ${res.status}`);
-    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
+    } catch {
+      try {
+        const newRef = rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`));
+        await rtdbSet(newRef, msgData);
+      } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
+    }
   };
 
   sendBtn.onclick = () => doSend();
