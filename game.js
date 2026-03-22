@@ -23,7 +23,7 @@ let pendingListener = null;
 let pendingPollingId = null;
 let countdownInterval = null;
 let allRoomDocs = [];
-let chatPollId = null;
+let chatSSE = null;
 let chatHostUid = null;
 let chatServerMsgs = [];
 let chatPendingMsgs = new Map();
@@ -834,8 +834,12 @@ async function submitFinal(finalHand) {
 // ─── 채팅 ───
 const RTDB_CHAT_URL = 'https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat';
 
-function openChat(gameId) {
-  if (chatPollId) { clearInterval(chatPollId); chatPollId = null; }
+function closeChatSSE() {
+  if (chatSSE) { chatSSE.close(); chatSSE = null; }
+}
+
+async function openChat(gameId) {
+  closeChatSSE();
   chatServerMsgs = [];
   chatPendingMsgs = new Map();
   document.getElementById('chat-section').style.display = '';
@@ -867,36 +871,78 @@ function openChat(gameId) {
       showToast('채팅 전송 실패', 'error');
     }
     chatPendingMsgs.delete(tempKey);
-    pollChat(gameId);
   };
 
   sendBtn.onclick = () => doSend();
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); doSend(); } };
 
-  // REST 폴링으로 채팅 수신 (1.5초 간격)
-  pollChat(gameId);
-  chatPollId = setInterval(() => pollChat(gameId), 1500);
+  // SSE로 채팅 실시간 수신
+  startChatSSE(gameId);
 }
 
-async function pollChat(gameId) {
+async function startChatSSE(gameId) {
+  closeChatSSE();
   if (!currentUser) return;
   try {
     const idToken = await currentUser.getIdToken();
-    const res = await fetch(`${RTDB_CHAT_URL}/${gameId}.json?auth=${idToken}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    chatServerMsgs = [];
-    if (data) {
-      Object.entries(data).forEach(([key, val]) => chatServerMsgs.push({ id: key, ...val }));
-      chatServerMsgs.sort((a, b) => a.createdAt - b.createdAt);
+    const es = new EventSource(`${RTDB_CHAT_URL}/${gameId}.json?auth=${idToken}`);
+    chatSSE = es;
+
+    es.addEventListener('put', (e) => {
+      try {
+        const { path, data } = JSON.parse(e.data);
+        if (path === '/') {
+          // 전체 데이터 (초기 로드 또는 전체 교체)
+          chatServerMsgs = [];
+          if (data) {
+            Object.entries(data).forEach(([key, val]) => chatServerMsgs.push({ id: key, ...val }));
+            chatServerMsgs.sort((a, b) => a.createdAt - b.createdAt);
+          }
+        } else {
+          // 개별 메시지 추가/수정 (path: "/-OoKK...")
+          const key = path.slice(1);
+          if (data) {
+            const idx = chatServerMsgs.findIndex(m => m.id === key);
+            if (idx >= 0) chatServerMsgs[idx] = { id: key, ...data };
+            else chatServerMsgs.push({ id: key, ...data });
+            chatServerMsgs.sort((a, b) => a.createdAt - b.createdAt);
+          }
+        }
+        removePendingMatches();
+        renderChatMerged();
+      } catch { /* ignore parse errors */ }
+    });
+
+    es.addEventListener('patch', (e) => {
+      try {
+        const { path, data } = JSON.parse(e.data);
+        if (path === '/' && data) {
+          Object.entries(data).forEach(([key, val]) => {
+            const idx = chatServerMsgs.findIndex(m => m.id === key);
+            if (idx >= 0) chatServerMsgs[idx] = { id: key, ...val };
+            else chatServerMsgs.push({ id: key, ...val });
+          });
+          chatServerMsgs.sort((a, b) => a.createdAt - b.createdAt);
+          removePendingMatches();
+          renderChatMerged();
+        }
+      } catch { /* ignore */ }
+    });
+
+    es.onerror = () => {
+      // 연결 끊기면 새 토큰으로 재연결
+      closeChatSSE();
+      setTimeout(() => startChatSSE(gameId), 2000);
+    };
+  } catch { /* ignore */ }
+}
+
+function removePendingMatches() {
+  for (const [key, pd] of chatPendingMsgs) {
+    if (chatServerMsgs.some(s => s.uid === pd.uid && s.createdAt === pd.createdAt)) {
+      chatPendingMsgs.delete(key);
     }
-    for (const [key, pd] of chatPendingMsgs) {
-      if (chatServerMsgs.some(s => s.uid === pd.uid && s.createdAt === pd.createdAt)) {
-        chatPendingMsgs.delete(key);
-      }
-    }
-    renderChatMerged();
-  } catch { /* ignore polling errors */ }
+  }
 }
 
 function renderChatMerged() {
@@ -938,10 +984,7 @@ function closeModal() {
     activeGameListener();
     activeGameListener = null;
   }
-  if (chatPollId) {
-    clearInterval(chatPollId);
-    chatPollId = null;
-  }
+  closeChatSSE();
   chatHostUid = null;
   document.getElementById('chat-section').style.display = 'none';
   if (handScene) { handScene.dispose(); handScene = null; }
