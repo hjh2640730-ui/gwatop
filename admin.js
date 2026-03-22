@@ -194,7 +194,7 @@ function renderGames(games) {
   }).join('');
   body.querySelectorAll('.game-cancel-btn').forEach(btn => {
     btn.addEventListener('click', () => openGenericDelete(
-      '게임 취소', '이 게임을 강제 취소하시겠습니까?',
+      '게임 강제 취소 + 환불', '이 게임을 강제 취소하고 양쪽 포인트를 환불하시겠습니까?',
       async () => {
         const idToken = await currentUser.getIdToken();
         const res = await fetch('/api/admin', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: idToken, action: 'cancelGame', gameId: btn.dataset.id }) });
@@ -203,7 +203,8 @@ function renderGames(games) {
         const game = allGames.find(g => g.id === btn.dataset.id);
         if (game) game.status = 'cancelled';
         renderGames(filterGames());
-        showToast('게임이 취소됐습니다.', 'success');
+        const refundMsg = d.refunded?.length ? ` (${d.refunded.length}명 환불 완료)` : '';
+        showToast(`게임이 취소됐습니다${refundMsg}`, 'success');
       }
     ));
   });

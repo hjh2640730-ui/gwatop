@@ -180,8 +180,32 @@ export async function onRequestPost(context) {
     if (!gameId) return json({ error: 'gameId 누락' }, 400);
     try {
       const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
+      // 게임 조회하여 환불 처리
+      const gameUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/games/${gameId}`;
+      const gameRes = await fetch(gameUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+      let refunded = [];
+      if (gameRes.ok) {
+        const gameDoc = await gameRes.json();
+        const f = gameDoc.fields || {};
+        const status = f.status?.stringValue;
+        const wager = parseInt(f.wager?.integerValue || 0);
+        const p1 = f.player1?.mapValue?.fields?.uid?.stringValue;
+        const p2 = f.player2?.mapValue?.fields?.uid?.stringValue;
+        if (status !== 'finished' && status !== 'cancelled' && wager > 0) {
+          const DOC_BASE = `projects/${PROJECT_ID}/databases/(default)/documents`;
+          const writes = [];
+          if (p1) { writes.push({ transform: { document: `${DOC_BASE}/users/${p1}`, fieldTransforms: [{ fieldPath: 'freePoints', increment: { integerValue: String(wager) } }] } }); refunded.push(p1); }
+          if (p2) { writes.push({ transform: { document: `${DOC_BASE}/users/${p2}`, fieldTransforms: [{ fieldPath: 'freePoints', increment: { integerValue: String(wager) } }] } }); refunded.push(p2); }
+          if (writes.length) {
+            await fetch(`https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:commit`, {
+              method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ writes }),
+            });
+          }
+        }
+      }
       await patchFirestoreDoc(`games/${gameId}`, { status: { stringValue: 'cancelled' } }, ['status'], accessToken);
-      return json({ success: true });
+      return json({ success: true, refunded });
     } catch (e) { return json({ error: e.message }, 500); }
   }
 
