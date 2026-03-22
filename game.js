@@ -11,7 +11,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
   ref as rtdbRef, onValue,
-  query as rtdbQuery, orderByChild, equalTo
+  query as rtdbQuery, orderByChild
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 let currentUser = null;
@@ -370,6 +370,17 @@ function renderRooms(docs) {
         </div>
       </div>`;
     }
+    if (g.status === 'ready' || g.status === 'hands_shown') {
+      return `<div class="room-card playing">
+        <div class="room-card-left">
+          <div>${titleHtml}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="room-playing-badge">⚔️ 대결중</span>
+          <span class="room-wager">🟢 ${g.wager}P</span>
+        </div>
+      </div>`;
+    }
     return `<button class="room-card" data-id="${d.id}">
       <div class="room-card-left">
         <div>${titleHtml}</div>
@@ -404,18 +415,20 @@ function loadRooms() {
   if (roomsListener) { roomsListener(); roomsListener = null; }
   if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
 
-  const roomsRef = rtdbQuery(
-    rtdbRef(rtdb, 'game_realtime'),
-    orderByChild('status'),
-    equalTo('waiting')
-  );
+  const roomsRef = rtdbRef(rtdb, 'game_realtime');
   roomsListener = onValue(roomsRef, snap => {
     const now = Date.now();
     allRoomDocs = [];
     snap.forEach(child => {
       const g = child.val();
-      if (g.createdAt && now - g.createdAt > 10 * 60 * 1000) return;
+      if (!g.status || g.status === 'finished' || g.status === 'cancelled') return;
+      if (g.status === 'waiting' && g.createdAt && now - g.createdAt > 10 * 60 * 1000) return;
       allRoomDocs.push({ id: child.key, data: () => g });
+    });
+    allRoomDocs.sort((a, b) => {
+      const sa = a.data().status === 'waiting' ? 0 : 1;
+      const sb = b.data().status === 'waiting' ? 0 : 1;
+      return sa - sb;
     });
     const searchQuery = document.getElementById('room-search')?.value.trim() || '';
     renderRooms(filterRooms(searchQuery));
