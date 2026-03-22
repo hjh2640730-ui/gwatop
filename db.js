@@ -263,29 +263,6 @@ export function clearPendingQuiz() {
   sessionStorage.removeItem('gwatop_pending_quiz');
 }
 
-// ─── Shared Quizzes ───
-export async function saveSharedQuiz(uid, docName, questions, type) {
-  if (!firestoreDb) throw new Error('Firestore 연결 실패');
-  const ref = await addDoc(collection(firestoreDb, 'shared_quizzes'), {
-    uid: uid || null,
-    docName,
-    questions,
-    type,
-    totalQuestions: questions.length,
-    createdAt: Date.now()
-  });
-  return ref.id;
-}
-
-export async function getSharedQuiz(shareId) {
-  if (!firestoreDb) return null;
-  try {
-    const snap = await getDoc(doc(firestoreDb, 'shared_quizzes', shareId));
-    if (!snap.exists()) return null;
-    return snap.data();
-  } catch { return null; }
-}
-
 // ─── Guest Quota (localStorage) ───
 export function getGuestQuizCount() {
   const today = new Date().toDateString();

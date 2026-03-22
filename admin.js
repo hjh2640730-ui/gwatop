@@ -11,7 +11,6 @@ let allUsers = [];
 let allPosts = [];
 let allPayments = [];
 let allComments = [];
-let allSharedQuizzes = [];
 let allGames = [];
 let editingUid = null;
 let deletingUid = null;
@@ -23,11 +22,10 @@ let usersLoaded = false;
 let postsLoaded = false;
 let paymentsLoaded = false;
 let commentsLoaded = false;
-let quizzesLoaded = false;
 let gamesLoaded = false;
 
 // ─── 탭 시스템 ───
-const TABS = ['dashboard', 'users', 'posts', 'payments', 'comments', 'quizzes', 'games', 'messages', 'system', 'monitor'];
+const TABS = ['dashboard', 'users', 'posts', 'payments', 'comments', 'games', 'messages', 'system', 'monitor'];
 
 function switchTab(tabName) {
   TABS.forEach(t => {
@@ -45,7 +43,6 @@ function switchTab(tabName) {
   if (tabName === 'payments' && !paymentsLoaded) loadPayments();
   if (tabName === 'messages') setupMessages();
   if (tabName === 'comments' && !commentsLoaded) loadComments();
-  if (tabName === 'quizzes' && !quizzesLoaded) loadSharedQuizzes();
   if (tabName === 'games' && !gamesLoaded) loadGames();
   if (tabName === 'system') setupSystem();
   if (tabName === 'monitor') setupMonitor();
@@ -138,51 +135,6 @@ function renderComments(comments) {
   });
 }
 
-// ─── Load Shared Quizzes ───
-async function loadSharedQuizzes() {
-  quizzesLoaded = false;
-  document.getElementById('quizzes-table-body').innerHTML = '<div class="empty-row">데이터 로딩 중...</div>';
-  try {
-    const idToken = await currentUser.getIdToken();
-    const res = await fetch(`/api/admin?token=${idToken}&type=shared_quizzes`);
-    const data = await res.json();
-    if (!res.ok || data.error) { showToast(data.error || '공유퀴즈 로드 실패', 'error'); return; }
-    allSharedQuizzes = data.quizzes || [];
-    renderSharedQuizzes(allSharedQuizzes);
-    quizzesLoaded = true;
-  } catch (e) { showToast('네트워크 오류: ' + e.message, 'error'); }
-}
-
-function renderSharedQuizzes(quizzes) {
-  const body = document.getElementById('quizzes-table-body');
-  document.getElementById('quizzes-summary').textContent = `총 ${quizzes.length}개`;
-  if (!quizzes.length) { body.innerHTML = '<div class="empty-row">공유된 퀴즈가 없습니다.</div>'; return; }
-  body.innerHTML = quizzes.map(q => `
-    <div class="quizzes-table-row">
-      <div class="td td-name" data-label="제목">${escapeHtml(q.title) || '(제목없음)'}</div>
-      <div class="td" data-label="주제">${escapeHtml(q.subject) || '-'}</div>
-      <div class="td" data-label="작성자">${escapeHtml(q.nickname) || '-'}</div>
-      <div class="td" data-label="문제수">${q.questionCount}</div>
-      <div class="td" data-label="조회">${q.viewCount || 0}</div>
-      <div class="td td-date" data-label="날짜">${formatDate(q.createdAt)}</div>
-      <div class="td"><button class="btn-delete quiz-delete-btn" data-id="${q.id}">삭제</button></div>
-    </div>
-  `).join('');
-  body.querySelectorAll('.quiz-delete-btn').forEach(btn => {
-    btn.addEventListener('click', () => openGenericDelete(
-      '공유퀴즈 삭제', `이 공유퀴즈를 삭제하시겠습니까?<br/><strong>${escapeHtml(allSharedQuizzes.find(q=>q.id===btn.dataset.id)?.title||'')}</strong>`,
-      async () => {
-        const idToken = await currentUser.getIdToken();
-        const res = await fetch('/api/admin', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ token: idToken, action: 'deleteSharedQuiz', quizId: btn.dataset.id }) });
-        const d = await res.json();
-        if (!res.ok || d.error) throw new Error(d.error || '삭제 실패');
-        allSharedQuizzes = allSharedQuizzes.filter(q => q.id !== btn.dataset.id);
-        renderSharedQuizzes(allSharedQuizzes);
-        showToast('공유퀴즈가 삭제됐습니다.', 'success');
-      }
-    ));
-  });
-}
 
 // ─── Load Games ───
 async function loadGames() {
@@ -495,7 +447,6 @@ async function runHealthCheck() {
   const checks = [
     { name: 'Firestore 연결 (유저 API)', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/admin?token=${idToken}`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).users?.length}명 확인`; } },
     { name: '결제 API', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/payment-history?token=${idToken}&all=1`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).payments?.length}건 확인`; } },
-    { name: '공유퀴즈 Firestore', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/admin?token=${idToken}&type=shared_quizzes`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).quizzes?.length}개 확인`; } },
     { name: '게임 Firestore', fn: async () => { const idToken = await currentUser.getIdToken(); const r = await fetch(`/api/admin?token=${idToken}&type=games`); if (!r.ok) throw new Error(r.status); return `${(await r.json()).games?.length}개 확인`; } },
   ];
   container.innerHTML = checks.map(c => `<div class="health-item" id="hc-${c.name}"><div class="health-dot health-pending"></div><span>${c.name}</span><span style="margin-left:auto;font-size:12px;color:var(--text-muted)">확인 중...</span></div>`).join('');
@@ -584,17 +535,15 @@ async function loadDashboard() {
   dashboardLoaded = false;
   try {
     const idToken = await currentUser.getIdToken();
-    const [usersRes, postsRes, paymentsRes, quizzesRes] = await Promise.all([
+    const [usersRes, postsRes, paymentsRes] = await Promise.all([
       fetch(`/api/admin?token=${idToken}`),
       fetch(`/api/admin?token=${idToken}&type=posts`),
       fetch(`/api/payment-history?token=${idToken}&all=1`),
-      fetch(`/api/admin?token=${idToken}&type=shared_quizzes`),
     ]);
 
     const usersData = await usersRes.json();
     const postsData = await postsRes.json();
     const paymentsData = await paymentsRes.json();
-    const quizzesData = await quizzesRes.json();
 
     if (!usersRes.ok || usersData.error) { showToast(usersData.error || '유저 데이터 로드 실패', 'error'); return; }
     if (!postsRes.ok || postsData.error) { showToast(postsData.error || '게시글 데이터 로드 실패', 'error'); return; }
@@ -602,7 +551,6 @@ async function loadDashboard() {
     const users = usersData.users;
     const posts = postsData.posts;
     const payments = paymentsData.payments || [];
-    const sharedQuizzes = quizzesData.quizzes || [];
 
     // 오늘 신규 가입자
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -622,11 +570,6 @@ async function loadDashboard() {
     document.getElementById('stat-total-likes').textContent = totalLikes.toLocaleString();
     document.getElementById('stat-total-revenue').textContent = totalRevenue.toLocaleString() + '원';
     document.getElementById('stat-total-payments').textContent = payments.length.toLocaleString() + '건';
-    // 공유퀴즈 수는 대시보드 카드 없으면 skip
-    if (document.getElementById('stat-shared-quizzes')) {
-      document.getElementById('stat-shared-quizzes').textContent = sharedQuizzes.length.toLocaleString();
-    }
-
     dashboardLoaded = true;
   } catch (e) {
     showToast('네트워크 오류: ' + e.message, 'error');
@@ -786,17 +729,6 @@ function setupEvents() {
   });
   document.getElementById('show-deleted-comments').addEventListener('change', () => renderComments(allComments));
   document.getElementById('comments-refresh-btn').addEventListener('click', () => { commentsLoaded = false; loadComments(); });
-
-  // 공유퀴즈 검색
-  document.getElementById('quiz-search-input').addEventListener('input', (e) => {
-    const q = e.target.value.toLowerCase();
-    renderSharedQuizzes(allSharedQuizzes.filter(q2 =>
-      (q2.title||'').toLowerCase().includes(q) ||
-      (q2.subject||'').toLowerCase().includes(q) ||
-      (q2.nickname||'').toLowerCase().includes(q)
-    ));
-  });
-  document.getElementById('quizzes-refresh-btn').addEventListener('click', () => { quizzesLoaded = false; loadSharedQuizzes(); });
 
   // 게임 검색/필터
   document.getElementById('game-search-input').addEventListener('input', () => renderGames(filterGames()));

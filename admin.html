@@ -107,12 +107,6 @@
     .comments-table-row:hover { background:var(--glass-bg-hover); }
     .td-deleted { opacity:0.4; text-decoration:line-through; }
 
-    /* Quizzes 테이블 */
-    .quizzes-table-header { display:grid; grid-template-columns:2.5fr 1fr 1fr 0.7fr 0.7fr 1fr 65px; gap:0; padding:14px 20px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--glass-border); }
-    .quizzes-table-row { display:grid; grid-template-columns:2.5fr 1fr 1fr 0.7fr 0.7fr 1fr 65px; gap:0; padding:14px 20px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; transition:background var(--transition); }
-    .quizzes-table-row:last-child { border-bottom:none; }
-    .quizzes-table-row:hover { background:var(--glass-bg-hover); }
-
     /* Games 테이블 */
     .games-table-header { display:grid; grid-template-columns:1.5fr 1fr 1fr 0.7fr 0.8fr 1.2fr 1fr 80px; gap:0; padding:14px 20px; background:rgba(255,255,255,0.03); border-bottom:1px solid var(--glass-border); }
     .games-table-row { display:grid; grid-template-columns:1.5fr 1fr 1fr 0.7fr 0.8fr 1.2fr 1fr 80px; gap:0; padding:14px 20px; border-bottom:1px solid rgba(255,255,255,0.04); align-items:center; transition:background var(--transition); }
@@ -176,8 +170,8 @@
       .posts-table-row { grid-template-columns:1fr; padding:16px; gap:4px; }
       .payments-table-header { display:none; }
       .payments-table-row { grid-template-columns:1fr; padding:16px; gap:4px; }
-      .comments-table-header,.quizzes-table-header,.games-table-header { display:none; }
-      .comments-table-row,.quizzes-table-row,.games-table-row { grid-template-columns:1fr; padding:16px; gap:4px; }
+      .comments-table-header,.games-table-header { display:none; }
+      .comments-table-row,.games-table-row { grid-template-columns:1fr; padding:16px; gap:4px; }
     }
   </style>
 </head>
@@ -243,7 +237,6 @@
       <button class="admin-tab" data-tab="posts">🎮 놀이터 관리</button>
       <button class="admin-tab" data-tab="payments">💳 결제 내역</button>
       <button class="admin-tab" data-tab="comments">💬 댓글 관리</button>
-      <button class="admin-tab" data-tab="quizzes">📝 공유퀴즈</button>
       <button class="admin-tab" data-tab="games">✊ 게임</button>
       <button class="admin-tab" data-tab="messages">✉️ 메시지</button>
       <button class="admin-tab" data-tab="system">🛠️ 시스템</button>
@@ -368,28 +361,6 @@
       </div>
     </div>
 
-    <!-- 탭 6: 공유퀴즈 관리 -->
-    <div id="tab-quizzes" class="tab-pane" style="display:none">
-      <div class="search-bar">
-        <input class="search-input" id="quiz-search-input" placeholder="🔍  제목, 주제, 작성자로 검색..." />
-        <button class="btn btn-glass" id="quizzes-refresh-btn">🔄 새로고침</button>
-      </div>
-      <div id="quizzes-summary" style="margin-bottom:12px;font-size:13px;color:var(--text-muted)"></div>
-      <div class="table-wrap">
-        <div class="quizzes-table-header">
-          <div class="th">제목</div>
-          <div class="th">주제</div>
-          <div class="th">작성자</div>
-          <div class="th">문제수</div>
-          <div class="th">조회</div>
-          <div class="th">날짜</div>
-          <div class="th">삭제</div>
-        </div>
-        <div class="table-body" id="quizzes-table-body">
-          <div class="empty-row">데이터 로딩 중...</div>
-        </div>
-      </div>
-    </div>
 
     <!-- 탭 7: 게임 모니터링 -->
     <div id="tab-games" class="tab-pane" style="display:none">

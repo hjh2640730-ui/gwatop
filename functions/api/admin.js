@@ -59,11 +59,6 @@ export async function onRequestGet(context) {
       return json({ comments });
     }
 
-    if (type === 'shared_quizzes') {
-      const quizzes = await getSharedQuizzes(accessToken);
-      return json({ quizzes });
-    }
-
     if (type === 'games') {
       const games = await getGames(accessToken);
       return json({ games });
@@ -168,16 +163,6 @@ export async function onRequestPost(context) {
     } catch (e) {
       return json({ error: e.message }, 500);
     }
-  }
-
-  if (action === 'deleteSharedQuiz') {
-    const { quizId } = body;
-    if (!quizId) return json({ error: 'quizId 누락' }, 400);
-    try {
-      const accessToken = await getFirebaseAccessToken(env.FIREBASE_CLIENT_EMAIL, env.FIREBASE_PRIVATE_KEY);
-      await deleteFirestoreDoc(`shared_quizzes/${quizId}`, accessToken);
-      return json({ success: true });
-    } catch (e) { return json({ error: e.message }, 500); }
   }
 
   if (action === 'deleteComment') {
@@ -456,37 +441,6 @@ async function getComments(accessToken) {
       deleted: f.deleted?.booleanValue || false,
       isAnonymous: f.isAnonymous?.booleanValue || false,
       likes: parseInt(f.likes?.integerValue || 0),
-      createdAt: f.createdAt?.timestampValue || null,
-    };
-  });
-}
-
-// ─── Firestore: 공유퀴즈 목록 ───
-async function getSharedQuizzes(accessToken) {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents:runQuery`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: 'shared_quizzes' }],
-        orderBy: [{ field: { fieldPath: 'createdAt' }, direction: 'DESCENDING' }],
-        limit: 300,
-      },
-    }),
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  return data.filter(r => r.document).map(r => {
-    const f = r.document.fields || {};
-    return {
-      id: r.document.name.split('/').pop(),
-      title: f.title?.stringValue || '',
-      subject: f.subject?.stringValue || '',
-      uid: f.uid?.stringValue || '',
-      nickname: f.nickname?.stringValue || '',
-      questionCount: parseInt(f.questionCount?.integerValue || 0),
-      viewCount: parseInt(f.viewCount?.integerValue || 0),
       createdAt: f.createdAt?.timestampValue || null,
     };
   });
