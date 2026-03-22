@@ -79,16 +79,20 @@ export async function onRequestPost(context) {
 
   const truncatedText = text.slice(0, 55000);
 
-  // ─── PDF 캐싱: 동일 텍스트+설정이면 캐시에서 반환 ───
+  // ─── PDF 캐싱: 다른 유저가 같은 PDF+설정이면 캐시에서 반환 ───
+  const requestUid = idToken ? (decodeJWT(idToken)?.user_id || decodeJWT(idToken)?.sub || '') : '';
   const cacheKey = await hashText(`${truncatedText.slice(0, 5000)}|${validTypes.join(',')}|${count}|${language}`);
   if (env.GWATOP_CACHE) {
     try {
       const cached = await env.GWATOP_CACHE.get(`quiz_${cacheKey}`);
       if (cached) {
-        const quiz = JSON.parse(cached);
-        // 캐시된 문제를 셔플해서 반환 (매번 다른 순서)
-        quiz.questions = shuffleArray(quiz.questions).map((q, i) => ({ ...q, id: i + 1 }));
-        return json({ ...quiz, cached: true }, 200);
+        const cacheData = JSON.parse(cached);
+        // 같은 유저면 캐시 스킵 (다양한 문제 제공)
+        if (cacheData._uid !== requestUid) {
+          const quiz = { questions: cacheData.questions };
+          quiz.questions = shuffleArray(quiz.questions).map((q, i) => ({ ...q, id: i + 1 }));
+          return json({ ...quiz, cached: true }, 200);
+        }
       }
     } catch {}
   }
@@ -203,9 +207,9 @@ export async function onRequestPost(context) {
 
     quiz.questions = quiz.questions.map((q, i) => ({ id: i + 1, ...q }));
 
-    // 캐시 저장 (1시간 TTL)
+    // 캐시 저장 (1시간 TTL, uid 포함)
     if (env.GWATOP_CACHE) {
-      try { await env.GWATOP_CACHE.put(`quiz_${cacheKey}`, JSON.stringify(quiz), { expirationTtl: 3600 }); } catch {}
+      try { await env.GWATOP_CACHE.put(`quiz_${cacheKey}`, JSON.stringify({ ...quiz, _uid: requestUid }), { expirationTtl: 3600 }); } catch {}
     }
 
     return json(quiz, 200);
