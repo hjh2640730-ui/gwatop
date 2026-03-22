@@ -100,6 +100,12 @@ export function checkAndShowNicknameModal(user, userData) {
     msg.style.color = 'var(--text-muted)';
     btn.disabled = true;
 
+    if (hasNickname && v === userData.nickname) {
+      msg.textContent = '✅ 현재 사용 중인 닉네임입니다.';
+      msg.style.color = '#34d399';
+      btn.disabled = false;
+      return;
+    }
     const available = await checkNicknameAvailable(v);
     if (available) {
       msg.textContent = '✅ 사용 가능한 닉네임입니다.';
@@ -127,13 +133,15 @@ export function checkAndShowNicknameModal(user, userData) {
     btn.textContent = '저장 중...';
 
     try {
-      // 저장 직전 한번 더 중복 확인 (race condition 방지)
-      const available = await checkNicknameAvailable(nickname);
-      if (!available) {
-        msg.textContent = '❌ 이미 사용 중인 닉네임입니다.';
-        msg.style.color = '#f87171';
-        btn.textContent = '저장';
-        return;
+      // 저장 직전 한번 더 중복 확인 (기존 닉네임 유지 시 스킵)
+      if (!(hasNickname && nickname === userData.nickname)) {
+        const available = await checkNicknameAvailable(nickname);
+        if (!available) {
+          msg.textContent = '❌ 이미 사용 중인 닉네임입니다.';
+          msg.style.color = '#f87171';
+          btn.textContent = '저장';
+          return;
+        }
       }
       await setNickname(user.uid, nickname, selectedIcon);
       modal.classList.remove('visible');
