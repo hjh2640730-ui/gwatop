@@ -20,7 +20,6 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  serverTimestamp,
   increment,
   collection,
   query,
@@ -140,7 +139,7 @@ export async function ensureUserDoc(user, extra = {}) {
         referralCredits: 0,
         totalQuizzes: 0,
         ...(extra.provider ? { provider: extra.provider } : {}),
-        createdAt: serverTimestamp()
+        createdAt: new Date()
       });
       isCreatingNewUser = false;
 
@@ -325,7 +324,6 @@ export function onUserChange(callback) {
         }));
         const ca = userData?.createdAt;
         currentUserCreatedAt = ca?.toDate ? ca.toDate().getTime() : ca?.seconds ? ca.seconds * 1000 : (ca ? new Date(ca).getTime() : 0);
-        console.log('[auth] userCreatedAt:', currentUserCreatedAt, new Date(currentUserCreatedAt).toISOString(), 'raw:', ca);
         try { localStorage.removeItem('gm_cache'); } catch (_) {}
         injectInboxNav(user);
         callback(user, userData);
