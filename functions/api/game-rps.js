@@ -318,6 +318,15 @@ export async function onRequestPost(context) {
 
     const newId = await fsCreate('games', fields, accessToken);
     if (!newId) return json({ error: '게임 생성 실패' }, 500);
+    // RTDB에 초기 노드 생성 (방장도 onValue/채팅 사용 가능하도록)
+    await rtdbSet(newId, {
+      status: 'waiting',
+      wager: w,
+      player1: { uid, name: userData.nickname || user.displayName || '익명', photo: user.photoUrl || '' },
+      player2: null,
+      p1HandsSubmitted: false,
+      p2HandsSubmitted: false,
+    }, accessToken);
     return json({ gameId: newId });
   }
 

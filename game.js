@@ -4,11 +4,14 @@
 
 import { createHandScene } from './hand3d.js';
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange, ensureUserDoc } from './auth.js';
-import { db } from './auth.js';
+import { db, rtdb } from './auth.js';
 import {
   collection, doc, query, where, limit, onSnapshot,
   getDocs, getDoc, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+  ref as rtdbRef, onValue, push as rtdbPush
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 let currentUser = null;
 let currentUserData = null;
@@ -529,10 +532,12 @@ function openGameModal(gameId, isP1) {
 
   openChat(gameId);
   if (activeGameListener) { activeGameListener(); activeGameListener = null; }
-  const gameRef = doc(db, 'games', gameId);
-  activeGameListener = onSnapshot(gameRef, snap => {
+  const gameStateRef = rtdbRef(rtdb, `game_realtime/${gameId}`);
+  activeGameListener = onValue(gameStateRef, snap => {
     if (!snap.exists()) return;
-    syncModal({ id: gameId, ...snap.data() }, isP1);
+    syncModal({ id: gameId, ...snap.val() }, isP1);
+  }, err => {
+    console.error('game state onValue error:', err);
   });
 
   // "건승을 빕니다." 인트로 → 2초 후 선택 화면
@@ -831,18 +836,15 @@ function openChat(gameId) {
   if (chatListener) { chatListener(); chatListener = null; }
   document.getElementById('chat-section').style.display = '';
 
-  const chatQuery = query(
-    collection(db, 'games', gameId, 'messages'),
-    orderBy('createdAt'),
-    limit(50)
-  );
-  chatListener = onSnapshot(chatQuery, snap => {
-    const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const chatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
+  chatListener = onValue(chatRef, snap => {
+    const messages = [];
+    snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
     renderMessages(messages);
   }, err => {
-    console.error('chat onSnapshot error:', err);
+    console.error('chat onValue error:', err.code, err.message);
     const container = document.getElementById('chat-messages');
-    if (container) container.innerHTML = '<div class="chat-empty">채팅을 불러오지 못했습니다</div>';
+    if (container) container.innerHTML = '<div class="chat-empty">채팅 연결 실패 (RTDB 규칙 확인 필요)</div>';
   });
 
   const input = document.getElementById('chat-input');
@@ -853,7 +855,7 @@ function openChat(gameId) {
     if (!text || !currentUser) return;
     input.value = '';
     try {
-      await addDoc(collection(db, 'games', gameId, 'messages'), {
+      await rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`), {
         uid: currentUser.uid,
         name: currentUserData?.nickname || currentUser.displayName || '익명',
         text: text.slice(0, 100),
