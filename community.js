@@ -1077,11 +1077,15 @@ function timeAgo(ts) {
   const m = Math.floor(diff / 60000);
   if (m < 1) return '방금';
   if (m < 60) return `${m}분 전`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}시간 전`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}일 전`;
-  return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  const today = new Date();
+  const isToday = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+  const time = date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
+  if (isToday) return time;
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const isYesterday = date.getFullYear() === yesterday.getFullYear() && date.getMonth() === yesterday.getMonth() && date.getDate() === yesterday.getDate();
+  if (isYesterday) return `어제 ${time}`;
+  if (date.getFullYear() === today.getFullYear()) return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) + ` ${time}`;
+  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function escapeHtml(str) {
