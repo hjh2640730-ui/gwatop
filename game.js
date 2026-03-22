@@ -10,7 +10,7 @@ import {
   getDocs, getDoc, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
-  ref as rtdbRef, onValue, push as rtdbPush, set as rtdbSet,
+  ref as rtdbRef, onValue,
   query as rtdbQuery, orderByChild, equalTo
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
@@ -848,19 +848,13 @@ function openChat(gameId) {
       createdAt: Date.now(),
     };
     try {
-      const newRef = rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`));
-      await rtdbSet(newRef, msgData);
-    } catch (e) {
-      console.warn('chat SDK write failed, trying REST fallback', e);
-      try {
-        const idToken = await currentUser.getIdToken();
-        const res = await fetch(
-          `https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat/${gameId}.json?auth=${idToken}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData) }
-        );
-        if (!res.ok) throw new Error(`REST ${res.status}`);
-      } catch (e2) { console.error('chat send error', e2); showToast('채팅 전송 실패', 'error'); }
-    }
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(
+        `https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat/${gameId}.json?auth=${idToken}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData) }
+      );
+      if (!res.ok) throw new Error(`REST ${res.status}`);
+    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
   };
 
   sendBtn.onclick = () => doSend();
