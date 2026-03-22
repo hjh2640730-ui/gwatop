@@ -33,7 +33,7 @@ function setupNav() {
       lo.style.display = 'none';
       li.style.display = 'flex';
       document.getElementById('nav-avatar').src = user.photoURL || '';
-      document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || '';
+      document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || '');
       const credits = userData?.credits ?? 0;
       document.getElementById('nav-credits').textContent = credits;
       document.getElementById('current-credits').textContent = credits;

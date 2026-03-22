@@ -59,11 +59,22 @@ function escapeHtml(str) {
 // ─── 프로필 렌더 ───
 function renderProfile(user, userData) {
   const name = userData?.nickname || user.displayName || '이름 없음';
-  document.getElementById('mp-name').textContent = name;
+  const icon = userData?.icon || '';
+  document.getElementById('mp-name').textContent = (icon ? icon + ' ' : '') + name;
   document.getElementById('mp-email').textContent = user.email || '';
-  document.getElementById('mp-nickname-display').textContent = userData?.nickname || '미설정';
+  document.getElementById('mp-nickname-display').textContent = (icon ? icon + ' ' : '') + (userData?.nickname || '미설정');
 
-  if (user.photoURL) {
+  if (icon) {
+    // 아이콘이 있으면 프로필 이미지 대신 이모지 표시
+    const img = document.getElementById('mp-avatar');
+    const placeholder = document.getElementById('mp-avatar-placeholder');
+    img.style.display = 'none';
+    if (placeholder) {
+      placeholder.style.display = 'flex';
+      placeholder.textContent = icon;
+      placeholder.style.fontSize = '48px';
+    }
+  } else if (user.photoURL) {
     const img = document.getElementById('mp-avatar');
     img.src = user.photoURL;
     img.style.display = 'block';

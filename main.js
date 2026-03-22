@@ -114,7 +114,7 @@ function updateNavUI(user, userData) {
     navLoggedOut.style.display = 'none';
     navLoggedIn.style.display = 'flex';
     navAvatar.src = user.photoURL || '';
-    navUsername.textContent = userData?.nickname || user.displayName || user.email || '사용자';
+    navUsername.textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || user.email || '사용자');
     const credits = userData?.credits ?? 0;
     document.getElementById('nav-credits').textContent = credits;
     updateCreditTypeUI(userData);
