@@ -215,15 +215,19 @@ export async function onRequestPost(context) {
 
 // ─── Firestore: 유저 목록 ───
 async function getUsers(accessToken) {
-  const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users?pageSize=300`;
-  const res = await fetch(baseUrl, {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
-  if (!res.ok) throw new Error('유저 목록 조회 실패');
-  const data = await res.json();
-  if (!data.documents) return [];
+  const baseUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users`;
+  let allDocs = [];
+  let pageToken = '';
+  do {
+    const url = `${baseUrl}?pageSize=300${pageToken ? `&pageToken=${pageToken}` : ''}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    if (!res.ok) throw new Error('유저 목록 조회 실패');
+    const data = await res.json();
+    if (data.documents) allDocs = allDocs.concat(data.documents);
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
 
-  return data.documents.map(doc => {
+  return allDocs.map(doc => {
     const f = doc.fields || {};
     return {
       uid: f.uid?.stringValue || doc.name.split('/').pop(),
@@ -378,8 +382,10 @@ async function updateUserFields(uid, fields, accessToken) {
   if (!res.ok) throw new Error('유저 정보 업데이트 실패');
 }
 
-// ─── Firebase JWT ───
+// ─── Firebase JWT (캐시) ───
+let _cachedToken = null, _tokenExpiry = 0;
 async function getFirebaseAccessToken(clientEmail, privateKey) {
+  if (_cachedToken && Date.now() < _tokenExpiry) return _cachedToken;
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'RS256', typ: 'JWT' };
   const payload = {
@@ -415,7 +421,9 @@ async function getFirebaseAccessToken(clientEmail, privateKey) {
   });
   const tokenData = await tokenRes.json();
   if (!tokenData.access_token) throw new Error('Access token 발급 실패');
-  return tokenData.access_token;
+  _cachedToken = tokenData.access_token;
+  _tokenExpiry = Date.now() + 50 * 60 * 1000; // 50분 캐시
+  return _cachedToken;
 }
 
 // ─── Firestore: 댓글 목록 (collectionGroup) ───
