@@ -215,9 +215,11 @@ export async function checkNicknameAvailable(nickname) {
 }
 
 // ─── 닉네임 저장 ───
-export async function setNickname(uid, nickname) {
+export async function setNickname(uid, nickname, icon) {
   if (!isConfigured || !db) return;
-  await updateDoc(doc(db, 'users', uid), { nickname });
+  const data = { nickname };
+  if (icon) data.icon = icon;
+  await updateDoc(doc(db, 'users', uid), data);
 }
 
 // ─── Get Credits ───

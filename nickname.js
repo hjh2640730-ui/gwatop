@@ -6,6 +6,7 @@
 import { checkNicknameAvailable, setNickname } from './auth.js';
 
 const MODAL_ID = 'nickname-modal';
+const ICON_OPTIONS = ['😀','😎','🤓','🧐','😇','🤠','👻','🐱','🐶','🦊','🐻','🐼','🐸','🦄','🐲','🌟','⚡','🔥','💎','🎯','🎮','🏆','🎵','🍀','🌈','🚀','🪐','👑','🤖','🎭'];
 
 function injectModal() {
   if (document.getElementById(MODAL_ID)) return;
@@ -13,9 +14,12 @@ function injectModal() {
   el.innerHTML = `
     <div class="modal-overlay" id="${MODAL_ID}" style="z-index:200">
       <div class="modal" style="max-width:420px">
-        <div class="modal-icon">✏️</div>
-        <h2 class="modal-title">닉네임 설정</h2>
-        <p class="modal-desc" style="margin-bottom:20px">놀이터에서 사용할 닉네임을 설정하세요.<br/><span style="font-size:13px;color:var(--text-muted)">한글·영문·숫자, 2~16자</span></p>
+        <div class="modal-icon" id="nickname-preview-icon" style="cursor:pointer;transition:transform 0.2s">😀</div>
+        <h2 class="modal-title">프로필 설정</h2>
+        <p class="modal-desc" style="margin-bottom:16px">아이콘과 닉네임을 설정하세요.<br/><span style="font-size:13px;color:var(--text-muted)">한글·영문·숫자, 2~16자</span></p>
+        <div id="nickname-icon-grid" style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-bottom:16px;max-height:120px;overflow-y:auto;padding:8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-md);">
+          ${ICON_OPTIONS.map((e, i) => `<button class="nick-icon-btn${i === 0 ? ' selected' : ''}" data-icon="${e}" style="font-size:22px;padding:4px;border:2px solid transparent;border-radius:8px;background:none;cursor:pointer;transition:all 0.15s;line-height:1">${e}</button>`).join('')}
+        </div>
         <input
           id="nickname-input"
           type="text"
@@ -29,8 +33,15 @@ function injectModal() {
         </div>
       </div>
     </div>
+    <style>
+      .nick-icon-btn:hover { background:rgba(124,58,237,0.15) !important; transform:scale(1.15); }
+      .nick-icon-btn.selected { border-color:#a78bfa !important; background:rgba(124,58,237,0.2) !important; }
+    </style>
   `;
   document.body.appendChild(el.firstElementChild);
+  // style도 추가
+  const styleEl = el.querySelector('style');
+  if (styleEl) document.head.appendChild(styleEl);
 }
 
 export function checkAndShowNicknameModal(user, userData) {
@@ -41,15 +52,31 @@ export function checkAndShowNicknameModal(user, userData) {
   const input = document.getElementById('nickname-input');
   const msg = document.getElementById('nickname-msg');
   const btn = document.getElementById('nickname-save-btn');
+  const previewIcon = document.getElementById('nickname-preview-icon');
+  const iconGrid = document.getElementById('nickname-icon-grid');
 
   // 이미 열려있으면 스킵
   if (modal.classList.contains('visible')) return;
 
   // 초기화
+  let selectedIcon = ICON_OPTIONS[0];
   input.value = '';
   msg.textContent = '';
   msg.style.color = '';
   btn.disabled = true;
+  previewIcon.textContent = selectedIcon;
+
+  // 아이콘 선택
+  iconGrid.addEventListener('click', (e) => {
+    const iconBtn = e.target.closest('.nick-icon-btn');
+    if (!iconBtn) return;
+    selectedIcon = iconBtn.dataset.icon;
+    previewIcon.textContent = selectedIcon;
+    previewIcon.style.transform = 'scale(1.2)';
+    setTimeout(() => previewIcon.style.transform = '', 150);
+    iconGrid.querySelectorAll('.nick-icon-btn').forEach(b => b.classList.remove('selected'));
+    iconBtn.classList.add('selected');
+  });
 
   modal.classList.add('visible');
   setTimeout(() => input.focus(), 100);
@@ -109,12 +136,12 @@ export function checkAndShowNicknameModal(user, userData) {
         btn.textContent = '저장';
         return;
       }
-      await setNickname(user.uid, nickname);
+      await setNickname(user.uid, nickname, selectedIcon);
       modal.classList.remove('visible');
-      // nav 닉네임 즉시 업데이트
+      // nav 즉시 업데이트
       const navUsername = document.getElementById('nav-username');
       if (navUsername) navUsername.textContent = nickname;
-      window.dispatchEvent(new CustomEvent('nickname-set', { detail: { nickname } }));
+      window.dispatchEvent(new CustomEvent('nickname-set', { detail: { nickname, icon: selectedIcon } }));
     } catch (e) {
       msg.textContent = '오류가 발생했습니다. 다시 시도해주세요.';
       msg.style.color = '#f87171';
