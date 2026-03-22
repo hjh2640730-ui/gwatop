@@ -606,9 +606,14 @@ function handleNext() {
     renderQuestion(currentIdx);
     return;
   }
-  // 마지막 답한 문제에서 결과로
-  if (answeredState[currentIdx] && currentIdx >= questions.length - 1 && !generatingMore) {
-    showResults();
+  // 마지막 답한 문제에서 결과로 (또는 스트리밍 대기)
+  if (answeredState[currentIdx] && currentIdx >= questions.length - 1) {
+    if (generatingMore) {
+      waitingForQuestions = true;
+      showWaitingForQuestions();
+    } else {
+      showResults();
+    }
     return;
   }
 
