@@ -161,6 +161,7 @@ function renderQuestion(idx) {
   explanationBox.classList.remove('visible');
   const scrapBtn = document.getElementById('scrap-btn');
   if (scrapBtn) scrapBtn.style.display = 'none';
+  scrapBtnForIdx = -1;
 
   // Type badge
   const types = { mcq: '📝 객관식', short: '✏️ 주관식', ox: '⭕ OX 퀴즈' };
@@ -734,21 +735,19 @@ function formatAnswer(ans) {
 
 
 // ─── 스크랩 ───
-let scrapBtnReady = true;
+let scrapBtnForIdx = -1;
 
 function updateScrapBtn(idx) {
   const btn = document.getElementById('scrap-btn');
   if (!btn) return;
+  scrapBtnForIdx = idx;
   const isScrapped = scrappedMap.has(idx);
   btn.textContent = isScrapped ? '🔖 스크랩됨' : '🔖 스크랩';
   btn.classList.toggle('scrapped', isScrapped);
-  // 버튼이 새로 표시될 때 잠시 클릭 방지
-  scrapBtnReady = false;
-  setTimeout(() => { scrapBtnReady = true; }, 300);
 }
 
 async function toggleScrap() {
-  if (!scrapBtnReady) return;
+  if (scrapBtnForIdx !== currentIdx) return;
   if (!currentUser) {
     showToast('로그인 후 스크랩할 수 있습니다.', 'error');
     return;
