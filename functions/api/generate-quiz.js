@@ -78,6 +78,43 @@ export async function onRequestPost(context) {
   if (!count || count < 1 || count > 50) return json({ error: '문제 개수는 1~50 사이여야 합니다.' }, 400);
 
   const truncatedText = text.slice(0, 55000);
+
+  // ─── PDF 캐싱: 동일 텍스트+설정이면 캐시에서 반환 ───
+  const cacheKey = await hashText(`${truncatedText.slice(0, 5000)}|${validTypes.join(',')}|${count}|${language}`);
+  if (env.GWATOP_CACHE) {
+    try {
+      const cached = await env.GWATOP_CACHE.get(`quiz_${cacheKey}`);
+      if (cached) {
+        const quiz = JSON.parse(cached);
+        // 캐시된 문제를 셔플해서 반환 (매번 다른 순서)
+        quiz.questions = shuffleArray(quiz.questions).map((q, i) => ({ ...q, id: i + 1 }));
+        return json({ ...quiz, cached: true }, 200);
+      }
+    } catch {}
+  }
+
+  // ─── 요청 큐: Gemini 동시 요청 수 제한 ───
+  const QUEUE_KEY = 'gemini_active';
+  const MAX_CONCURRENT = 15;
+  let queuePosition = 0;
+  if (env.GWATOP_CACHE) {
+    for (let wait = 0; wait < 30; wait++) {
+      const active = parseInt(await env.GWATOP_CACHE.get(QUEUE_KEY) || '0');
+      if (active < MAX_CONCURRENT) {
+        await env.GWATOP_CACHE.put(QUEUE_KEY, String(active + 1), { expirationTtl: 120 });
+        break;
+      }
+      queuePosition = active - MAX_CONCURRENT + 1;
+      if (wait === 0) {
+        // 첫 대기 시 유저에게 알림 (429 + 대기 정보)
+      }
+      if (wait >= 20) {
+        return json({ error: '현재 퀴즈 생성 요청이 많습니다. 잠시 후 다시 시도해주세요.', queue: true, position: queuePosition }, 429);
+      }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+
   const prompt = buildPrompt(truncatedText, validTypes, Math.min(parseInt(count), 50), language);
 
   try {
@@ -165,12 +202,42 @@ export async function onRequestPost(context) {
     }
 
     quiz.questions = quiz.questions.map((q, i) => ({ id: i + 1, ...q }));
+
+    // 캐시 저장 (1시간 TTL)
+    if (env.GWATOP_CACHE) {
+      try { await env.GWATOP_CACHE.put(`quiz_${cacheKey}`, JSON.stringify(quiz), { expirationTtl: 3600 }); } catch {}
+    }
+
     return json(quiz, 200);
 
   } catch (err) {
     console.error('Unexpected error:', err);
     return json({ error: `서버 오류: ${err.message}` }, 500);
+  } finally {
+    // 큐 해제
+    if (env.GWATOP_CACHE) {
+      try {
+        const active = parseInt(await env.GWATOP_CACHE.get(QUEUE_KEY) || '1');
+        await env.GWATOP_CACHE.put(QUEUE_KEY, String(Math.max(0, active - 1)), { expirationTtl: 120 });
+      } catch {}
+    }
   }
+}
+
+// ─── Cache Helpers ───
+async function hashText(text) {
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 // ─── Rate Limit Helpers ───

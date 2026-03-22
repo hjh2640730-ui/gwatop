@@ -340,17 +340,22 @@ async function generateQuiz(useFreeFirst = false) {
     setLoadingStep(isPreloaded ? 2 : 2, '🤖 AI가 첫 문제를 출제 중...', `첫 ${firstBatch}문제를 먼저 만듭니다. 나머지는 풀면서 자동 생성됩니다`);
 
     const idToken = await currentUser.getIdToken();
-    const response = await fetch('/api/generate-quiz', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: extractedText.slice(0, 60000),
-        types,
-        count: firstBatch,
-        lang,
-        idToken
-      })
-    });
+    const quizBody = JSON.stringify({ text: extractedText.slice(0, 60000), types, count: firstBatch, lang, idToken });
+
+    // 큐 대기 + 재시도 루프
+    let response;
+    for (let retry = 0; retry < 5; retry++) {
+      response = await fetch('/api/generate-quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: quizBody });
+      if (response.status !== 429) break;
+      const errData = await response.json().catch(() => ({}));
+      if (errData.queue) {
+        const pos = errData.position || '?';
+        setLoadingStep(2, `⏳ 대기 중 (${pos}번째)`, '현재 퀴즈 생성 요청이 많습니다. 순서대로 처리 중이니 잠시만 기다려주세요.');
+        await new Promise(r => setTimeout(r, 5000));
+      } else {
+        throw new Error(errData.error || '서버가 혼잡합니다.');
+      }
+    }
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
