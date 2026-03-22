@@ -629,13 +629,22 @@ export async function onRequestPost(context) {
       const isP1 = game.player1?.uid === uid;
       const isP2 = game.player2?.uid === uid;
       if (!isP1 && !isP2) return json({ error: '게임 참가자 아님' }, 403);
-      if (game.status === 'ready'       && isP1 && game.p1HandsSubmitted)  return json({ error: '이미 제출했습니다' }, 400);
-      if (game.status === 'ready'       && isP2 && game.p2HandsSubmitted)  return json({ error: '이미 제출했습니다' }, 400);
-      if (game.status === 'hands_shown' && isP1 && game.p1FinalSubmitted)  return json({ error: '이미 선택했습니다' }, 400);
-      if (game.status === 'hands_shown' && isP2 && game.p2FinalSubmitted)  return json({ error: '이미 선택했습니다' }, 400);
 
-      const winnerId   = isP1 ? game.player2.uid : game.player1.uid;
-      const winnerSide = isP1 ? 'p2' : 'p1';
+      // 이미 제출한 경우: 상대방이 미제출(접속 종료) → 내가 승리
+      const callerAlreadySubmitted =
+        (game.status === 'ready'       && isP1 && game.p1HandsSubmitted)  ||
+        (game.status === 'ready'       && isP2 && game.p2HandsSubmitted)  ||
+        (game.status === 'hands_shown' && isP1 && game.p1FinalSubmitted)  ||
+        (game.status === 'hands_shown' && isP2 && game.p2FinalSubmitted);
+
+      // callerAlreadySubmitted=true → 상대방 타임아웃, 내가 승리
+      // callerAlreadySubmitted=false → 내가 타임아웃, 상대방 승리
+      const winnerId   = callerAlreadySubmitted
+        ? (isP1 ? game.player1.uid : game.player2.uid)
+        : (isP1 ? game.player2.uid : game.player1.uid);
+      const winnerSide = callerAlreadySubmitted
+        ? (isP1 ? 'p1' : 'p2')
+        : (isP1 ? 'p2' : 'p1');
 
       const [p1Doc, p2Doc] = await Promise.all([
         fsGetTx(`users/${game.player1.uid}`, accessToken, txId),

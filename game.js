@@ -4,14 +4,11 @@
 
 import { createHandScene } from './hand3d.js';
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange, ensureUserDoc } from './auth.js';
-import { db, rtdb } from './auth.js';
+import { db } from './auth.js';
 import {
   collection, doc, query, where, limit, onSnapshot,
   getDocs, getDoc, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import {
-  ref as rtdbRef, onValue, push as rtdbPush, off
-} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 let currentUser = null;
 let currentUserData = null;
@@ -42,7 +39,10 @@ let mySelectionEnabled = false;
 let rematchTimeoutId = null;
 let phase1TimerId = null;
 let phase2TimerId = null;
+let opponentWaitTimerId = null;
 let roomsPollingId = null;
+let myHandsSubmitted = false;
+let myFinalHandSubmitted = false;
 
 const ACTIVE_GAME_KEY = 'gwatop_active_game';
 const EMOJI = { '가위': '✌️', '바위': '✊', '보': '🖐️' };
@@ -514,6 +514,8 @@ function openGameModal(gameId, isP1) {
   myHandRemoved = false;
   oppHandRemoved = false;
   mySelectionEnabled = false;
+  myHandsSubmitted = false;
+  myFinalHandSubmitted = false;
   clearPhaseTimers();
   document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => {
     b.classList.remove('selected');
@@ -604,6 +606,7 @@ function syncModal(game, isP1) {
   }
 
   if (game.status === 'finished') {
+    clearOpponentWaitTimer();
     if (!resultShown) {
       resultShown = true;
       stopPhase2Timer();
@@ -787,6 +790,8 @@ async function submitHands(leftHand, rightHand) {
     showToast(data.error, 'error');
     btn.disabled = false;
     document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => b.disabled = false);
+  } else {
+    myHandsSubmitted = true;
   }
 }
 
@@ -812,23 +817,32 @@ async function submitFinal(finalHand) {
   const data = await res.json();
   if (data.error) {
     showToast(data.error, 'error');
+  } else {
+    myFinalHandSubmitted = true;
+    if (data.waiting) {
+      // 상대방 아직 미제출 → 60초 대기 후 상대방 타임아웃 처리
+      startOpponentWaitTimer();
+    }
   }
 }
 
 // ─── 채팅 ───
 function openChat(gameId) {
-  if (chatListener) { off(rtdbRef(rtdb, `game_chat/${gameId}`)); chatListener = null; }
+  if (chatListener) { chatListener(); chatListener = null; }
   document.getElementById('chat-section').style.display = '';
 
-  const chatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
-  chatListener = onValue(chatRef, snap => {
-    const messages = [];
-    snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
+  const chatQuery = query(
+    collection(db, 'games', gameId, 'messages'),
+    orderBy('createdAt'),
+    limit(50)
+  );
+  chatListener = onSnapshot(chatQuery, snap => {
+    const messages = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderMessages(messages);
   }, err => {
-    console.error('chat onValue error:', err);
+    console.error('chat onSnapshot error:', err);
     const container = document.getElementById('chat-messages');
-    if (container) container.innerHTML = '<div class="chat-empty">채팅을 사용할 수 없습니다 (서버 오류)</div>';
+    if (container) container.innerHTML = '<div class="chat-empty">채팅을 불러오지 못했습니다</div>';
   });
 
   const input = document.getElementById('chat-input');
@@ -839,7 +853,7 @@ function openChat(gameId) {
     if (!text || !currentUser) return;
     input.value = '';
     try {
-      await rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`), {
+      await addDoc(collection(db, 'games', gameId, 'messages'), {
         uid: currentUser.uid,
         name: currentUserData?.nickname || currentUser.displayName || '익명',
         text: text.slice(0, 100),
@@ -881,7 +895,7 @@ function closeModal() {
     activeGameListener = null;
   }
   if (chatListener) {
-    off(rtdbRef(rtdb, `game_chat/${activeGameId}`));
+    chatListener();
     chatListener = null;
   }
   document.getElementById('chat-section').style.display = 'none';
@@ -912,7 +926,11 @@ function startPhase1Timer() {
       stopPhase1Timer();
       document.querySelectorAll('#left-hand-choices .hand-btn, #right-hand-choices .hand-btn').forEach(b => b.disabled = true);
       document.getElementById('submit-hands-btn').disabled = true;
-      showToast('시간 초과! 자동 패배 처리됩니다 ⏱', 'warning');
+      if (myHandsSubmitted) {
+        showToast('상대방이 시간 초과! 결과 처리 중... ⏱', 'success');
+      } else {
+        showToast('시간 초과! 자동 패배 처리됩니다 ⏱', 'warning');
+      }
       submitTimeout();
     }
   }, 1000);
@@ -960,9 +978,24 @@ function stopPhase2Timer() {
   if (timerEl) timerEl.style.display = 'none';
 }
 
+function startOpponentWaitTimer() {
+  clearOpponentWaitTimer();
+  opponentWaitTimerId = setTimeout(() => {
+    opponentWaitTimerId = null;
+    if (!activeGameId || !currentUser) return;
+    showToast('상대방이 응답하지 않습니다 ⏱', 'warning');
+    submitTimeout();
+  }, 60000);
+}
+
+function clearOpponentWaitTimer() {
+  if (opponentWaitTimerId) { clearTimeout(opponentWaitTimerId); opponentWaitTimerId = null; }
+}
+
 function clearPhaseTimers() {
   stopPhase1Timer();
   stopPhase2Timer();
+  clearOpponentWaitTimer();
 }
 
 function startRematchTimeout() {
