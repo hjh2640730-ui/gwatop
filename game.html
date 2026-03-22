@@ -54,8 +54,6 @@
     .room-card.playing { opacity: 0.55; cursor: default; border-color: rgba(239,68,68,0.2); }
     .room-playing-badge { font-size: 10px; font-weight: 700; color: #f87171; background: rgba(239,68,68,0.12); border-radius: var(--radius-full); padding: 2px 8px; white-space: nowrap; }
     .room-expire { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-    .room-status-bar { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-muted); margin-bottom:10px; padding:0 2px; }
-    .room-status-bar span { display:flex; align-items:center; gap:4px; }
     .wager-filter { display:flex; gap:4px; margin-bottom:10px; }
     .wager-filter-btn { padding:5px 12px; border-radius:var(--radius-full); border:1px solid var(--glass-border); background:transparent; color:var(--text-muted); font-family:var(--font); font-size:12px; font-weight:600; cursor:pointer; transition:all var(--transition); }
     .wager-filter-btn:hover { border-color:rgba(52,211,153,0.4); color:var(--text-secondary); }
@@ -240,11 +238,6 @@
       <button class="btn btn-glass" id="quick-join-btn" style="flex:1">⚡ 빠른 참가</button>
     </div>
 
-    <!-- Room Status Bar -->
-    <div class="room-status-bar" id="room-status-bar">
-      <span id="room-online-count">접속 중 -</span>
-      <span id="room-count-summary">대기 - · 대결 -</span>
-    </div>
 
     <!-- Wager Filter -->
     <div class="wager-filter" id="wager-filter">

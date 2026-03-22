@@ -374,12 +374,6 @@ function filterRooms(query) {
 
 function updateRoomStatusBar() {
   const waiting = allRoomDocs.filter(d => d.data().status === 'waiting').length;
-  const playing = allRoomDocs.filter(d => d.data().status === 'ready' || d.data().status === 'hands_shown').length;
-  const onlineEst = waiting + playing * 2;
-  const onlineEl = document.getElementById('room-online-count');
-  if (onlineEl) onlineEl.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ade80;margin-right:2px"></span> ${onlineEst}명 접속 중`;
-  const summary = document.getElementById('room-count-summary');
-  if (summary) summary.textContent = `대기 ${waiting} · 대결 ${playing}`;
 
   // 새 방 알림
   if (waiting > prevWaitingCount && prevWaitingCount > 0) {
