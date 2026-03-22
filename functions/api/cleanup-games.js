@@ -51,10 +51,19 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
 
-  // secret으로 무단 호출 방지
+  // secret 또는 공개 호출 허용 (KV 기반 5분 rate limit)
   const secret = url.searchParams.get('secret');
-  if (!env.CLEANUP_SECRET || secret !== env.CLEANUP_SECRET) {
-    return new Response(JSON.stringify({ error: '인증 실패' }), { status: 401, headers: CORS });
+  const isAdmin = env.CLEANUP_SECRET && secret === env.CLEANUP_SECRET;
+  if (!isAdmin) {
+    const RATE_KEY = 'cleanup_last_run';
+    const RATE_LIMIT = 5 * 60 * 1000;
+    try {
+      const last = await env.GWATOP_CACHE?.get(RATE_KEY);
+      if (last && Date.now() - parseInt(last) < RATE_LIMIT) {
+        return new Response(JSON.stringify({ skipped: true }), { status: 200, headers: CORS });
+      }
+      await env.GWATOP_CACHE?.put(RATE_KEY, String(Date.now()), { expirationTtl: 300 });
+    } catch { /* KV 미설정 시 무시 */ }
   }
 
   if (!env.FIREBASE_CLIENT_EMAIL || !env.FIREBASE_PRIVATE_KEY) {

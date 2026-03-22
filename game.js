@@ -87,6 +87,7 @@ function init() {
       }
     }
     loadRooms();
+    triggerCleanup();
   });
 }
 
@@ -1130,6 +1131,10 @@ function stopPhase2Timer() {
   phase2TimerId = null;
   const timerEl = document.getElementById('phase2-timer');
   if (timerEl) timerEl.style.display = 'none';
+}
+
+function triggerCleanup() {
+  fetch('/api/cleanup-games').catch(() => {});
 }
 
 function startOpponentWaitTimer() {
