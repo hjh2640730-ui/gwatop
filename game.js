@@ -531,7 +531,12 @@ function openGameModal(gameId, isP1) {
     if (!snap.exists()) return;
     syncModal({ id: gameId, ...snap.val() }, isP1);
   }, err => {
-    console.error('game state onValue error:', err);
+    console.warn('RTDB game state unavailable, falling back to Firestore:', err.code);
+    // RTDB 보안 규칙 미설정 등으로 실패 시 Firestore onSnapshot으로 자동 전환
+    activeGameListener = onSnapshot(doc(db, 'games', gameId), snap => {
+      if (!snap.exists()) return;
+      syncModal({ id: gameId, ...snap.data() }, isP1);
+    });
   });
 
   // "건승을 빕니다." 인트로 → 2초 후 선택 화면
@@ -830,21 +835,11 @@ function openChat(gameId) {
   if (chatListener) { chatListener(); chatListener = null; }
   document.getElementById('chat-section').style.display = '';
 
-  const chatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
-  chatListener = onValue(chatRef, snap => {
-    const messages = [];
-    snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
-    renderMessages(messages);
-  }, err => {
-    console.error('chat onValue error:', err.code, err.message);
-    const container = document.getElementById('chat-messages');
-    if (container) container.innerHTML = '<div class="chat-empty">채팅 연결 실패 (RTDB 규칙 확인 필요)</div>';
-  });
-
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send-btn');
 
-  const doSend = async () => {
+  // send 함수 — RTDB 실패 시 Firestore로 교체됨
+  let doSend = async () => {
     const text = input.value.trim();
     if (!text || !currentUser) return;
     input.value = '';
@@ -855,11 +850,51 @@ function openChat(gameId) {
         text: text.slice(0, 100),
         createdAt: Date.now(),
       });
-    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
+    } catch (e) {
+      // RTDB write 실패 → Firestore로 폴백
+      try {
+        await addDoc(collection(db, 'games', gameId, 'messages'), {
+          uid: currentUser.uid,
+          name: currentUserData?.nickname || currentUser.displayName || '익명',
+          text: text.slice(0, 100),
+          createdAt: Date.now(),
+        });
+      } catch (e2) { console.error('chat send error', e2); showToast('채팅 전송 실패', 'error'); }
+    }
   };
 
-  sendBtn.onclick = doSend;
+  sendBtn.onclick = () => doSend();
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); doSend(); } };
+
+  // RTDB 채팅 리스너 — 실패 시 Firestore로 자동 전환
+  const rtdbChatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
+  chatListener = onValue(rtdbChatRef, snap => {
+    const messages = [];
+    snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
+    renderMessages(messages);
+  }, err => {
+    console.warn('RTDB chat unavailable, falling back to Firestore:', err.code);
+    // Firestore games/{gameId}/messages 서브컬렉션으로 전환
+    const fsChatUnsub = onSnapshot(
+      query(collection(db, 'games', gameId, 'messages'), orderBy('createdAt'), limit(50)),
+      snap => renderMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    chatListener = fsChatUnsub;
+    // send도 Firestore로 전환
+    doSend = async () => {
+      const text = input.value.trim();
+      if (!text || !currentUser) return;
+      input.value = '';
+      try {
+        await addDoc(collection(db, 'games', gameId, 'messages'), {
+          uid: currentUser.uid,
+          name: currentUserData?.nickname || currentUser.displayName || '익명',
+          text: text.slice(0, 100),
+          createdAt: Date.now(),
+        });
+      } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
+    };
+  });
 }
 
 function renderMessages(messages) {
