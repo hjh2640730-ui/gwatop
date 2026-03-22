@@ -249,7 +249,15 @@ function renderReviewMode(idx, q, state) {
   const scrapBtn = document.getElementById('scrap-btn');
   if (scrapBtn) {
     scrapBtn.style.display = '';
-    updateScrapBtn(idx);
+    if (currentUser && !scrappedMap.has(idx)) {
+      getAllScraps(currentUser.uid).then(scraps => {
+        const match = scraps.find(s => s.question === q.question && s.answer === q.answer);
+        if (match) scrappedMap.set(idx, match.id);
+        updateScrapBtn(idx);
+      }).catch(() => updateScrapBtn(idx));
+    } else {
+      updateScrapBtn(idx);
+    }
   }
 
   quizCard.classList.remove('shake', 'correct-flash', 'card-enter');
@@ -448,11 +456,19 @@ async function handleSubmit() {
   explanationText.innerHTML = formatExplanation(q.explanation || '해설이 제공되지 않았습니다.');
   explanationBox.classList.add('visible');
 
-  // 스크랩 버튼
+  // 스크랩 버튼 (DB에서 직접 확인)
   const scrapBtn = document.getElementById('scrap-btn');
   if (scrapBtn) {
     scrapBtn.style.display = '';
-    updateScrapBtn(currentIdx);
+    if (currentUser && !scrappedMap.has(currentIdx)) {
+      getAllScraps(currentUser.uid).then(scraps => {
+        const match = scraps.find(s => s.question === q.question && s.answer === q.answer);
+        if (match) scrappedMap.set(currentIdx, match.id);
+        updateScrapBtn(currentIdx);
+      }).catch(() => updateScrapBtn(currentIdx));
+    } else {
+      updateScrapBtn(currentIdx);
+    }
   }
 
   // For short answer and OX, show correct answer if wrong
