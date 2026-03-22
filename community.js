@@ -730,7 +730,6 @@ function renderPostCard(post) {
       ${post.title ? `<div class="post-card-title">${escapeHtml(post.title)}</div>` : ''}
       <div class="post-card-preview">${escapeHtml(previewText)}</div>
       ${imagesHtml}
-      <span class="post-card-time">${timeAgo(post.createdAt)}</span>
     </div>
     <div class="post-footer post-footer-compact">
       <button class="post-like-btn${isLiked ? ' liked' : ''}" data-id="${post.id}" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>
@@ -741,6 +740,7 @@ function renderPostCard(post) {
         <span>💬</span>
         <span class="comment-count">${post.commentCount || 0}</span>
       </span>
+      <span class="post-card-time">${timeAgo(post.createdAt)}</span>
     </div>
   `;
 
