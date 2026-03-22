@@ -28,6 +28,8 @@ let chatHostUid = null;
 let chatServerMsgs = [];
 let chatPendingMsgs = new Map();
 let pendingJoinGameId = null;
+let wagerFilter = 'all';
+let prevWaitingCount = 0;
 let resultShown = false;
 
 // 하나빼기 state
@@ -153,6 +155,29 @@ function setupUI() {
     }
   });
 
+  // 빠른 참가
+  document.getElementById('quick-join-btn')?.addEventListener('click', () => {
+    if (!currentUser) { openLoginModal(); return; }
+    const waiting = allRoomDocs.filter(d => {
+      const g = d.data();
+      return g.status === 'waiting' && g.player1?.uid !== currentUser.uid && !g.hasPassword;
+    });
+    if (!waiting.length) { showToast('참가 가능한 방이 없습니다', 'warning'); return; }
+    const pick = waiting[Math.floor(Math.random() * waiting.length)];
+    joinRoom(pick.id);
+  });
+
+  // 배팅 필터
+  document.querySelectorAll('.wager-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.wager-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      wagerFilter = btn.dataset.filter;
+      const q = document.getElementById('room-search')?.value.trim() || '';
+      renderRooms(filterRooms(q));
+    });
+  });
+
   const searchInput = document.getElementById('room-search');
   const searchWrap = document.getElementById('room-search-wrap');
   const searchClear = document.getElementById('room-search-clear');
@@ -164,7 +189,7 @@ function setupUI() {
   searchClear?.addEventListener('click', () => {
     searchInput.value = '';
     searchWrap.classList.remove('has-value');
-    renderRooms(allRoomDocs);
+    renderRooms(filterRooms(''));
   });
 
   document.getElementById('create-room-btn')?.addEventListener('click', async () => {
@@ -327,20 +352,56 @@ function getRemainingMin(createdAt) {
 }
 
 function filterRooms(query) {
-  if (!query) return allRoomDocs;
-  const q = query.toLowerCase();
-  return allRoomDocs.filter(d => {
-    const g = d.data();
-    return (g.title || '').toLowerCase().includes(q) || (g.player1?.name || '').toLowerCase().includes(q);
-  });
+  let filtered = allRoomDocs;
+  if (wagerFilter !== 'all') {
+    filtered = filtered.filter(d => {
+      const w = d.data().wager || 0;
+      if (wagerFilter === 'low') return w === 1;
+      if (wagerFilter === 'mid') return w >= 2 && w <= 5;
+      if (wagerFilter === 'high') return w >= 6;
+      return true;
+    });
+  }
+  if (query) {
+    const q = query.toLowerCase();
+    filtered = filtered.filter(d => {
+      const g = d.data();
+      return (g.title || '').toLowerCase().includes(q) || (g.player1?.name || '').toLowerCase().includes(q);
+    });
+  }
+  return filtered;
+}
+
+function updateRoomStatusBar() {
+  const waiting = allRoomDocs.filter(d => d.data().status === 'waiting').length;
+  const playing = allRoomDocs.filter(d => d.data().status === 'ready' || d.data().status === 'hands_shown').length;
+  const onlineEst = waiting + playing * 2;
+  const onlineEl = document.getElementById('room-online-count');
+  if (onlineEl) onlineEl.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ade80;margin-right:2px"></span> ${onlineEst}명 접속 중`;
+  const summary = document.getElementById('room-count-summary');
+  if (summary) summary.textContent = `대기 ${waiting} · 대결 ${playing}`;
+
+  // 새 방 알림
+  if (waiting > prevWaitingCount && prevWaitingCount > 0) {
+    const toast = document.createElement('div');
+    toast.className = 'room-new-toast';
+    toast.textContent = '🆕 새로운 방이 생겼습니다!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+  prevWaitingCount = waiting;
 }
 
 function renderRooms(docs) {
   const list = document.getElementById('rooms-list');
   if (!list) return;
+  updateRoomStatusBar();
   if (!docs.length) {
     const isSearch = document.getElementById('room-search')?.value.trim();
-    list.innerHTML = `<div class="room-empty">${isSearch ? '검색 결과가 없습니다' : '열린 게임방이 없습니다'}</div>`;
+    const isFilter = wagerFilter !== 'all';
+    list.innerHTML = isSearch || isFilter
+      ? '<div class="room-empty">검색 결과가 없습니다</div>'
+      : `<div class="room-empty">아직 열린 방이 없어요!<div class="room-empty-cta"><button class="btn btn-primary btn-sm" onclick="document.getElementById('open-create-modal-btn').click()">✌️ 직접 방 만들기</button></div></div>`;
     return;
   }
   list.innerHTML = docs.map(d => {
@@ -381,9 +442,10 @@ function renderRooms(docs) {
         </div>
       </div>`;
     }
+    const remaining = getRemainingMin(g.createdAt);
     return `<button class="room-card" data-id="${d.id}">
       <div class="room-card-left">
-        <div>${titleHtml}</div>
+        <div>${titleHtml}<div class="room-expire">${remaining}분 후 만료</div></div>
       </div>
       <span class="room-wager">🟢 ${g.wager}P</span>
     </button>`;

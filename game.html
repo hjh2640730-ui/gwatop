@@ -51,9 +51,19 @@
       font-size: 13px; font-weight: 800; color: #34d399;
       background: rgba(16,185,129,0.1); border-radius: var(--radius-full); padding: 4px 10px;
     }
-    .room-card.playing { opacity: 0.6; cursor: default; border-color: rgba(239,68,68,0.2); }
+    .room-card.playing { opacity: 0.55; cursor: default; border-color: rgba(239,68,68,0.2); }
     .room-playing-badge { font-size: 10px; font-weight: 700; color: #f87171; background: rgba(239,68,68,0.12); border-radius: var(--radius-full); padding: 2px 8px; white-space: nowrap; }
+    .room-expire { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .room-status-bar { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--text-muted); margin-bottom:10px; padding:0 2px; }
+    .room-status-bar span { display:flex; align-items:center; gap:4px; }
+    .wager-filter { display:flex; gap:4px; margin-bottom:10px; }
+    .wager-filter-btn { padding:5px 12px; border-radius:var(--radius-full); border:1px solid var(--glass-border); background:transparent; color:var(--text-muted); font-family:var(--font); font-size:12px; font-weight:600; cursor:pointer; transition:all var(--transition); }
+    .wager-filter-btn:hover { border-color:rgba(52,211,153,0.4); color:var(--text-secondary); }
+    .wager-filter-btn.active { background:rgba(52,211,153,0.12); border-color:rgba(52,211,153,0.4); color:#34d399; }
     .room-empty { color: var(--text-muted); font-size: 14px; text-align: center; padding: 20px 0; }
+    .room-empty-cta { margin-top:10px; }
+    .room-new-toast { position:fixed; top:calc(var(--nav-height) + 10px); left:50%; transform:translateX(-50%); background:rgba(52,211,153,0.15); border:1px solid rgba(52,211,153,0.3); color:#34d399; font-size:13px; font-weight:600; padding:8px 18px; border-radius:var(--radius-full); z-index:100; animation:fadeInDown 0.3s ease; pointer-events:none; }
+    @keyframes fadeInDown { from { opacity:0; transform:translateX(-50%) translateY(-10px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 
     /* Title / Search Input */
     .room-title-input, .room-search-input {
@@ -224,11 +234,27 @@
       🟢 <strong style="color:var(--text-secondary)">무료 포인트</strong>는 출석체크 등으로 얻는 포인트로, 유료 ⚡ 크레딧과 별개입니다. 게임에서만 사용 가능하며 환불되지 않습니다.
     </div>
 
-    <!-- Create Room Button -->
-    <button class="btn btn-primary btn-full" id="open-create-modal-btn" style="margin-bottom:20px">✌️ 방 만들기</button>
+    <!-- Action Buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn btn-primary" id="open-create-modal-btn" style="flex:1">✌️ 방 만들기</button>
+      <button class="btn btn-glass" id="quick-join-btn" style="flex:1">⚡ 빠른 참가</button>
+    </div>
 
-    <!-- Open Rooms -->
-    <div class="section-label">열린 게임방</div>
+    <!-- Room Status Bar -->
+    <div class="room-status-bar" id="room-status-bar">
+      <span id="room-online-count">접속 중 -</span>
+      <span id="room-count-summary">대기 - · 대결 -</span>
+    </div>
+
+    <!-- Wager Filter -->
+    <div class="wager-filter" id="wager-filter">
+      <button class="wager-filter-btn active" data-filter="all">전체</button>
+      <button class="wager-filter-btn" data-filter="low">1P</button>
+      <button class="wager-filter-btn" data-filter="mid">2~5P</button>
+      <button class="wager-filter-btn" data-filter="high">6~10P</button>
+    </div>
+
+    <!-- Search -->
     <div class="room-search-wrap" id="room-search-wrap">
       <input type="text" class="room-search-input" id="room-search" placeholder="🔍 방 제목 또는 닉네임 검색..." />
       <button class="room-search-clear" id="room-search-clear">✕</button>
