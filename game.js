@@ -413,6 +413,17 @@ function renderRooms(docs) {
     const titleHtml = g.title
       ? `<div class="room-title-on-card">${safeTitle}${lockBadge}</div><div class="room-host-name">${safeName}</div>`
       : `<div class="room-title-on-card">${safeName}의 방${lockBadge}</div>`;
+    if (g.status === 'ready' || g.status === 'hands_shown') {
+      return `<div class="room-card playing">
+        <div class="room-card-left">
+          <div>${titleHtml}${isMine ? '<div class="room-expire" style="color:#a78bfa">내 대결</div>' : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="room-playing-badge">⚔️ 대결중</span>
+          <span class="room-wager">🟢 ${g.wager}P</span>
+        </div>
+      </div>`;
+    }
     if (isMine) {
       const remaining = getRemainingMin(g.createdAt);
       return `<div class="room-card mine">
@@ -431,17 +442,6 @@ function renderRooms(docs) {
         </div>
       </div>`;
     }
-    if (g.status === 'ready' || g.status === 'hands_shown') {
-      return `<div class="room-card playing">
-        <div class="room-card-left">
-          <div>${titleHtml}</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="room-playing-badge">⚔️ 대결중</span>
-          <span class="room-wager">🟢 ${g.wager}P</span>
-        </div>
-      </div>`;
-    }
     const remaining = getRemainingMin(g.createdAt);
     return `<button class="room-card" data-id="${d.id}">
       <div class="room-card-left">
@@ -451,7 +451,7 @@ function renderRooms(docs) {
     </button>`;
   }).join('');
 
-  list.querySelectorAll('.room-card:not(.mine)').forEach(card => {
+  list.querySelectorAll('.room-card:not(.mine):not(.playing)').forEach(card => {
     card.addEventListener('click', () => {
       const d = allRoomDocs.find(d => d.id === card.dataset.id);
       if (d?.data().hasPassword) openJoinPwModal(card.dataset.id);
