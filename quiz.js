@@ -86,9 +86,12 @@ async function loadExistingScraps(uid) {
   try {
     const scraps = await getAllScraps(uid);
     questions.forEach((q, idx) => {
-      const match = scraps.find(s => s.question === q.question);
+      const match = scraps.find(s => s.question === q.question && s.answer === q.answer);
       if (match) scrappedMap.set(idx, match.id);
     });
+    // 현재 보이는 스크랩 버튼 UI 갱신
+    const btn = document.getElementById('scrap-btn');
+    if (btn && btn.style.display !== 'none') updateScrapBtn(currentIdx);
   } catch {}
 }
 
