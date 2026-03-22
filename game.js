@@ -847,19 +847,20 @@ function openChat(gameId) {
       text: text.slice(0, 100),
       createdAt: Date.now(),
     };
+    // SDK push로 키 생성 + 로컬 즉시 표시, REST로 서버 확실히 저장 (같은 키)
+    const newRef = rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`));
+    const newKey = newRef.key;
+    // SDK 쓰기 (로컬 즉시 반영, 실패해도 무시)
+    rtdbSet(newRef, msgData).catch(() => {});
+    // REST 쓰기 (서버 확실히 저장)
     try {
       const idToken = await currentUser.getIdToken();
       const res = await fetch(
-        `https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat/${gameId}.json?auth=${idToken}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData) }
+        `https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat/${gameId}/${newKey}.json?auth=${idToken}`,
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData) }
       );
       if (!res.ok) throw new Error(`REST ${res.status}`);
-    } catch {
-      try {
-        const newRef = rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`));
-        await rtdbSet(newRef, msgData);
-      } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
-    }
+    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
   };
 
   sendBtn.onclick = () => doSend();
