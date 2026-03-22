@@ -170,7 +170,7 @@ function renderGames(games) {
     `총 ${allGames.length}개 | 대기 ${counts.waiting} · 진행 ${counts.ready} · 완료 ${counts.finished} · 취소 ${counts.cancelled}`;
   if (!games.length) { body.innerHTML = '<div class="empty-row">게임이 없습니다.</div>'; return; }
   const statusBadge = s => {
-    const map = { waiting:'대기 중', ready:'진행 중', finished:'완료', cancelled:'취소됨' };
+    const map = { waiting:'대기 중', ready:'진행 중', hands_shown:'하나빼기', finished:'완료', cancelled:'취소됨' };
     return `<span class="badge badge-${s}">${map[s]||s}</span>`;
   };
   body.innerHTML = games.map(g => {
@@ -180,7 +180,7 @@ function renderGames(games) {
     const winnerName = g.winner
       ? (g.winner === g.player1?.uid ? g.player1.name : g.player2?.name) || '?'
       : (g.status === 'finished' ? '무승부' : '-');
-    const canCancel = g.status === 'waiting' || g.status === 'ready';
+    const canCancel = g.status === 'waiting' || g.status === 'ready' || g.status === 'hands_shown';
     return `<div class="games-table-row">
       <div class="td td-name" data-label="방 제목">${escapeHtml(g.title||'(제목없음)')}${g.hasPassword?' 🔒':''}</div>
       <div class="td" data-label="플레이어1">${escapeHtml(g.player1?.name||'-')}</div>
