@@ -1079,7 +1079,7 @@ function timeAgo(ts) {
   if (m < 60) return `${m}분 전`;
   const today = new Date();
   const isToday = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
-  const time = date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const time = `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
   if (isToday) return time;
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
   const isYesterday = date.getFullYear() === yesterday.getFullYear() && date.getMonth() === yesterday.getMonth() && date.getDate() === yesterday.getDate();
