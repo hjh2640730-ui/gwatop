@@ -732,26 +732,19 @@ function renderPostCard(post) {
       ${imagesHtml}
       <span class="post-card-time">${timeAgo(post.createdAt)}</span>
     </div>
-    <div class="post-footer">
+    <div class="post-footer post-footer-compact">
       <button class="post-like-btn${isLiked ? ' liked' : ''}" data-id="${post.id}" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>
         <span class="like-heart">${isLiked ? '❤️' : '🤍'}</span>
         <span class="like-count">${likeCount}</span>
-        ${likeCount >= 5 ? '<span class="like-maxed">MAX</span>' : ''}
       </button>
       <span class="post-comment-count-wrap">
         <span>💬</span>
         <span class="comment-count">${post.commentCount || 0}</span>
       </span>
-      <div class="post-footer-right">
-        <button class="post-action-btn bookmark-btn${bookmarked ? ' bookmarked' : ''}" data-id="${post.id}">${bookmarked ? '🔖' : '북마크'}</button>
-        <button class="post-action-btn share-btn" data-id="${post.id}" data-title="${escapeHtml(post.title || '')}">공유</button>
-      </div>
     </div>
   `;
 
   card.querySelector('.post-like-btn').addEventListener('click', e => { e.stopPropagation(); handleLike(post.id, post.uid); });
-  card.querySelector('.bookmark-btn').addEventListener('click', e => { e.stopPropagation(); toggleBookmark(post.id, post.title || ''); });
-  card.querySelector('.share-btn').addEventListener('click', e => { e.stopPropagation(); handleShare(post.id, post.title || ''); });
   card.addEventListener('click', () => { window.location.href = `/post.html?id=${post.id}`; });
 
   feed.appendChild(card);

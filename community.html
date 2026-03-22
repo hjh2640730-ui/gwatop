@@ -232,8 +232,8 @@
       background: var(--glass-bg);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-lg);
-      padding: 20px;
-      margin-bottom: 12px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
       transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
       animation: fadeInUp 0.25s ease both;
       cursor: pointer;
@@ -282,7 +282,7 @@
     .post-time { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
 
     /* ── Card Body ── */
-    .post-card-body { margin-bottom: 14px; }
+    .post-card-body { margin-bottom: 6px; }
     .post-card-time { font-size: 11px; color: var(--text-muted); margin-top: 6px; display: block; }
     .post-card-title {
       font-size: 16px; font-weight: 800;
@@ -312,6 +312,17 @@
       display: flex; align-items: center; gap: 8px;
       padding-top: 12px;
       border-top: 1px solid var(--glass-border);
+    }
+    .post-footer-compact {
+      padding-top: 8px;
+      border-top: none;
+    }
+    .post-footer-compact .post-like-btn,
+    .post-footer-compact .post-comment-count-wrap {
+      padding: 3px 8px;
+      font-size: 12px;
+      border: none;
+      background: none;
     }
     .post-footer-right {
       margin-left: auto;
