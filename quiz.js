@@ -321,10 +321,16 @@ function setupControls() {
   document.getElementById('download-pdf-btn')?.addEventListener('click', downloadPDF);
 
   // 스크랩 버튼
-  document.getElementById('scrap-btn')?.addEventListener('click', toggleScrap);
+  document.getElementById('scrap-btn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleScrap();
+    e.target.blur();
+  });
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // 스크랩 버튼 포커스 시 Enter → 무시 (중복 동작 방지)
+    if (e.target?.id === 'scrap-btn') return;
     if (e.target === shortInput) {
       // 주관식 입력창에서 Enter → 제출
       if (e.key === 'Enter' && !answered && !submitBtn.disabled) {
