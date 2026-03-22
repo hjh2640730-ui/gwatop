@@ -502,7 +502,7 @@ export async function onRequestPost(context) {
               status: 'ready', wager: game.wager,
               player1: game.player1, player2: game.player2,
               p1HandsSubmitted: false, p2HandsSubmitted: false,
-            }, accessToken),
+            }, idToken),
           ]);
           return json({ finished: true, draw: true, drawRematchId: rematchId });
         }
@@ -601,7 +601,7 @@ export async function onRequestPost(context) {
         player1: { uid: game.player1.uid, name: game.player1.name, photo: game.player1.photo || '' },
         player2: { uid: game.player2.uid, name: game.player2.name, photo: game.player2.photo || '' },
         p1HandsSubmitted: false, p2HandsSubmitted: false,
-      }, accessToken),
+      }, idToken),
     ]);
 
     const isP1ForAcceptor = game.player1?.uid === uid;
