@@ -10,7 +10,8 @@ import {
   getDocs, getDoc, addDoc, orderBy, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import {
-  ref as rtdbRef, onValue, push as rtdbPush
+  ref as rtdbRef, onValue, push as rtdbPush,
+  query as rtdbQuery, orderByChild, equalTo
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 let currentUser = null;
@@ -295,13 +296,14 @@ function checkActiveGame() {
   if (pendingListener) { pendingListener(); pendingListener = null; }
   if (pendingPollingId) { clearInterval(pendingPollingId); pendingPollingId = null; }
 
-  pendingListener = onSnapshot(doc(db, 'games', stored.gameId), snap => {
+  const gameRef = rtdbRef(rtdb, `game_realtime/${stored.gameId}`);
+  pendingListener = onValue(gameRef, snap => {
     if (!snap.exists()) {
       clearStoredGame();
       if (pendingListener) { pendingListener(); pendingListener = null; }
       return;
     }
-    const game = { id: snap.id, ...snap.data() };
+    const game = snap.val();
     if (game.status === 'cancelled' || game.status === 'finished') {
       clearStoredGame();
       if (pendingListener) { pendingListener(); pendingListener = null; }
@@ -312,12 +314,12 @@ function checkActiveGame() {
       if (game.status === 'ready') showToast('상대방이 입장했습니다! 게임을 시작하세요 🎮', 'success');
       openGameModal(stored.gameId, isP1);
     }
-  }, e => { console.error('checkActiveGame onSnapshot:', e); });
+  }, e => { console.error('checkActiveGame onValue:', e); });
 }
 
 function getRemainingMin(createdAt) {
   if (!createdAt) return 10;
-  const t = typeof createdAt === 'string' ? new Date(createdAt) : (createdAt.toDate?.() || new Date());
+  const t = createdAt?.toDate ? createdAt.toDate() : new Date(createdAt);
   return Math.max(0, Math.ceil((10 * 60 * 1000 - (Date.now() - t.getTime())) / 60000));
 }
 
@@ -397,27 +399,24 @@ function renderRooms(docs) {
 
 function loadRooms() {
   if (roomsListener) { roomsListener(); roomsListener = null; }
-  if (roomsPollingId) { clearInterval(roomsPollingId); roomsPollingId = null; }
   if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
 
-  fetchRooms();
-  roomsPollingId = setInterval(fetchRooms, 10000);
-}
-
-async function fetchRooms() {
-  try {
-    const q = query(collection(db, 'games'), where('status', '==', 'waiting'), limit(30));
-    const snap = await getDocs(q);
+  const roomsRef = rtdbQuery(
+    rtdbRef(rtdb, 'game_realtime'),
+    orderByChild('status'),
+    equalTo('waiting')
+  );
+  roomsListener = onValue(roomsRef, snap => {
     const now = Date.now();
-    allRoomDocs = snap.docs.filter(d => {
-      const ts = d.data().createdAt;
-      if (!ts) return true;
-      const t = typeof ts === 'string' ? new Date(ts) : (ts.toDate?.() || new Date());
-      return now - t.getTime() < 10 * 60 * 1000;
+    allRoomDocs = [];
+    snap.forEach(child => {
+      const g = child.val();
+      if (g.createdAt && now - g.createdAt > 10 * 60 * 1000) return;
+      allRoomDocs.push({ id: child.key, data: () => g });
     });
     const searchQuery = document.getElementById('room-search')?.value.trim() || '';
     renderRooms(filterRooms(searchQuery));
-  } catch { /* 네트워크 오류 시 현재 상태 유지 */ }
+  });
 }
 
 async function createRoom(wager, title = '', password = '') {
@@ -496,8 +495,8 @@ async function cancelRoomById(gameId) {
 
 // ─── 게임 모달 오픈 ───
 function openGameModal(gameId, isP1) {
-  // 게임 중에는 방 목록 폴링 불필요
-  if (roomsPollingId) { clearInterval(roomsPollingId); roomsPollingId = null; }
+  // 게임 중에는 방 목록 리스너 불필요
+  if (roomsListener) { roomsListener(); roomsListener = null; }
   activeGameId = gameId;
   resultShown = false;
   introFinished = false;
@@ -531,12 +530,8 @@ function openGameModal(gameId, isP1) {
     if (!snap.exists()) return;
     syncModal({ id: gameId, ...snap.val() }, isP1);
   }, err => {
-    console.warn('RTDB game state unavailable, falling back to Firestore:', err.code);
-    // RTDB 보안 규칙 미설정 등으로 실패 시 Firestore onSnapshot으로 자동 전환
-    activeGameListener = onSnapshot(doc(db, 'games', gameId), snap => {
-      if (!snap.exists()) return;
-      syncModal({ id: gameId, ...snap.data() }, isP1);
-    });
+    console.error('RTDB game state error:', err.code);
+    showToast('게임 연결에 문제가 발생했습니다. 새로고침해주세요.', 'error');
   });
 
   // "건승을 빕니다." 인트로 → 2초 후 선택 화면
@@ -838,8 +833,7 @@ function openChat(gameId) {
   const input = document.getElementById('chat-input');
   const sendBtn = document.getElementById('chat-send-btn');
 
-  // send 함수 — RTDB 실패 시 Firestore로 교체됨
-  let doSend = async () => {
+  const doSend = async () => {
     const text = input.value.trim();
     if (!text || !currentUser) return;
     input.value = '';
@@ -850,50 +844,20 @@ function openChat(gameId) {
         text: text.slice(0, 100),
         createdAt: Date.now(),
       });
-    } catch (e) {
-      // RTDB write 실패 → Firestore로 폴백
-      try {
-        await addDoc(collection(db, 'games', gameId, 'messages'), {
-          uid: currentUser.uid,
-          name: currentUserData?.nickname || currentUser.displayName || '익명',
-          text: text.slice(0, 100),
-          createdAt: Date.now(),
-        });
-      } catch (e2) { console.error('chat send error', e2); showToast('채팅 전송 실패', 'error'); }
-    }
+    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
   };
 
   sendBtn.onclick = () => doSend();
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); doSend(); } };
 
-  // RTDB 채팅 리스너 — 실패 시 Firestore로 자동 전환
   const rtdbChatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
   chatListener = onValue(rtdbChatRef, snap => {
     const messages = [];
     snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
     renderMessages(messages);
   }, err => {
-    console.warn('RTDB chat unavailable, falling back to Firestore:', err.code);
-    // Firestore games/{gameId}/messages 서브컬렉션으로 전환
-    const fsChatUnsub = onSnapshot(
-      query(collection(db, 'games', gameId, 'messages'), orderBy('createdAt'), limit(50)),
-      snap => renderMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
-    chatListener = fsChatUnsub;
-    // send도 Firestore로 전환
-    doSend = async () => {
-      const text = input.value.trim();
-      if (!text || !currentUser) return;
-      input.value = '';
-      try {
-        await addDoc(collection(db, 'games', gameId, 'messages'), {
-          uid: currentUser.uid,
-          name: currentUserData?.nickname || currentUser.displayName || '익명',
-          text: text.slice(0, 100),
-          createdAt: Date.now(),
-        });
-      } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
-    };
+    console.error('RTDB chat error:', err.code);
+    showToast('채팅 연결에 문제가 발생했습니다. 새로고침해주세요.', 'error');
   });
 }
 
@@ -932,11 +896,8 @@ function closeModal() {
   document.getElementById('chat-section').style.display = 'none';
   if (handScene) { handScene.dispose(); handScene = null; }
   activeGameId = null;
-  // 모달 닫히면 방 목록 폴링 재개
-  if (!roomsPollingId) {
-    fetchRooms();
-    roomsPollingId = setInterval(fetchRooms, 10000);
-  }
+  // 모달 닫히면 방 목록 리스너 재개
+  loadRooms();
 }
 
 function startPhase1Timer() {

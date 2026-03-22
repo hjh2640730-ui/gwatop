@@ -322,6 +322,9 @@ export async function onRequestPost(context) {
     await rtdbSet(newId, {
       status: 'waiting',
       wager: w,
+      title: roomTitle,
+      hasPassword: !!roomPw,
+      createdAt: Date.now(),
       player1: { uid, name: userData.nickname || user.displayName || '익명', photo: user.photoUrl || '' },
       player2: null,
       p1HandsSubmitted: false,
@@ -689,6 +692,7 @@ export async function onRequestPost(context) {
     if (game.player1?.uid !== uid) return json({ error: '방장만 취소 가능' }, 403);
     if (game.status !== 'waiting') return json({ error: '이미 시작된 게임은 취소 불가' }, 400);
     await fsPatch(`games/${gameId}`, { status: v('cancelled') }, accessToken);
+    await rtdbPatch(gameId, { status: 'cancelled' }, accessToken);
     return json({ success: true });
   }
 
