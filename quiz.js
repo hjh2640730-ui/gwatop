@@ -3,7 +3,7 @@
 // 퀴즈 UI, 진행, 결과, 오답 노트
 // ============================================================
 
-import { onUserChange } from './auth.js';
+import { onUserChange, applyAvatar } from './auth.js';
 import { loadPendingQuiz, clearPendingQuiz, saveQuiz, updateQuizScore, scrapQuestion, unscrapQuestion } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 import { marked } from 'https://esm.sh/marked@11';
@@ -93,7 +93,7 @@ function setupNav() {
     if (user) {
       lo.style.display = 'none';
       li.style.display = 'flex';
-      document.getElementById('nav-avatar').src = user.photoURL || '';
+      applyAvatar(document.getElementById('nav-avatar'), user, userData);
       document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || user.email || '');
       checkAndShowNicknameModal(user, userData);
 

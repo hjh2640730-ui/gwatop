@@ -3,7 +3,7 @@
 // 저장된 퀴즈 및 문서 관리
 // ============================================================
 
-import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange, applyAvatar } from './auth.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 import {
   getAllQuizzes, getAllDocuments,
@@ -46,7 +46,7 @@ function setupNav() {
       currentUid = user.uid;
       lo.style.display = 'none';
       li.style.display = 'flex';
-      document.getElementById('nav-avatar').src = user.photoURL || '';
+      applyAvatar(document.getElementById('nav-avatar'), user, userData);
       document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || user.email || '');
       const creditsEl = document.getElementById('nav-credits');
       if (creditsEl) creditsEl.textContent = userData?.credits ?? 0;

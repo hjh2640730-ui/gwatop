@@ -4,7 +4,7 @@
 
 import { createHandScene } from './hand3d.js';
 import { checkAndShowNicknameModal } from './nickname.js';
-import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange, ensureUserDoc } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange, ensureUserDoc, applyAvatar } from './auth.js';
 import { db, rtdb } from './auth.js';
 import {
   collection, doc, query, where, limit, onSnapshot,
@@ -71,7 +71,7 @@ function init() {
     if (user) {
       lo.style.display = 'none';
       li.style.display = 'flex';
-      document.getElementById('nav-avatar').src = user.photoURL || '';
+      applyAvatar(document.getElementById('nav-avatar'), user, userData);
       document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || '');
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
       document.getElementById('my-fp').textContent = (userData?.freePoints ?? 0) + 'P';

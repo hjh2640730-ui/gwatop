@@ -7,7 +7,7 @@ const ALGOLIA_APP_ID = 'THOWOPCXWC';
 const ALGOLIA_SEARCH_KEY = 'f926a04651ab3a962b0367c3dcdf5290';
 const ALGOLIA_INDEX = 'posts';
 
-import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange, applyAvatar } from './auth.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 import { db, app } from './auth.js';
 import {
@@ -138,7 +138,7 @@ function setupNav() {
     if (user) {
       lo.style.display = 'none';
       li.style.display = 'flex';
-      document.getElementById('nav-avatar').src = user.photoURL || '';
+      applyAvatar(document.getElementById('nav-avatar'), user, userData);
       document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || '');
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
       await loadLikesForPosts(currentPagePosts.map(p => p.id));

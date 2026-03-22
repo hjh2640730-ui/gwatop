@@ -3,7 +3,7 @@
 // PDF 업로드, 텍스트 추출, 퀴즈 생성, 크레딧 기반 과금
 // ============================================================
 
-import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange, deductCreditMixed, calcCredits } from './auth.js';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, handleRedirectResult, onUserChange, deductCreditMixed, calcCredits, applyAvatar } from './auth.js';
 import { saveDocument, savePendingQuiz } from './db.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 
@@ -113,7 +113,7 @@ function updateNavUI(user, userData) {
   if (user) {
     navLoggedOut.style.display = 'none';
     navLoggedIn.style.display = 'flex';
-    navAvatar.src = user.photoURL || '';
+    applyAvatar(navAvatar, user, userData);
     navUsername.textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || user.email || '사용자');
     const credits = userData?.credits ?? 0;
     document.getElementById('nav-credits').textContent = credits;

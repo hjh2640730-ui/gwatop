@@ -463,8 +463,14 @@
       if (user) {
         lo.style.display = 'none';
         li.style.display = 'flex';
-        document.getElementById('nav-avatar').src = user.photoURL || '';
-        document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
+        const _navImg = document.getElementById('nav-avatar');
+        if (userData?.icon) {
+          _navImg.style.display = 'none';
+          let _e = _navImg.nextElementSibling;
+          if (!_e || !_e.classList.contains('nav-avatar-emoji')) { _e = document.createElement('span'); _e.className = 'nav-avatar-emoji'; _navImg.parentNode.insertBefore(_e, _navImg.nextSibling); }
+          _e.textContent = userData.icon;
+        } else { _navImg.style.display = ''; _navImg.src = user.photoURL || ''; }
+        document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || user.email || '');
         document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
         checkAndShowNicknameModal(user, userData);
       } else {

@@ -288,8 +288,13 @@ function applyNavCache() {
     const avatar = document.getElementById('nav-avatar');
     const username = document.getElementById('nav-username');
     const credits = document.getElementById('nav-credits');
-    if (avatar) avatar.src = cache.photoURL || '';
-    if (username) username.textContent = cache.nickname || cache.displayName || '';
+    if (avatar && cache.icon) {
+      avatar.style.display = 'none';
+      let emojiEl = avatar.nextElementSibling;
+      if (!emojiEl || !emojiEl.classList.contains('nav-avatar-emoji')) { emojiEl = document.createElement('span'); emojiEl.className = 'nav-avatar-emoji'; avatar.parentNode.insertBefore(emojiEl, avatar.nextSibling); }
+      emojiEl.textContent = cache.icon;
+    } else if (avatar) { avatar.src = cache.photoURL || ''; }
+    if (username) username.textContent = (cache.icon ? cache.icon + ' ' : '') + (cache.nickname || cache.displayName || '');
     if (credits) credits.textContent = cache.credits ?? 0;
   } catch (_) {}
 }
@@ -315,6 +320,7 @@ export function onUserChange(callback) {
           photoURL: user.photoURL || '',
           displayName: user.displayName || '',
           nickname: userData?.nickname || '',
+          icon: userData?.icon || '',
           credits: userData?.credits ?? 0
         }));
         injectInboxNav(user);
@@ -466,6 +472,26 @@ function _updateNavAvatar(photoURL, displayName) {
 }
 
 export { isConfigured, auth, db, rtdb, app };
+
+// ─── 프로필 아바타 헬퍼 (이모지 or 사진) ───
+export function applyAvatar(imgEl, user, userData) {
+  if (!imgEl) return;
+  if (userData?.icon) {
+    imgEl.style.display = 'none';
+    let emojiEl = imgEl.nextElementSibling;
+    if (!emojiEl || !emojiEl.classList.contains('nav-avatar-emoji')) {
+      emojiEl = document.createElement('span');
+      emojiEl.className = 'nav-avatar-emoji';
+      imgEl.parentNode.insertBefore(emojiEl, imgEl.nextSibling);
+    }
+    emojiEl.textContent = userData.icon;
+  } else {
+    imgEl.style.display = '';
+    imgEl.src = user?.photoURL || '';
+    const emojiEl = imgEl.nextElementSibling;
+    if (emojiEl?.classList.contains('nav-avatar-emoji')) emojiEl.remove();
+  }
+}
 
 // ─── 메시지함 네비 버튼 ───
 let _inboxClickHandler = null;

@@ -3,7 +3,7 @@
 // Toss Payments API 개별 연동 (위젯 없음)
 // ============================================================
 
-import { signInWithGoogle, logOut, onUserChange } from './auth.js';
+import { signInWithGoogle, logOut, onUserChange, applyAvatar } from './auth.js';
 import { checkAndShowNicknameModal } from './nickname.js';
 
 const TOSS_CLIENT_KEY = 'test_ck_DnyRpQWGrN2jDYK5Wa0LrKwv1M9E';
