@@ -726,20 +726,11 @@ function renderPostCard(post) {
     : '';
 
   card.innerHTML = `
-    <div class="post-header">
-      <div class="post-author-row">
-        <div class="post-avatar" style="background:${avatarColor}">${escapeHtml(avatarChar)}</div>
-        <div>
-          <span class="post-author-name">${escapeHtml(displayName)}</span>
-          ${showMyUniversityOnly ? `<span class="post-uni-badge">${escapeHtml(post.university || '')}</span>` : ''}
-        </div>
-      </div>
-      <span class="post-time">${timeAgo(post.createdAt)}</span>
-    </div>
     <div class="post-card-body">
       ${post.title ? `<div class="post-card-title">${escapeHtml(post.title)}</div>` : ''}
       <div class="post-card-preview">${escapeHtml(previewText)}</div>
       ${imagesHtml}
+      <span class="post-card-time">${timeAgo(post.createdAt)}</span>
     </div>
     <div class="post-footer">
       <button class="post-like-btn${isLiked ? ' liked' : ''}" data-id="${post.id}" ${isMine ? 'disabled title="내 글에는 좋아요를 누를 수 없습니다"' : ''}>
