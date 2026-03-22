@@ -186,13 +186,8 @@ function renderQuizActionBar() {
       : `<span class="scrap-action-info">삭제할 항목을 선택하세요</span>
          <button class="btn btn-glass btn-sm" id="quiz-select-all-btn">전체 선택</button>
          <button class="btn btn-ghost btn-sm" id="quiz-cancel-select">취소</button>`;
-    document.getElementById('quiz-del-selected')?.addEventListener('click', async () => {
-      for (const id of selectedQuizIds) await deleteQuiz(id);
-      allQuizzes = allQuizzes.filter(q => !selectedQuizIds.has(q.id));
-      selectedQuizIds.clear();
-      quizSelectMode = false;
-      renderQuizGrid();
-      showToast('선택한 퀴즈가 삭제됐습니다.', 'success');
+    document.getElementById('quiz-del-selected')?.addEventListener('click', () => {
+      confirmBulkDelete('quiz', selectedQuizIds.size);
     });
     document.getElementById('quiz-select-all-btn')?.addEventListener('click', () => {
       if (selectedQuizIds.size === allQuizzes.length) selectedQuizIds.clear();
@@ -331,13 +326,8 @@ function renderDocActionBar() {
       : `<span class="scrap-action-info">삭제할 항목을 선택하세요</span>
          <button class="btn btn-glass btn-sm" id="doc-select-all-btn">전체 선택</button>
          <button class="btn btn-ghost btn-sm" id="doc-cancel-select">취소</button>`;
-    document.getElementById('doc-del-selected')?.addEventListener('click', async () => {
-      for (const id of selectedDocIds) await deleteDocument(id);
-      allDocuments = allDocuments.filter(d => !selectedDocIds.has(d.id));
-      selectedDocIds.clear();
-      docSelectMode = false;
-      renderDocGrid();
-      showToast('선택한 문서가 삭제됐습니다.', 'success');
+    document.getElementById('doc-del-selected')?.addEventListener('click', () => {
+      confirmBulkDelete('doc', selectedDocIds.size);
     });
     document.getElementById('doc-select-all-btn')?.addEventListener('click', () => {
       if (selectedDocIds.size === allDocuments.length) selectedDocIds.clear();
@@ -727,15 +717,32 @@ function setupDeleteModal() {
   document.getElementById('delete-confirm-btn')?.addEventListener('click', async () => {
     if (!pendingDelete) return;
     modal.classList.remove('visible');
-    if (pendingDelete.type === 'quiz') {
+    if (pendingDelete.type === 'bulk') {
+      if (pendingDelete.bulkType === 'quiz') {
+        for (const id of selectedQuizIds) await deleteQuiz(id);
+        allQuizzes = allQuizzes.filter(q => !selectedQuizIds.has(q.id));
+        selectedQuizIds.clear();
+        quizSelectMode = false;
+        renderQuizGrid();
+        showToast('선택한 퀴즈가 삭제됐습니다.', 'success');
+      } else {
+        for (const id of selectedDocIds) await deleteDocument(id);
+        allDocuments = allDocuments.filter(d => !selectedDocIds.has(d.id));
+        selectedDocIds.clear();
+        docSelectMode = false;
+        renderDocGrid();
+        showToast('선택한 문서가 삭제됐습니다.', 'success');
+      }
+    } else if (pendingDelete.type === 'quiz') {
       await deleteQuiz(pendingDelete.id);
       showToast('퀴즈 결과가 삭제되었습니다.', 'success');
+      await loadAll(currentUid);
     } else {
       await deleteDocument(pendingDelete.id);
       showToast('문서가 삭제되었습니다.', 'success');
+      await loadAll(currentUid);
     }
     pendingDelete = null;
-    await loadAll(currentUid);
   });
   document.getElementById('delete-cancel-btn')?.addEventListener('click', () => {
     modal.classList.remove('visible');
@@ -758,6 +765,15 @@ function setupLoginModal() {
 
 function confirmDelete(type, id, desc) {
   pendingDelete = { type, id };
+  document.getElementById('delete-modal-desc').textContent = desc;
+  document.getElementById('delete-modal').classList.add('visible');
+}
+
+function confirmBulkDelete(bulkType, count) {
+  const desc = bulkType === 'quiz'
+    ? `선택한 ${count}개의 퀴즈 결과를 삭제하시겠습니까?`
+    : `선택한 ${count}개의 문서를 삭제하시겠습니까?`;
+  pendingDelete = { type: 'bulk', bulkType };
   document.getElementById('delete-modal-desc').textContent = desc;
   document.getElementById('delete-modal').classList.add('visible');
 }
