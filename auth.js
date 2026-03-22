@@ -182,7 +182,7 @@ export async function addReferralCredit(referrerUid) {
     const referralCredits = data.referralCredits ?? 0;
     if (referralCredits >= 3) return; // 최대 3회 제한
     await updateDoc(ref, {
-      credits: increment(5),
+      freePoints: increment(5),
       referralCredits: increment(1)
     });
   } catch (e) {
