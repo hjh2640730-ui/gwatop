@@ -784,7 +784,10 @@ body {
   .features-grid { grid-template-columns: 1fr 1fr; }
 
   /* Modal */
-  .modal { padding: 28px 20px; }
+  .modal { padding: 24px 16px; max-width: calc(100vw - 32px); }
+  .modal-icon { font-size: 40px; margin-bottom: 14px; }
+  .modal-title { font-size: 19px; }
+  .modal-desc { font-size: 14px; margin-bottom: 20px; }
   .modal-actions { flex-direction: column; }
   .modal-actions .btn { width: 100%; justify-content: center; }
 
@@ -799,7 +802,7 @@ body {
   .quiz-option { padding: 13px 14px; font-size: 14px; }
   .option-marker { width: 28px; height: 28px; font-size: 12px; flex-shrink: 0; }
   .ox-options { gap: 12px; }
-  .ox-option { padding: 24px 12px; font-size: 48px; }
+  .ox-option { padding: 20px 12px; font-size: 40px; min-height: 44px; }
   .quiz-actions { flex-direction: column-reverse; }
   .quiz-actions .btn { width: 100%; justify-content: center; }
   .short-answer-input { min-height: 90px; font-size: 16px; /* 16px prevents iOS zoom */ }
@@ -813,8 +816,8 @@ body {
   .results-stat { padding: 12px 8px; }
   .results-stat-num { font-size: 22px; }
 
-  /* Toast — above bottom nav */
-  .toast-container { bottom: 84px; right: 12px; left: 12px; }
+  /* Toast — above bottom nav + safe area */
+  .toast-container { bottom: calc(72px + env(safe-area-inset-bottom, 8px) + 8px); right: 12px; left: 12px; }
   .toast { min-width: unset; max-width: 100%; width: 100%; }
 
   /* History */
@@ -828,7 +831,7 @@ body {
   .footer-links { gap: 16px; }
 
   /* Bottom nav padding for pages */
-  .page { padding-bottom: 72px; }
+  .page { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
 
   /* Mobile Bottom Nav */
   .mobile-bottom-nav {
@@ -868,7 +871,7 @@ body {
   padding: 10px 20px;
   font-size: 13px; font-weight: 700; color: #34d399;
   text-decoration: none; cursor: pointer;
-  z-index: 130;
+  z-index: 110;
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 4px 24px rgba(52,211,153,0.15);
   white-space: nowrap;
@@ -876,6 +879,23 @@ body {
 }
 #game-active-badge:hover { background: rgba(16,185,129,0.12); }
 @media (min-width: 641px) { #game-active-badge { bottom: 24px; } }
+
+/* ─── Very Small Screens (< 360px) ─── */
+@media (max-width: 360px) {
+  .modal { padding: 20px 14px; }
+  .modal-icon { font-size: 32px; }
+  .modal-title { font-size: 17px; }
+  .hero-title { font-size: 28px; }
+  .nav-plan-badge { font-size: 10px; padding: 3px 8px; }
+  .nav-avatar, .nav-avatar-emoji { width: 28px; height: 28px; font-size: 16px; }
+  .quiz-question { font-size: 15px; }
+  .quiz-option { padding: 11px 12px; font-size: 13px; }
+  .option-marker { width: 24px; height: 24px; font-size: 11px; }
+  .ox-option { padding: 16px 10px; font-size: 32px; }
+  .history-card { padding: 16px; gap: 10px; }
+  .history-card-icon { font-size: 24px; }
+  .scrap-sq-grid { grid-template-columns: 1fr !important; }
+}
 
 /* ─── Global Input Focus ─── */
 input:focus-visible, textarea:focus-visible, select:focus-visible {

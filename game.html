@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>GWATOP - 하나빼기 게임</title>
   <link rel="stylesheet" href="/style.css" />
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
   <style>
-    .game-page { max-width: 480px; margin: 0 auto; padding: calc(var(--nav-height) + 32px) 16px 100px; }
+    .game-page { max-width: 480px; margin: 0 auto; padding: calc(var(--nav-height) + 32px) 16px calc(72px + env(safe-area-inset-bottom, 0px) + 16px); }
 
     /* Header */
     .game-header { margin-bottom: 24px; }
