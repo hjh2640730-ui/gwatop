@@ -72,7 +72,7 @@ function init() {
       lo.style.display = 'none';
       li.style.display = 'flex';
       applyAvatar(document.getElementById('nav-avatar'), user, userData);
-      document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || '');
+      document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || '';
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
       document.getElementById('my-fp').textContent = (userData?.freePoints ?? 0) + 'P';
       checkActiveGame();

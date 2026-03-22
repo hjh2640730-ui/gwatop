@@ -60,9 +60,9 @@ function escapeHtml(str) {
 function renderProfile(user, userData) {
   const name = userData?.nickname || user.displayName || '이름 없음';
   const icon = userData?.icon || '';
-  document.getElementById('mp-name').textContent = (icon ? icon + ' ' : '') + name;
+  document.getElementById('mp-name').textContent = name;
   document.getElementById('mp-email').textContent = user.email || '';
-  document.getElementById('mp-nickname-display').textContent = (icon ? icon + ' ' : '') + (userData?.nickname || '미설정');
+  document.getElementById('mp-nickname-display').textContent = userData?.nickname || '미설정';
 
   if (icon) {
     // 아이콘이 있으면 프로필 이미지 대신 이모지 표시

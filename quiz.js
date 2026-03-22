@@ -94,7 +94,7 @@ function setupNav() {
       lo.style.display = 'none';
       li.style.display = 'flex';
       applyAvatar(document.getElementById('nav-avatar'), user, userData);
-      document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || user.email || '');
+      document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
       checkAndShowNicknameModal(user, userData);
 
       // 백그라운드 나머지 문제 생성 시작

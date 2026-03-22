@@ -294,7 +294,7 @@ function applyNavCache() {
       if (!emojiEl || !emojiEl.classList.contains('nav-avatar-emoji')) { emojiEl = document.createElement('span'); emojiEl.className = 'nav-avatar-emoji'; avatar.parentNode.insertBefore(emojiEl, avatar.nextSibling); }
       emojiEl.textContent = cache.icon;
     } else if (avatar) { avatar.src = cache.photoURL || ''; }
-    if (username) username.textContent = (cache.icon ? cache.icon + ' ' : '') + (cache.nickname || cache.displayName || '');
+    if (username) username.textContent = cache.nickname || cache.displayName || '';
     if (credits) credits.textContent = cache.credits ?? 0;
   } catch (_) {}
 }

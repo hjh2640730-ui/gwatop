@@ -47,7 +47,7 @@ function setupNav() {
       lo.style.display = 'none';
       li.style.display = 'flex';
       applyAvatar(document.getElementById('nav-avatar'), user, userData);
-      document.getElementById('nav-username').textContent = (userData?.icon ? userData.icon + ' ' : '') + (userData?.nickname || user.displayName || user.email || '');
+      document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
       const creditsEl = document.getElementById('nav-credits');
       if (creditsEl) creditsEl.textContent = userData?.credits ?? 0;
       if (prevUid !== currentUid) loadAll(currentUid);
