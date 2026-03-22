@@ -320,9 +320,8 @@ async function renderBookmarks() {
       const likes = p.likes || 0;
       const comments = p.commentCount || 0;
       const ago = timeAgo(p.createdAt);
-      const cat = p.category ? `<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface);border:1px solid var(--border);color:var(--text-muted);margin-right:6px">${escapeHtml(p.category)}</span>` : '';
       return `<div class="post-item" onclick="location.href='/post.html?id=${d.id}'">
-        <div class="post-item-title">${cat}${escapeHtml(title)}</div>
+        <div class="post-item-title">${escapeHtml(title)}</div>
         <div class="post-item-meta">
           <span>❤️ ${likes}</span>
           <span>💬 ${comments}</span>
