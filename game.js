@@ -23,7 +23,7 @@ let pendingListener = null;
 let pendingPollingId = null;
 let countdownInterval = null;
 let allRoomDocs = [];
-let chatListener = null;
+let chatPollId = null;
 let chatHostUid = null;
 let chatServerMsgs = [];
 let chatPendingMsgs = new Map();
@@ -835,7 +835,7 @@ async function submitFinal(finalHand) {
 const RTDB_CHAT_URL = 'https://gwatop-8edaf-default-rtdb.asia-southeast1.firebasedatabase.app/game_chat';
 
 function openChat(gameId) {
-  if (chatListener) { chatListener(); chatListener = null; }
+  if (chatPollId) { clearInterval(chatPollId); chatPollId = null; }
   chatServerMsgs = [];
   chatPendingMsgs = new Map();
   document.getElementById('chat-section').style.display = '';
@@ -853,44 +853,50 @@ function openChat(gameId) {
       text: text.slice(0, 100),
       createdAt: Date.now(),
     };
-    // 임시 키 생성 후 로컬 즉시 표시
     const tempKey = `_p${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     chatPendingMsgs.set(tempKey, msgData);
     renderChatMerged();
-    // REST로 서버에 저장
     try {
       const idToken = await currentUser.getIdToken();
       const res = await fetch(`${RTDB_CHAT_URL}/${gameId}.json?auth=${idToken}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData),
       });
-      const body = await res.text();
-      console.log('[chat] REST response:', res.status, body);
-      if (!res.ok) throw new Error(`REST ${res.status}: ${body}`);
+      if (!res.ok) throw new Error(`REST ${res.status}`);
     } catch (e) {
       console.error('chat send error', e);
       showToast('채팅 전송 실패', 'error');
     }
     chatPendingMsgs.delete(tempKey);
+    pollChat(gameId);
   };
 
   sendBtn.onclick = () => doSend();
   input.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); doSend(); } };
 
-  const rtdbChatRef = rtdbRef(rtdb, `game_chat/${gameId}`);
-  chatListener = onValue(rtdbChatRef, snap => {
+  // REST 폴링으로 채팅 수신 (1.5초 간격)
+  pollChat(gameId);
+  chatPollId = setInterval(() => pollChat(gameId), 1500);
+}
+
+async function pollChat(gameId) {
+  if (!currentUser) return;
+  try {
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(`${RTDB_CHAT_URL}/${gameId}.json?auth=${idToken}`);
+    if (!res.ok) return;
+    const data = await res.json();
     chatServerMsgs = [];
-    snap.forEach(child => chatServerMsgs.push({ id: child.key, ...child.val() }));
-    // 서버에 도착한 pending 메시지 제거
+    if (data) {
+      Object.entries(data).forEach(([key, val]) => chatServerMsgs.push({ id: key, ...val }));
+      chatServerMsgs.sort((a, b) => a.createdAt - b.createdAt);
+    }
     for (const [key, pd] of chatPendingMsgs) {
       if (chatServerMsgs.some(s => s.uid === pd.uid && s.createdAt === pd.createdAt)) {
         chatPendingMsgs.delete(key);
       }
     }
     renderChatMerged();
-  }, err => {
-    console.error('RTDB chat error:', err.code);
-    showToast('채팅 연결에 문제가 발생했습니다. 새로고침해주세요.', 'error');
-  });
+  } catch { /* ignore polling errors */ }
 }
 
 function renderChatMerged() {
@@ -932,9 +938,9 @@ function closeModal() {
     activeGameListener();
     activeGameListener = null;
   }
-  if (chatListener) {
-    chatListener();
-    chatListener = null;
+  if (chatPollId) {
+    clearInterval(chatPollId);
+    chatPollId = null;
   }
   chatHostUid = null;
   document.getElementById('chat-section').style.display = 'none';
