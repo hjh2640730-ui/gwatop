@@ -205,7 +205,12 @@ export async function onRequestPost(context) {
           }
         }
       }
-      await patchFirestoreDoc(`games/${gameId}`, { status: { stringValue: 'cancelled' } }, ['status'], accessToken);
+      await Promise.all([
+        patchFirestoreDoc(`games/${gameId}`, { status: { stringValue: 'cancelled' } }, ['status'], accessToken),
+        fetch(`${RTDB_BASE}/game_realtime/${gameId}/status.json?auth=${token}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify('cancelled'),
+        }).catch(() => {}),
+      ]);
       return json({ success: true, refunded });
     } catch (e) { return json({ error: e.message }, 500); }
   }
