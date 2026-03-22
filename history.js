@@ -20,6 +20,12 @@ let currentUid = null;
 let scrapData = [];
 let scrapFilter = 'all';
 let selectedScrapIds = new Set();
+let allQuizzes = [];
+let allDocuments = [];
+let selectedQuizIds = new Set();
+let selectedDocIds = new Set();
+let quizSelectMode = false;
+let docSelectMode = false;
 
 // ─── Init ───
 async function init() {
@@ -103,34 +109,105 @@ async function loadAll(uid) {
 
 // ─── Load Quizzes ───
 async function loadQuizzes(uid) {
+  allQuizzes = await getAllQuizzes(uid);
+  selectedQuizIds.clear();
+  quizSelectMode = false;
+  renderQuizGrid();
+}
+
+function renderQuizGrid() {
   const grid = document.getElementById('quizzes-grid');
   const empty = document.getElementById('quizzes-empty');
-  const quizzes = await getAllQuizzes(uid);
+  const actionBar = document.getElementById('quizzes-action-bar');
 
-  if (quizzes.length === 0) {
+  if (allQuizzes.length === 0) {
     grid.style.display = 'none';
     empty.style.display = '';
+    if (actionBar) actionBar.style.display = 'none';
     return;
   }
 
   grid.style.display = '';
   empty.style.display = 'none';
-  grid.innerHTML = quizzes.map(q => renderQuizCard(q)).join('');
+  grid.innerHTML = allQuizzes.map(q => renderQuizCard(q)).join('');
 
-  // Attach events
-  grid.querySelectorAll('[data-replay]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      try {
-        await replayQuiz(parseInt(btn.dataset.replay), btn.dataset.firestoreOnly === 'true');
-      } catch (e) {
-        console.error('replayQuiz error:', e);
-        showToast('퀴즈를 불러오는데 실패했습니다.', 'error');
-      }
+  if (quizSelectMode) {
+    grid.querySelectorAll('.history-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = Number(card.dataset.id);
+        if (selectedQuizIds.has(id)) selectedQuizIds.delete(id);
+        else selectedQuizIds.add(id);
+        renderQuizGrid();
+      });
     });
-  });
-  grid.querySelectorAll('[data-delete-quiz]').forEach(btn => {
-    btn.addEventListener('click', () => confirmDelete('quiz', parseInt(btn.dataset.deleteQuiz), `"${btn.dataset.name}" 퀴즈 결과를 삭제합니다.`));
-  });
+  } else {
+    grid.querySelectorAll('[data-replay]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await replayQuiz(parseInt(btn.dataset.replay), btn.dataset.firestoreOnly === 'true');
+        } catch (e) {
+          console.error('replayQuiz error:', e);
+          showToast('퀴즈를 불러오는데 실패했습니다.', 'error');
+        }
+      });
+    });
+    grid.querySelectorAll('[data-delete-quiz]').forEach(btn => {
+      btn.addEventListener('click', () => confirmDelete('quiz', parseInt(btn.dataset.deleteQuiz), `"${btn.dataset.name}" 퀴즈 결과를 삭제합니다.`));
+    });
+  }
+  renderQuizActionBar();
+}
+
+function renderQuizActionBar() {
+  let bar = document.getElementById('quizzes-action-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'quizzes-action-bar';
+    bar.className = 'scrap-action-bar';
+    document.getElementById('tab-quizzes-content').appendChild(bar);
+  }
+
+  if (allQuizzes.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+
+  if (quizSelectMode) {
+    const cnt = selectedQuizIds.size;
+    bar.className = `scrap-action-bar${cnt > 0 ? ' has-selection' : ''}`;
+    bar.innerHTML = cnt > 0
+      ? `<span class="scrap-action-info">${cnt}개 선택됨</span>
+         <button class="btn btn-danger btn-sm" id="quiz-del-selected">🗑 삭제</button>
+         <button class="btn btn-glass btn-sm" id="quiz-select-all-btn">전체 선택</button>
+         <button class="btn btn-ghost btn-sm" id="quiz-cancel-select">취소</button>`
+      : `<span class="scrap-action-info">삭제할 항목을 선택하세요</span>
+         <button class="btn btn-glass btn-sm" id="quiz-select-all-btn">전체 선택</button>
+         <button class="btn btn-ghost btn-sm" id="quiz-cancel-select">취소</button>`;
+    document.getElementById('quiz-del-selected')?.addEventListener('click', async () => {
+      for (const id of selectedQuizIds) await deleteQuiz(id);
+      allQuizzes = allQuizzes.filter(q => !selectedQuizIds.has(q.id));
+      selectedQuizIds.clear();
+      quizSelectMode = false;
+      renderQuizGrid();
+      showToast('선택한 퀴즈가 삭제됐습니다.', 'success');
+    });
+    document.getElementById('quiz-select-all-btn')?.addEventListener('click', () => {
+      if (selectedQuizIds.size === allQuizzes.length) selectedQuizIds.clear();
+      else allQuizzes.forEach(q => selectedQuizIds.add(q.id));
+      renderQuizGrid();
+    });
+    document.getElementById('quiz-cancel-select')?.addEventListener('click', () => {
+      selectedQuizIds.clear();
+      quizSelectMode = false;
+      renderQuizGrid();
+    });
+  } else {
+    bar.className = 'scrap-action-bar';
+    bar.innerHTML = `<span class="scrap-action-info">${allQuizzes.length}개의 퀴즈</span>
+      <button class="btn btn-glass btn-sm" id="quiz-edit-btn">편집</button>`;
+    document.getElementById('quiz-edit-btn')?.addEventListener('click', () => {
+      quizSelectMode = true;
+      renderQuizGrid();
+    });
+  }
 }
 
 function renderQuizCard(q) {
@@ -139,9 +216,25 @@ function renderQuizCard(q) {
   const score = q.score != null ? q.score : null;
   const scoreColor = score == null ? 'var(--text-secondary)' : score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
   const emoji = score == null ? '📝' : score >= 80 ? '🏆' : score >= 60 ? '🎯' : '📚';
+  const isSelected = quizSelectMode && selectedQuizIds.has(q.id);
+
+  if (quizSelectMode) {
+    return `
+      <div class="history-card${isSelected ? ' selected' : ''}" data-id="${q.id}" style="cursor:pointer">
+        <div class="scrap-sq-check-mark">✓</div>
+        <div class="history-card-icon">${emoji}</div>
+        <div class="history-card-title">${escapeHtml(q.docName || '문서')}</div>
+        <div class="history-card-meta">
+          <span class="history-meta-chip">${typeLabels[q.type] || '퀴즈'}</span>
+          <span class="history-meta-chip">${q.totalQuestions || q.questions?.length || 0}문제</span>
+          <span class="history-meta-chip">${date}</span>
+        </div>
+        ${score != null ? `<div class="history-card-score" style="color:${scoreColor}">${score}점</div>` : '<div style="font-size:13px;color:var(--text-muted)">미완료</div>'}
+      </div>`;
+  }
 
   return `
-    <div class="history-card">
+    <div class="history-card" data-id="${q.id}">
       <div class="history-card-icon">${emoji}</div>
       <div class="history-card-title">${escapeHtml(q.docName || '문서')}</div>
       <div class="history-card-meta">
@@ -162,41 +255,126 @@ function renderQuizCard(q) {
 
 // ─── Load Documents ───
 async function loadDocuments(uid) {
+  allDocuments = await getAllDocuments(uid);
+  selectedDocIds.clear();
+  docSelectMode = false;
+  renderDocGrid();
+}
+
+function renderDocGrid() {
   const grid = document.getElementById('documents-grid');
   const empty = document.getElementById('documents-empty');
-  const docs = await getAllDocuments(uid);
+  const actionBar = document.getElementById('documents-action-bar');
 
-  if (docs.length === 0) {
+  if (allDocuments.length === 0) {
     grid.style.display = 'none';
     empty.style.display = '';
+    if (actionBar) actionBar.style.display = 'none';
     return;
   }
 
   grid.style.display = '';
   empty.style.display = 'none';
-  grid.innerHTML = docs.map(d => renderDocCard(d)).join('');
+  grid.innerHTML = allDocuments.map(d => renderDocCard(d)).join('');
 
-  grid.querySelectorAll('[data-delete-doc]').forEach(btn => {
-    btn.addEventListener('click', () => confirmDelete('doc', parseInt(btn.dataset.deleteDoc), `"${btn.dataset.name}" 문서와 관련된 모든 퀴즈를 삭제합니다.`));
-  });
-
-  grid.querySelectorAll('[data-new-quiz]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const doc = await getDocument(parseInt(btn.dataset.newQuiz));
-      if (!doc) { showToast('문서를 불러올 수 없습니다.', 'error'); return; }
-      sessionStorage.setItem('gwatop_preload_doc', JSON.stringify({ id: doc.id, name: doc.name, text: doc.text, fileSize: doc.fileSize || 0 }));
-      window.location.href = '/create.html';
+  if (docSelectMode) {
+    grid.querySelectorAll('.history-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = Number(card.dataset.id);
+        if (selectedDocIds.has(id)) selectedDocIds.delete(id);
+        else selectedDocIds.add(id);
+        renderDocGrid();
+      });
     });
-  });
+  } else {
+    grid.querySelectorAll('[data-delete-doc]').forEach(btn => {
+      btn.addEventListener('click', () => confirmDelete('doc', parseInt(btn.dataset.deleteDoc), `"${btn.dataset.name}" 문서와 관련된 모든 퀴즈를 삭제합니다.`));
+    });
+    grid.querySelectorAll('[data-new-quiz]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const doc = await getDocument(parseInt(btn.dataset.newQuiz));
+        if (!doc) { showToast('문서를 불러올 수 없습니다.', 'error'); return; }
+        sessionStorage.setItem('gwatop_preload_doc', JSON.stringify({ id: doc.id, name: doc.name, text: doc.text, fileSize: doc.fileSize || 0 }));
+        window.location.href = '/create.html';
+      });
+    });
+  }
+  renderDocActionBar();
+}
+
+function renderDocActionBar() {
+  let bar = document.getElementById('documents-action-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'documents-action-bar';
+    bar.className = 'scrap-action-bar';
+    document.getElementById('tab-documents-content').appendChild(bar);
+  }
+
+  if (allDocuments.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+
+  if (docSelectMode) {
+    const cnt = selectedDocIds.size;
+    bar.className = `scrap-action-bar${cnt > 0 ? ' has-selection' : ''}`;
+    bar.innerHTML = cnt > 0
+      ? `<span class="scrap-action-info">${cnt}개 선택됨</span>
+         <button class="btn btn-danger btn-sm" id="doc-del-selected">🗑 삭제</button>
+         <button class="btn btn-glass btn-sm" id="doc-select-all-btn">전체 선택</button>
+         <button class="btn btn-ghost btn-sm" id="doc-cancel-select">취소</button>`
+      : `<span class="scrap-action-info">삭제할 항목을 선택하세요</span>
+         <button class="btn btn-glass btn-sm" id="doc-select-all-btn">전체 선택</button>
+         <button class="btn btn-ghost btn-sm" id="doc-cancel-select">취소</button>`;
+    document.getElementById('doc-del-selected')?.addEventListener('click', async () => {
+      for (const id of selectedDocIds) await deleteDocument(id);
+      allDocuments = allDocuments.filter(d => !selectedDocIds.has(d.id));
+      selectedDocIds.clear();
+      docSelectMode = false;
+      renderDocGrid();
+      showToast('선택한 문서가 삭제됐습니다.', 'success');
+    });
+    document.getElementById('doc-select-all-btn')?.addEventListener('click', () => {
+      if (selectedDocIds.size === allDocuments.length) selectedDocIds.clear();
+      else allDocuments.forEach(d => selectedDocIds.add(d.id));
+      renderDocGrid();
+    });
+    document.getElementById('doc-cancel-select')?.addEventListener('click', () => {
+      selectedDocIds.clear();
+      docSelectMode = false;
+      renderDocGrid();
+    });
+  } else {
+    bar.className = 'scrap-action-bar';
+    bar.innerHTML = `<span class="scrap-action-info">${allDocuments.length}개의 문서</span>
+      <button class="btn btn-glass btn-sm" id="doc-edit-btn">편집</button>`;
+    document.getElementById('doc-edit-btn')?.addEventListener('click', () => {
+      docSelectMode = true;
+      renderDocGrid();
+    });
+  }
 }
 
 function renderDocCard(d) {
   const date = new Date(d.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
   const size = formatSize(d.fileSize || 0);
   const previewText = (d.text || '').slice(0, 120).replace(/\s+/g, ' ') + '...';
+  const isSelected = docSelectMode && selectedDocIds.has(d.id);
+
+  if (docSelectMode) {
+    return `
+      <div class="history-card${isSelected ? ' selected' : ''}" data-id="${d.id}" style="cursor:pointer">
+        <div class="scrap-sq-check-mark">✓</div>
+        <div class="history-card-icon">📄</div>
+        <div class="history-card-title">${escapeHtml(d.name || '문서')}</div>
+        <div class="history-card-meta">
+          <span class="history-meta-chip">${size}</span>
+          <span class="history-meta-chip">${date}</span>
+        </div>
+      </div>`;
+  }
 
   return `
-    <div class="history-card">
+    <div class="history-card" data-id="${d.id}">
       <div class="history-card-icon">📄</div>
       <div class="history-card-title">${escapeHtml(d.name || '문서')}</div>
       <div class="history-card-meta">
