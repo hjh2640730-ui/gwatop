@@ -416,6 +416,8 @@ function loadRooms() {
     });
     const searchQuery = document.getElementById('room-search')?.value.trim() || '';
     renderRooms(filterRooms(searchQuery));
+  }, err => {
+    console.error('[loadRooms] RTDB 오류:', err.code, err.message);
   });
 }
 
