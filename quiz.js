@@ -79,17 +79,17 @@ async function init() {
   showArea('quiz');
   renderQuestion(0);
   setupControls();
+}
 
-  // 기존 스크랩 매칭 (중복 스크랩 방지)
-  if (data.uid) {
-    try {
-      const scraps = await getAllScraps(data.uid);
-      questions.forEach((q, idx) => {
-        const match = scraps.find(s => s.question === q.question);
-        if (match) scrappedMap.set(idx, match.id);
-      });
-    } catch {}
-  }
+async function loadExistingScraps(uid) {
+  if (!uid || !questions.length) return;
+  try {
+    const scraps = await getAllScraps(uid);
+    questions.forEach((q, idx) => {
+      const match = scraps.find(s => s.question === q.question);
+      if (match) scrappedMap.set(idx, match.id);
+    });
+  } catch {}
 }
 
 // ─── Nav ───
@@ -107,6 +107,7 @@ function setupNav() {
       applyAvatar(document.getElementById('nav-avatar'), user, userData);
       document.getElementById('nav-username').textContent = userData?.nickname || user.displayName || user.email || '';
       checkAndShowNicknameModal(user, userData);
+      loadExistingScraps(user.uid);
 
       // 백그라운드 나머지 문제 생성 시작
       if (pendingStreamingRemainder) {
@@ -769,6 +770,15 @@ async function toggleScrap() {
     scrappedMap.delete(idx);
     showToast('스크랩이 해제됐습니다.', 'info');
   } else {
+    // 중복 스크랩 방지: 이미 같은 문제가 스크랩되어 있는지 확인
+    const existingScraps = await getAllScraps(currentUser.uid);
+    const dup = existingScraps.find(s => s.question === q.question);
+    if (dup) {
+      scrappedMap.set(idx, dup.id);
+      showToast('이미 스크랩된 문제입니다.', 'info');
+      updateScrapBtn(idx);
+      return;
+    }
     const id = await scrapQuestion(currentUser.uid, {
       question: q.question,
       type: q.type,
