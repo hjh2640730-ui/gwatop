@@ -837,16 +837,20 @@ function openChat(gameId) {
 
   const doSend = async () => {
     const text = input.value.trim();
+    console.log('[chat] doSend called', { text: !!text, uid: currentUser?.uid, gameId });
     if (!text || !currentUser) return;
     input.value = '';
     try {
-      await rtdbPush(rtdbRef(rtdb, `game_chat/${gameId}`), {
+      const ref = rtdbRef(rtdb, `game_chat/${gameId}`);
+      console.log('[chat] pushing to', ref.toString());
+      await rtdbPush(ref, {
         uid: currentUser.uid,
         name: currentUserData?.nickname || currentUser.displayName || '익명',
         text: text.slice(0, 100),
         createdAt: Date.now(),
       });
-    } catch (e) { console.error('chat send error', e); showToast('채팅 전송 실패', 'error'); }
+      console.log('[chat] push SUCCESS');
+    } catch (e) { console.error('[chat] push FAILED', e); showToast('채팅 전송 실패', 'error'); }
   };
 
   sendBtn.onclick = () => doSend();
@@ -856,6 +860,7 @@ function openChat(gameId) {
   chatListener = onValue(rtdbChatRef, snap => {
     const messages = [];
     snap.forEach(child => messages.push({ id: child.key, ...child.val() }));
+    console.log('[chat] onValue fired, messages:', messages.length, messages.map(m => m.uid));
     renderMessages(messages);
   }, err => {
     console.error('RTDB chat error:', err.code);
