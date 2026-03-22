@@ -863,7 +863,9 @@ function openChat(gameId) {
       const res = await fetch(`${RTDB_CHAT_URL}/${gameId}.json?auth=${idToken}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(msgData),
       });
-      if (!res.ok) throw new Error(`REST ${res.status}`);
+      const body = await res.text();
+      console.log('[chat] REST response:', res.status, body);
+      if (!res.ok) throw new Error(`REST ${res.status}: ${body}`);
     } catch (e) {
       console.error('chat send error', e);
       showToast('채팅 전송 실패', 'error');
