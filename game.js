@@ -24,6 +24,7 @@ let pendingPollingId = null;
 let countdownInterval = null;
 let allRoomDocs = [];
 let chatListener = null;
+let chatHostUid = null;
 let pendingJoinGameId = null;
 let resultShown = false;
 
@@ -559,6 +560,7 @@ function syncModal(game, isP1) {
   document.getElementById('c-wager').textContent = game.wager;
 
   if (game.status === 'ready') {
+    chatHostUid = game.player1?.uid || null;
     document.getElementById('chat-section').style.display = '';
 
     // VS display
@@ -884,8 +886,12 @@ function renderMessages(messages) {
   }
   container.innerHTML = messages.map(m => {
     const isMine = m.uid === currentUser?.uid;
-    const name = isMine ? '' : `<span class="chat-msg-name">${escapeHtml(m.name || '익명')}</span>`;
-    return `<div class="chat-msg ${isMine ? 'mine' : 'other'}">${name}<div class="chat-bubble">${escapeHtml(m.text)}</div></div>`;
+    const isHost = m.uid === chatHostUid;
+    const hostBadge = isHost ? '<span class="chat-host-badge">👑</span>' : '';
+    const nameTag = isMine
+      ? (isHost ? `<span class="chat-msg-name">${hostBadge}나</span>` : '')
+      : `<span class="chat-msg-name">${hostBadge}${escapeHtml(m.name || '익명')}</span>`;
+    return `<div class="chat-msg ${isMine ? 'mine' : 'other'}">${nameTag}<div class="chat-bubble">${escapeHtml(m.text)}</div></div>`;
   }).join('');
   container.scrollTop = container.scrollHeight;
 }
@@ -907,6 +913,7 @@ function closeModal() {
     chatListener();
     chatListener = null;
   }
+  chatHostUid = null;
   document.getElementById('chat-section').style.display = 'none';
   if (handScene) { handScene.dispose(); handScene = null; }
   activeGameId = null;
