@@ -484,7 +484,7 @@ function loadRooms() {
     snap.forEach(child => {
       const g = child.val();
       if (!g.status || g.status === 'finished' || g.status === 'cancelled') return;
-      if (g.status === 'waiting' && g.createdAt && now - g.createdAt > 10 * 60 * 1000) return;
+      if (g.createdAt && now - g.createdAt > 15 * 60 * 1000) return;
       allRoomDocs.push({ id: child.key, data: () => g });
     });
     allRoomDocs.sort((a, b) => {
