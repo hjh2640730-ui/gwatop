@@ -180,7 +180,7 @@ export async function addReferralCredit(referrerUid) {
     if (!snap.exists()) return;
     const data = snap.data();
     const referralCredits = data.referralCredits ?? 0;
-    if (referralCredits >= 3) return; // 최대 3회 제한
+    if (referralCredits >= 10) return; // 최대 10회 제한
     await updateDoc(ref, {
       freePoints: increment(5),
       referralCredits: increment(1)
