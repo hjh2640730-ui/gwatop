@@ -229,9 +229,14 @@ export async function scrapQuestion(uid, questionData) {
   // 중복 방지: 같은 유저의 같은 문제가 이미 있으면 기존 ID 반환
   if (uid) {
     const existing = await txGetAll(STORE_SCRAPS, 'uid', uid);
-    const dup = existing.find(s => s.question === questionData.question && s.answer === questionData.answer);
-    if (dup) return dup.id;
+    console.log('[scrap] existing scraps:', existing.length, 'checking question:', questionData.question?.slice(0, 30));
+    const dup = existing.find(s => {
+      console.log('[scrap] compare:', s.question?.slice(0, 30), '===', questionData.question?.slice(0, 30), s.question === questionData.question);
+      return s.question === questionData.question && s.answer === questionData.answer;
+    });
+    if (dup) { console.log('[scrap] DUPLICATE found, returning existing id:', dup.id); return dup.id; }
   }
+  console.log('[scrap] NEW scrap, saving...');
   return txAdd(STORE_SCRAPS, {
     uid: uid || null,
     question: questionData.question,
