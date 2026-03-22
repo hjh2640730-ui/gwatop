@@ -226,6 +226,12 @@ export async function deleteQuiz(id) {
 
 // ─── Scraps ───
 export async function scrapQuestion(uid, questionData) {
+  // 중복 방지: 같은 유저의 같은 문제가 이미 있으면 기존 ID 반환
+  if (uid) {
+    const existing = await txGetAll(STORE_SCRAPS, 'uid', uid);
+    const dup = existing.find(s => s.question === questionData.question && s.answer === questionData.answer);
+    if (dup) return dup.id;
+  }
   return txAdd(STORE_SCRAPS, {
     uid: uid || null,
     question: questionData.question,
