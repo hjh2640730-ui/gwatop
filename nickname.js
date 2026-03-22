@@ -10,38 +10,32 @@ const ICON_OPTIONS = ['😀','😎','🤓','🧐','😇','🤠','👻','🐱','�
 
 function injectModal() {
   if (document.getElementById(MODAL_ID)) return;
-  const el = document.createElement('div');
-  el.innerHTML = `
-    <div class="modal-overlay" id="${MODAL_ID}" style="z-index:200">
-      <div class="modal" style="max-width:420px">
-        <div class="modal-icon" id="nickname-preview-icon" style="cursor:pointer;transition:transform 0.2s">😀</div>
-        <h2 class="modal-title">프로필 설정</h2>
-        <p class="modal-desc" style="margin-bottom:16px">아이콘과 닉네임을 설정하세요.<br/><span style="font-size:13px;color:var(--text-muted)">한글·영문·숫자, 2~16자</span></p>
-        <div id="nickname-icon-grid" style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-bottom:16px;max-height:120px;overflow-y:auto;padding:8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-md);">
-          ${ICON_OPTIONS.map((e, i) => `<button class="nick-icon-btn${i === 0 ? ' selected' : ''}" data-icon="${e}" style="font-size:22px;padding:4px;border:2px solid transparent;border-radius:8px;background:none;cursor:pointer;transition:all 0.15s;line-height:1">${e}</button>`).join('')}
-        </div>
-        <input
-          id="nickname-input"
-          type="text"
-          maxlength="16"
-          placeholder="닉네임 입력"
-          style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:14px 18px;font-family:var(--font);font-size:16px;font-weight:600;color:var(--text-primary);outline:none;text-align:center;transition:border-color 0.2s;box-sizing:border-box;"
-        />
-        <div id="nickname-msg" style="min-height:20px;font-size:13px;margin-top:8px;text-align:center;"></div>
-        <div class="modal-actions" style="margin-top:20px">
-          <button class="btn btn-primary btn-lg" id="nickname-save-btn" style="flex:1" disabled>저장</button>
-        </div>
+  if (!document.getElementById('nick-icon-style')) {
+    const s = document.createElement('style');
+    s.id = 'nick-icon-style';
+    s.textContent = '.nick-icon-btn:hover{background:rgba(124,58,237,0.15)!important;transform:scale(1.15)}.nick-icon-btn.selected{border-color:#a78bfa!important;background:rgba(124,58,237,0.2)!important}';
+    document.head.appendChild(s);
+  }
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = MODAL_ID;
+  overlay.style.zIndex = '200';
+  overlay.innerHTML = `
+    <div class="modal" style="max-width:420px">
+      <div class="modal-icon" id="nickname-preview-icon" style="cursor:pointer;transition:transform 0.2s">😀</div>
+      <h2 class="modal-title">프로필 설정</h2>
+      <p class="modal-desc" style="margin-bottom:16px">아이콘과 닉네임을 설정하세요.<br/><span style="font-size:13px;color:var(--text-muted)">한글·영문·숫자, 2~16자</span></p>
+      <div id="nickname-icon-grid" style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-bottom:16px;max-height:120px;overflow-y:auto;padding:8px;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-md);">
+        ${ICON_OPTIONS.map((e, i) => `<button type="button" class="nick-icon-btn${i === 0 ? ' selected' : ''}" data-icon="${e}" style="font-size:22px;padding:4px;border:2px solid transparent;border-radius:8px;background:none;cursor:pointer;transition:all 0.15s;line-height:1">${e}</button>`).join('')}
       </div>
-    </div>
-    <style>
-      .nick-icon-btn:hover { background:rgba(124,58,237,0.15) !important; transform:scale(1.15); }
-      .nick-icon-btn.selected { border-color:#a78bfa !important; background:rgba(124,58,237,0.2) !important; }
-    </style>
-  `;
-  document.body.appendChild(el.firstElementChild);
-  // style도 추가
-  const styleEl = el.querySelector('style');
-  if (styleEl) document.head.appendChild(styleEl);
+      <input id="nickname-input" type="text" maxlength="16" placeholder="닉네임 입력"
+        style="width:100%;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:var(--radius-md);padding:14px 18px;font-family:var(--font);font-size:16px;font-weight:600;color:var(--text-primary);outline:none;text-align:center;transition:border-color 0.2s;box-sizing:border-box;" />
+      <div id="nickname-msg" style="min-height:20px;font-size:13px;margin-top:8px;text-align:center;"></div>
+      <div class="modal-actions" style="margin-top:20px">
+        <button class="btn btn-primary btn-lg" id="nickname-save-btn" style="flex:1" disabled>저장</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
 }
 
 export function checkAndShowNicknameModal(user, userData) {

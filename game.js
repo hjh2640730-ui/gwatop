@@ -3,6 +3,7 @@
 // ============================================================
 
 import { createHandScene } from './hand3d.js';
+import { checkAndShowNicknameModal } from './nickname.js';
 import { signInWithGoogle, signInWithKakao, signInWithNaver, logOut, onUserChange, ensureUserDoc } from './auth.js';
 import { db, rtdb } from './auth.js';
 import {
@@ -75,6 +76,7 @@ function init() {
       document.getElementById('nav-credits').textContent = userData?.credits ?? 0;
       document.getElementById('my-fp').textContent = (userData?.freePoints ?? 0) + 'P';
       checkActiveGame();
+      checkAndShowNicknameModal(user, userData);
     } else {
       lo.style.display = '';
       li.style.display = 'none';
