@@ -56,6 +56,15 @@ export async function onRequestPost(context) {
   if (!rewardAmount) return json({ error: '보상 금액이 없습니다' }, 400);
   const msgUpdateTime = msgDoc.updateTime; // for precondition on inbox messages
 
+  // 1.5 전체 메시지: 유저 가입일 이전 메시지는 수령 불가
+  if (messageType === 'global') {
+    const msgCreatedAt = f.createdAt?.timestampValue ? new Date(f.createdAt.timestampValue).getTime() : 0;
+    const userCreatedAt = user.createdAt ? parseInt(user.createdAt) : 0;
+    if (msgCreatedAt && userCreatedAt && msgCreatedAt < userCreatedAt) {
+      return json({ error: '가입 이전에 발송된 메시지입니다' }, 403);
+    }
+  }
+
   // 2. 중복 수령 확인
   if (messageType === 'global') {
     const claimedRes = await fetch(`${BASE}/users/${uid}/claimed/${messageId}`, {

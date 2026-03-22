@@ -160,10 +160,15 @@ async function renderInbox(user) {
     ]);
 
     const claimedIds = new Set(claimedSnap.docs.map(d => d.id));
+    const userCreated = user.metadata?.creationTime ? new Date(user.metadata.creationTime).getTime() : 0;
     const messages = [];
 
     inboxSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'inbox', ...d.data() }));
-    globalSnap.docs.forEach(d => messages.push({ id: d.id, messageType: 'global', claimed: claimedIds.has(d.id), ...d.data() }));
+    globalSnap.docs.forEach(d => {
+      const data = d.data();
+      const msgTime = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : new Date(data.createdAt || 0).getTime();
+      if (msgTime >= userCreated) messages.push({ id: d.id, messageType: 'global', claimed: claimedIds.has(d.id), ...data });
+    });
 
     messages.sort((a, b) => {
       const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
